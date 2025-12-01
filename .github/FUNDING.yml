@@ -1,0 +1,11 @@
+# Configuration des plateformes de dons pour PhotoOrganizer
+# Développé par Kiriiaq
+
+# GitHub Sponsors
+github: [Kiriiaq]
+
+# Ko-fi (plateforme principale de dons)
+ko_fi: kiriiaq
+
+# Custom links
+custom: ["https://ko-fi.com/kiriiaq"]

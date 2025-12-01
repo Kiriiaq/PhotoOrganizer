@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(python test_imports.py:*)",
+      "Bash(pip install:*)",
+      "Bash(exiftool:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://exiftool.org/exiftool-12.70.zip'' -OutFile ''D:\\#Bureau\\PhotoOrganizerV5\\exiftool.zip''\")",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://exiftool.org/exiftool-13.10.zip'' -OutFile ''D:\\#Bureau\\PhotoOrganizerV5\\exiftool.zip''\")",
+      "Bash(powershell -Command \"$ProgressPreference = ''SilentlyContinue''; Invoke-WebRequest -Uri ''https://exiftool.org/exiftool-12.96_64.zip'' -OutFile ''D:\\#Bureau\\PhotoOrganizerV5\\exiftool.zip'' -UseBasicParsing\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python download_exiftool.py:*)",
+      "Bash(python:*)",
+      "Bash(./exiftool.exe:*)",
+      "Bash(set PATH=%PATH%)",
+      "Bash(D:#BureauPhotoOrganizerV5)",
+      "Bash(pyinstaller:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(timeout 3 python:*)",
+      "Bash(echo:*)",
+      "Bash(timeout 5 ./:*)",
+      "Bash(timeout 10:*)",
+      "Bash(timeout 8 python:*)",
+      "Bash(timeout 15 python:*)",
+      "Bash(dir:*)",
+      "Bash(del AMELIORATIONS_CONTROLES.md AMELIORATIONS_FINALES.md BUGFIXES.md CONSOLIDATION_SUMMARY.md FIXES_APPLIED.md INSTRUCTIONS_TEST.md RESOLUTION_PROBLEME_AFFICHAGE.md)",
+      "Bash(timeout:*)",
+      "Bash(./PhotoManager.exe)",
+      "Bash(del resourcesiconsicon_new.ico create_icon.py)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
