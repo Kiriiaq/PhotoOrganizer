@@ -32,7 +32,10 @@
       "Bash(del resourcesiconsicon_new.ico create_icon.py)",
       "Bash(git init:*)",
       "Bash(git config:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []
