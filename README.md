@@ -1,150 +1,152 @@
-# 📸 PhotoOrganizer
+# PhotoOrganizer - Free Photo Organization Software
 
-**Version 1.0** - Outil professionnel pour organiser, analyser et gérer vos collections de photos
+> **Automatic photo sorting and EXIF metadata extraction tool** - Organize thousands of photos by date, camera, or GPS location in seconds.
 
-![Python](https://img.shields.io/badge/python-3.11+-green.svg) ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg) ![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)
-
----
-
-## ✨ Fonctionnalités
-
-### 📊 Analyse Complète
-- **45 formats supportés** : Images (JPG, PNG, HEIC, etc.), RAW (CR2, NEF, RW2, etc.), Vidéos (MP4, MOV, etc.)
-- **Extraction EXIF complète** : Date, appareil photo, GPS, dimensions
-- **Statistiques détaillées** : Distribution par type, date, appareil, localisation
-- **Recommandations intelligentes** : Suggestions d'organisation basées sur vos données
-
-### 🗂️ Organisation Intelligente
-- **Par date** : AAAA-MM-JJ ou AAAA/MM/JJ
-- **Par appareil photo** : Canon EOS 5D, LUMIX GH5, etc.
-- **Par localisation GPS** : Coordonnées géographiques
-- **Organisation multicouche** : Combinez plusieurs critères
-- **Copier ou déplacer** : Préservez vos originaux
-
-### 🎨 Interface Moderne
-- **CustomTkinter** : Interface élégante et professionnelle
-- **Barre de progression** : Suivi en temps réel
-- **Fenêtre de résultats** : Affichage détaillé avec scroll
-- **Contrôles intuitifs** : Analyser, Organiser, Annuler
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases/tag/v1.0.0)
+[![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases)
+[![License](https://img.shields.io/badge/license-MIT%20+%20Commons%20Clause-orange.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases/tag/v1.0.0)
 
 ---
 
-## 🚀 Installation et Utilisation
+## What is PhotoOrganizer?
 
-### Exécutable Windows (Recommandé)
-```bash
-1. Aller dans: dist\
-2. Double-cliquer sur: PhotoManager.exe
-3. C'est tout! L'application se lance
-```
+**PhotoOrganizer** is a **free photo organization software** designed to help photographers and enthusiasts manage large photo collections efficiently. It automatically sorts photos using **EXIF metadata extraction**, organizing files by date, camera model, or GPS coordinates.
 
-### Mode Python
+### The Problem It Solves
+
+- **Messy photo libraries** with thousands of unsorted images
+- **Time-consuming manual sorting** of photos from multiple cameras
+- **Lost photos** buried in unorganized folders
+- **No easy way to sort RAW files** alongside JPEGs
+
+### The Solution
+
+PhotoOrganizer provides **automatic photo sorting** with support for **45 file formats** including RAW files (CR2, NEF, RW2, ARW, DNG). Simply point it at your photo folder and let it organize everything in seconds.
+
+---
+
+## Key Features
+
+### Complete Photo Analysis
+- **45 supported formats**: Images (JPG, PNG, HEIC), RAW (CR2, NEF, RW2, DNG), Videos (MP4, MOV)
+- **Full EXIF extraction**: Date, camera model, GPS coordinates, dimensions
+- **Detailed statistics**: Distribution by type, date, camera, location
+- **Smart recommendations**: Organization suggestions based on your data
+
+### Intelligent Organization
+- **By date**: YYYY-MM-DD or YYYY/MM/DD folder structure
+- **By camera**: Canon EOS 5D, LUMIX GH5, iPhone, etc.
+- **By GPS location**: Geographic coordinates
+- **Multi-layer sorting**: Combine multiple criteria (e.g., Date > Camera)
+- **Copy or move**: Preserve your originals or relocate files
+
+### Modern Interface
+- **CustomTkinter UI**: Clean, professional dark/light theme
+- **Progress tracking**: Real-time progress bar
+- **Scrollable results**: Detailed analysis with icons
+- **Cancel operation**: Stop any operation instantly
+
+---
+
+## Quick Start
+
+### Windows Executable (Recommended)
+
+1. **Download** [PhotoManager.exe](https://github.com/Kiriiaq/PhotoOrganizer/releases/download/v1.0.0/PhotoManager.exe) from the latest release
+2. **Run** the executable - no installation required
+3. **Select** your photo folder and start organizing
+
+### Python Installation
+
 ```bash
-# Installer les dépendances
+# Clone the repository
+git clone https://github.com/Kiriiaq/PhotoOrganizer.git
+cd PhotoOrganizer
+
+# Install dependencies
 pip install customtkinter exifread piexif Pillow darkdetect
 
-# Lancer l'application
-cd PhotoOrganizerV5
+# Run the application
 python main.py
 ```
 
 ---
 
-## 📖 Guide d'Utilisation
+## How to Use
 
-### Analyser des Fichiers
+### 1. Analyze Your Photos
 
-1. **Sélectionner le dossier source**
-   - Cliquer sur "Parcourir" à côté de "Dossier source"
-   - Choisir le dossier contenant vos photos
+1. Click **"Browse"** to select your photo folder
+2. Choose file types: Images, RAW, Videos
+3. Enable **"Recursive search"** for subfolders
+4. Click **"Analyze files"**
 
-2. **Choisir les types de fichiers**
-   - ☑ Images (.jpg, .jpeg, .png, etc.)
-   - ☑ RAW (.raw, .arw, .cr2, .nef, .rw2, .dng, etc.)
-   - ☑ Vidéos (.mp4, .mov, .avi, etc.)
-   - ☑ Recherche récursive (inclure les sous-dossiers)
+**Results include:**
+- Total file count and types
+- Date distribution (year, month)
+- Camera models detected
+- GPS data availability
+- Organization recommendations
 
-3. **Lancer l'analyse**
-   - Cliquer sur **"Analyser les fichiers"**
-   - Attendre la progression (peut prendre 30-60s pour 600+ fichiers)
-   - Consulter les résultats dans la fenêtre modale
+### 2. Organize Your Photos
 
-**Résultats affichés:**
-- 📁 Nombre total de fichiers
-- 📷 Types de fichiers et extensions les plus courantes
-- 📅 Distribution par date (année, mois)
-- 📸 Appareils photo détectés
-- 🌍 Données GPS disponibles
-- 💡 Recommandations d'organisation
+1. Select **source** and **destination** folders
+2. Choose organization criteria:
+   - By date (YYYY-MM-DD)
+   - By camera model
+   - By GPS location
+3. Enable **"Multi-layer organization"** to combine criteria
+4. Choose **"Copy instead of move"** to preserve originals
+5. Click **"Organize files"**
 
----
-
-### Organiser des Fichiers
-
-1. **Sélectionner les dossiers**
-   - **Source** : Dossier contenant vos photos à organiser
-   - **Destination** : Dossier où seront copiées/déplacées les photos
-
-2. **Choisir les critères d'organisation**
-   - ☑ **Par date** : Organiser par AAAA-MM-JJ ou AAAA/MM/JJ
-   - ☑ **Par appareil photo** : Créer des dossiers par appareil
-   - ☑ **Par emplacement** : Organiser selon les coordonnées GPS
-
-3. **Options avancées**
-   - ☑ **Organisation multicouche** : Combiner plusieurs critères
-   - ☑ **Copier au lieu de déplacer** : Préserver les fichiers originaux
-   - Glisser-déposer pour définir l'ordre des critères
-
-4. **Lancer l'organisation**
-   - Cliquer sur **"Organiser les fichiers"**
-   - Consulter le rapport d'organisation
-
-**Exemple de résultat:**
+**Example output structure:**
 ```
-Destination\
-├── 2024-10\
-│   ├── Canon EOS 5D\
+Destination/
+├── 2024-10/
+│   ├── Canon EOS 5D/
 │   │   ├── IMG_0001.jpg
 │   │   └── IMG_0002.CR2
-│   └── LUMIX GH5\
+│   └── LUMIX GH5/
 │       ├── P1200001.RW2
 │       └── P1200002.JPG
-└── 2024-11\
-    └── Canon EOS 5D\
-        └── IMG_0003.jpg
+└── 2024-11/
+    └── iPhone 15 Pro/
+        └── IMG_0003.HEIC
 ```
 
 ---
 
-### Annuler une Opération
-
-- Cliquer sur **"Annuler l'opération"** (bouton rouge)
-- L'opération s'arrête immédiatement
-- Les boutons sont automatiquement réactivés
-
----
-
-## 📦 Formats Supportés (45 formats)
+## Supported Formats (45 Total)
 
 ### Images (15)
 `.jpg` `.jpeg` `.png` `.gif` `.bmp` `.tiff` `.tif` `.webp` `.heic` `.heif` `.svg` `.psd` `.jfif` `.jp2` `.avif`
 
-### RAW (17)
+### RAW Files (17)
 `.raw` `.arw` `.cr2` `.cr3` `.nef` `.orf` `.rw2` `.dng` `.3fr` `.raf` `.pef` `.srw` `.sr2` `.x3f` `.mef` `.iiq` `.rwl`
 
-### Vidéos (13)
+### Videos (13)
 `.mp4` `.mov` `.avi` `.mkv` `.wmv` `.flv` `.webm` `.3gp` `.m4v` `.mpg` `.mpeg` `.mts` `.ts` `.vob`
 
 ---
 
-## 🛠️ Créer l'Exécutable
+## System Requirements
 
-### Avec PyInstaller
+- **OS**: Windows 10/11
+- **Python**: 3.11+ (for source installation)
+- **RAM**: 4GB minimum, 8GB recommended
+- **Disk**: ~150MB for executable
+
+---
+
+## Building from Source
+
 ```bash
-# Installer PyInstaller
+# Install PyInstaller
 pip install pyinstaller
 
-# Créer l'exécutable
+# Build the executable
 pyinstaller --noconfirm --onefile --windowed --name "PhotoManager" \
   --hidden-import "PIL._tkinter_finder" \
   --hidden-import "customtkinter" \
@@ -153,163 +155,140 @@ pyinstaller --noconfirm --onefile --windowed --name "PhotoManager" \
   --hidden-import "piexif" \
   main.py
 
-# L'exécutable se trouve dans: dist\PhotoManager.exe
+# Output: dist/PhotoManager.exe (~100MB)
 ```
 
-**Caractéristiques de l'exécutable:**
-- Taille: ~101 MB
-- Mode fenêtré (sans console)
-- Autonome (toutes dépendances incluses)
-- Portable (pas d'installation requise)
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| No files found | Check folder path, enable correct file types, enable recursive search |
+| Results not showing | Wait for 100% completion, check console for errors |
+| Organization fails | Verify destination folder exists, check write permissions |
+| Slow performance | Large folders (10k+ files) may take 1-2 minutes |
 
 ---
 
-## 🔧 Dépannage
+## Contributing
 
-### Problème: Aucun fichier trouvé
-**Solutions:**
-- Vérifier que le dossier source existe
-- Cocher les bonnes cases (Images/RAW/Vidéos)
-- Activer "Recherche récursive" si photos dans sous-dossiers
+Contributions are welcome! Please:
 
-### Problème: Les résultats ne s'affichent pas
-**Solutions:**
-- Attendre la fin de l'analyse (100%)
-- Vérifier qu'il n'y a pas d'erreur dans la console
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-### Problème: L'organisation ne fonctionne pas
-**Solutions:**
-- Vérifier qu'un dossier de destination est sélectionné
-- Vérifier qu'au moins un critère est coché
-- Vérifier les permissions d'écriture
+### Report Issues
 
----
-
-## 🤝 Contribuer
-
-Les contributions sont les bienvenues! Pour contribuer:
-
-1. Fork le projet
-2. Créez une branche (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrez une Pull Request
-
-### Signaler un Bug
-Ouvrez une [issue GitHub](https://github.com/Kiriiaq/PhotoOrganizer/issues) avec:
-- Description du bug
-- Étapes pour reproduire
-- Comportement attendu
-- Version Python et OS
-
-### Contact
-📧 Email: manugrolleau48@gmail.com
-☕ Ko-fi: https://ko-fi.com/kiriiaq
+Open a [GitHub Issue](https://github.com/Kiriiaq/PhotoOrganizer/issues) with:
+- Bug description
+- Steps to reproduce
+- Expected vs actual behavior
+- Python version and OS
 
 ---
 
-## 📋 Historique des Versions
+## Changelog
 
-### Version 1.0 (2025-12-01) - Stable
-**Nouveautés:**
-- ✅ Interface moderne avec CustomTkinter
-- ✅ Analyse complète avec 45 formats
-- ✅ Fenêtre de résultats défilable avec icônes
-- ✅ Organisation multicouche
-- ✅ Verrouillage des boutons pendant opérations
-- ✅ Bouton annulation fonctionnel
-- ✅ Exécutable Windows autonome
+### v1.0.0 (2025-12-14) - Initial Stable Release
 
-**Corrections:**
-- ✅ Ajout de `ProgressManager.reset()`
-- ✅ Correction import `datetime`
-- ✅ Création des widgets de progression
-- ✅ Ajout de `ScrollableFrame` manquante
-- ✅ Réactivation boutons après annulation
+**Features:**
+- Modern CustomTkinter interface with dark/light theme
+- Complete EXIF metadata extraction
+- 45 supported file formats (Images, RAW, Videos)
+- Multi-layer organization (Date > Camera > GPS)
+- Copy or move operations
+- Progress tracking with cancel button
+- Scrollable results window
+- Standalone Windows executable
 
 ---
 
-## 💻 Architecture Technique
+## Project Structure
 
-### Structure du Projet
 ```
-PhotoOrganizerV5/
-├── main.py                  # Point d'entrée
+PhotoOrganizer/
+├── main.py                  # Entry point
+├── src/
+│   └── version.py           # Version info
 ├── core/
-│   ├── file_operations.py   # Opérations sur fichiers
-│   └── metadata.py          # Extraction EXIF
+│   ├── file_operations.py   # File operations
+│   ├── metadata.py          # EXIF extraction
+│   └── format_conversion.py # Format handling
 ├── gui/
-│   ├── app.py              # Application principale
-│   └── frames/
-│       └── file_organization_frame.py  # Interface
+│   ├── app.py               # Main application
+│   ├── frames/
+│   │   └── file_organization_frame.py
+│   └── widgets/
+│       └── scrollable_frame.py
 ├── utils/
-│   ├── config_manager.py   # Configuration
-│   ├── file_utils.py       # Utilitaires fichiers
-│   ├── progress_utils.py   # Gestion progression
-│   └── ui_utils.py         # Interface (ScrollableFrame)
+│   ├── config_manager.py    # Configuration
+│   ├── file_utils.py        # File utilities
+│   ├── progress_utils.py    # Progress management
+│   └── ui_utils.py          # UI helpers
 └── dist/
-    └── PhotoManager.exe    # Exécutable (101 MB)
+    └── PhotoManager.exe     # Windows executable
 ```
-
-### Technologies
-- **Python 3.11+** - Langage principal
-- **CustomTkinter** - Interface moderne
-- **ExifRead** - Extraction EXIF
-- **Piexif** - Manipulation EXIF
-- **Pillow** - Traitement images
-- **DarkDetect** - Détection thème système
-- **PyInstaller** - Création exécutable
 
 ---
 
-## 📄 Licence
+## License
 
-Ce projet est sous **licence MIT avec Commons Clause** - voir le fichier [LICENSE](LICENSE) pour les détails complets.
+This project is licensed under **MIT License with Commons Clause**.
 
-### Résumé de la Licence
+**You CAN:**
+- Use the software for free (personal and internal commercial use)
+- Modify the source code
+- Distribute the software
+- Create derivative works
+- Contribute to the project
 
-**MIT License + Commons Clause**
+**You CANNOT:**
+- Sell the software itself
+- Sell hosted services primarily based on this software
+- Charge for support/consulting where the primary value is this software
 
-✅ **Ce que vous POUVEZ faire:**
-- Utiliser le logiciel gratuitement (usage personnel et commercial interne)
-- Modifier le code source
-- Distribuer le logiciel
-- Créer des œuvres dérivées
-- Contribuer au projet
-
-❌ **Ce que vous NE POUVEZ PAS faire:**
-- Vendre le logiciel lui-même
-- Vendre des services hébergés basés principalement sur ce logiciel
-- Facturer pour du support/consulting où la valeur principale est ce logiciel
-
-**En résumé:** Gratuit pour tous usages sauf la vente directe du logiciel ou de services basés dessus.
-
-```
-MIT License with Commons Clause - Copyright (c) 2025 PhotoOrganizer
-
-Permission is granted for free use, modification, and distribution,
-but NOT for selling the software or software-as-a-service offerings.
-```
-
-Voir [LICENSE](LICENSE) pour tous les détails et exemples d'utilisation autorisée.
+See [LICENSE](LICENSE) for full details.
 
 ---
 
-## 🙏 Remerciements
+## Support the Project
 
-- **CustomTkinter** - Interface moderne
-- **ExifRead** - Extraction métadonnées
-- **Pillow** - Manipulation images
-- **Communauté Python** - Bibliothèques incroyables
+If PhotoOrganizer helps you organize your photos, consider supporting development:
+
+- [Ko-fi](https://ko-fi.com/kiriiaq) - Buy me a coffee
+- [GitHub Stars](https://github.com/Kiriiaq/PhotoOrganizer) - Star the repository
+- [Share](https://twitter.com/intent/tweet?text=Check%20out%20PhotoOrganizer%20-%20Free%20photo%20organization%20software%20with%20EXIF%20metadata%20extraction!%20https://github.com/Kiriiaq/PhotoOrganizer) - Tell others about it
+
+---
+
+## Contact
+
+- **Author**: Kiriiaq
+- **Email**: manugrolleau48@gmail.com
+- **Ko-fi**: [https://ko-fi.com/kiriiaq](https://ko-fi.com/kiriiaq)
+- **GitHub**: [https://github.com/Kiriiaq/PhotoOrganizer](https://github.com/Kiriiaq/PhotoOrganizer)
+
+---
+
+## Acknowledgments
+
+- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) - Modern Tkinter UI
+- [ExifRead](https://github.com/ianare/exif-py) - EXIF metadata extraction
+- [Pillow](https://python-pillow.org/) - Image processing
+- [PyInstaller](https://pyinstaller.org/) - Executable creation
 
 ---
 
 <div align="center">
 
-**Développé avec ❤️ pour la communauté photo**
+**PhotoOrganizer** - Free Photo Organization Software
 
-Par Kiriiaq - [Ko-fi](https://ko-fi.com/kiriiaq) | [Email](mailto:manugrolleau48@gmail.com)
+Developed by [Kiriiaq](https://github.com/Kiriiaq) | [Support on Ko-fi](https://ko-fi.com/kiriiaq)
 
-[⬆ Retour en haut](#-photoorganizer)
+**Keywords**: photo organizer, EXIF metadata extraction, automatic photo sorting, RAW photo manager, free photo organization tool, photo management software, image sorter, photo file organizer, camera roll organizer, picture organizer
 
 </div>
