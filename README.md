@@ -2,6 +2,8 @@
 
 > **Automatic photo sorting and EXIF metadata extraction tool** - Organize thousands of photos by date, camera, or GPS location in seconds.
 
+[![Download](https://img.shields.io/badge/Download-PhotoManager.exe-brightgreen?style=for-the-badge&logo=windows)](https://github.com/Kiriiaq/PhotoOrganizer/releases/download/v1.0.0/PhotoManager.exe)
+
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases/tag/v1.0.0)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases)
