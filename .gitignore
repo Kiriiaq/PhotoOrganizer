@@ -1,4 +1,9 @@
-# PhotoManager Pro - GitIgnore
+# PhotoOrganizer - GitIgnore
+
+# Secrets & Environment
+.env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -111,3 +116,7 @@ site/
 
 # Distribution
 *.whl
+
+# Claude Code
+.claude/
+tmpclaude-*

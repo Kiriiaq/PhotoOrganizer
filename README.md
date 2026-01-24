@@ -285,6 +285,29 @@ If PhotoOrganizer helps you organize your photos, consider supporting developmen
 
 ---
 
+## Build Executables
+
+```bash
+pip install -e ".[dev]"
+
+# Release (no console window)
+pyinstaller --onefile --noconsole --name "photoorganizer-release" --icon "resources/icons/icon.ico" --add-data "resources;resources" --add-data "src;src" main.py
+
+# Debug (with console)
+set PHOTOORGANIZER_DEBUG=1
+pyinstaller --onefile --console --debug=all --name "photoorganizer-debug" --icon "resources/icons/icon.ico" --add-data "resources;resources" --add-data "src;src" main.py
+```
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+ruff check .
+pytest --tb=short -q
+```
+
+---
+
 <div align="center">
 
 **PhotoOrganizer** - Free Photo Organization Software

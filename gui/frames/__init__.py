@@ -1,1 +1,0 @@
-"""GUI frames package"""
