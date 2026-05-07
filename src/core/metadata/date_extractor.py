@@ -3,11 +3,11 @@ Module d'extraction des dates des fichiers média.
 Supporte EXIF, nom de fichier et métadonnées système.
 """
 
+import logging
 import os
 import re
-import logging
 from datetime import datetime
-from typing import Optional, Tuple, Dict, Any, Callable, List
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

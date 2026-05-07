@@ -3,10 +3,10 @@ Module de détection des informations d'appareil photo.
 Extraction et normalisation des données fabricant/modèle.
 """
 
+import logging
 import os
 import re
-import logging
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

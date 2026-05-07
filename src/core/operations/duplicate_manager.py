@@ -6,22 +6,22 @@ This module provides a complete system for detecting, analyzing, and managing
 duplicate files with configurable conservation rules and execution modes.
 """
 
+import fnmatch
+import logging
 import os
 import shutil
-import logging
-import fnmatch
-from pathlib import Path
 from datetime import datetime
-from typing import List, Optional, Callable, Dict, Tuple
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple
 
 from src.config.duplicate_config import (
+    ConservationCriterion,
+    DuplicateGroupDecision,
     DuplicateManagerConfig,
     ExecutionMode,
-    ConservationCriterion,
+    ExecutionResult,
     FileAction,
     FileDecision,
-    DuplicateGroupDecision,
-    ExecutionResult,
 )
 from src.core.operations.duplicate_finder import (
     DuplicateFinder,

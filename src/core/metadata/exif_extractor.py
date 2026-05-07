@@ -3,16 +3,16 @@ Module d'extraction des métadonnées EXIF.
 Supporte JPEG, HEIC/HEIF, RAW et vidéos.
 """
 
-import os
 import json
-import subprocess
 import logging
+import os
+import subprocess
 from datetime import datetime
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 try:
-    from PIL import Image, ExifTags
+    from PIL import ExifTags, Image
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False

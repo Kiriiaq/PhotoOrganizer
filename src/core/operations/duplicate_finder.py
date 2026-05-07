@@ -7,14 +7,14 @@ Supports SHA-256 (default), SHA-1, MD5, and BLAKE3 algorithms.
 Optimized with 4MB chunk size for large files and optional hash caching.
 """
 
-import os
 import hashlib
 import logging
-from typing import Dict, List, Optional, Callable
-from dataclasses import dataclass, field
+import os
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
 
 # Try to import blake3 for faster hashing
 try:
