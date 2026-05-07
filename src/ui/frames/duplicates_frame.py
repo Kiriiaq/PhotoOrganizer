@@ -4,61 +4,62 @@ Frame avancé de détection et gestion des doublons.
 Intègre toutes les fonctionnalités du DuplicateManager dans l'IHM.
 """
 
+import logging
 import os
 import sys
-import logging
 import threading
-from typing import Optional, Callable, List
+from tkinter import filedialog, messagebox
+from typing import Callable, List, Optional
 
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
 
 logger = logging.getLogger(__name__)
 
-# Style cohérent IHM (cf. organize_frame.py).
-_FONT_SIZE = 13
-_FG = ("#1f6aa5", "#1f6aa5")
-_HOVER = ("#144870", "#144870")
-_BORDER = ("gray40", "gray60")
+# Design system unifié — cohérent avec organize_frame / settings_frame
+from ui.theme import (
+    COLOR_DANGER,
+    COLOR_DANGER_HOVER,
+    COLOR_INFO,
+    COLOR_INFO_HOVER,
+    COLOR_PRIMARY,
+    COLOR_PRIMARY_HOVER,
+    COLOR_WARNING,
+    COLOR_WARNING_HOVER,
+    LABEL_MUTED,
+    PAD_M,
+    PAD_S,
+    danger_button,
+    font_label,
+    font_section,
+    make_checkbox,
+    make_radio,
+    neutral_button,
+    primary_button,
+)
 
-
-def _make_checkbox(parent, **kwargs):
-    defaults = {
-        "font": ctk.CTkFont(size=_FONT_SIZE),
-        "fg_color": _FG, "hover_color": _HOVER,
-        "border_color": _BORDER, "border_width": 2,
-    }
-    defaults.update(kwargs)
-    return ctk.CTkCheckBox(parent, **defaults)
-
-
-def _make_radio(parent, **kwargs):
-    defaults = {
-        "font": ctk.CTkFont(size=_FONT_SIZE),
-        "fg_color": _FG, "hover_color": _HOVER,
-        "border_color": _BORDER, "border_width_unchecked": 2,
-    }
-    defaults.update(kwargs)
-    return ctk.CTkRadioButton(parent, **defaults)
+# Aliases retro-compat avec l'ancien nommage local (encore utilisé par
+# d'autres morceaux du fichier).
+_make_checkbox = make_checkbox
+_make_radio = make_radio
 
 # Ensure src is in path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.config.duplicate_config import (
-    DuplicateManagerConfig,
+    ConservationCriterion,
     ConservationPolicy,
+    DuplicateManagerConfig,
+    ExecutionMode,
+    ExecutionResult,
+    FileAction,
+    HashAlgorithm,
     HashingConfig,
     PerformanceConfig,
-    ExecutionMode,
-    ConservationCriterion,
-    HashAlgorithm,
-    FileAction,
-    ExecutionResult,
     load_config_from_yaml,
     save_config_to_yaml,
 )
-from src.core.operations.duplicate_manager import DuplicateManager
 from src.core.operations.duplicate_finder import DuplicateFinder, DuplicateResult
+from src.core.operations.duplicate_manager import DuplicateManager
 from src.reports.duplicate_reporter import DuplicateReporter
 
 
@@ -228,39 +229,47 @@ class DuplicatesFrame(ctk.CTkFrame):
     # =========================================================================
 
     def _create_main_section(self):
-        """Section principale avec onglets."""
-        self.main_tabview = ctk.CTkTabview(self)
-        self.main_tabview.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        """Section principale en split horizontal — refonte UI v3.
 
-        # Onglets
-        self.main_tabview.add("Options")
+        Layout :
+            ┌──────────────────┬─────────────────────────────────┐
+            │ OPTIONS          │ RÉSULTATS (toujours visibles)    │
+            │ sidebar 300 px   │ sous-onglet Résumé / Détails     │
+            │ scrollable       │ textbox plein écran              │
+            └──────────────────┴─────────────────────────────────┘
+
+        Bénéfice : après un scan, les résultats sont **immédiatement**
+        visibles sans clic sur un onglet. Les options restent accessibles
+        en sidebar gauche, scrollable si nécessaire.
+        """
+        # Container split avec 2 colonnes
+        split = ctk.CTkFrame(self, fg_color="transparent")
+        split.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
+        split.columnconfigure(0, weight=0, minsize=320)  # sidebar fixe
+        split.columnconfigure(1, weight=1)               # résultats expand
+        split.rowconfigure(0, weight=1)
+
+        # Sidebar gauche : options scrollables
+        options_scroll = ctk.CTkScrollableFrame(
+            split, width=300, label_text="⚙️ Options de scan",
+            label_font=font_section(),
+        )
+        options_scroll.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_M))
+
+        # Création des sous-sections d'options dans le scroll
+        self._create_hash_options(options_scroll)
+        self._create_filter_options(options_scroll)
+        self._create_conservation_options(options_scroll)
+        self._create_performance_options(options_scroll)
+        self._create_report_options(options_scroll)
+
+        # Zone droite : résultats permanents (sous-onglets Résumé/Détails)
+        self.main_tabview = ctk.CTkTabview(split)
+        self.main_tabview.grid(row=0, column=1, sticky="nsew")
         self.main_tabview.add("Resultats")
         self.main_tabview.add("Details")
-
-        self._create_options_tab()
         self._create_results_tab()
         self._create_details_tab()
-
-    def _create_options_tab(self):
-        """Onglet des options de scan."""
-        tab = self.main_tabview.tab("Options")
-        tab.columnconfigure(0, weight=1)
-        tab.columnconfigure(1, weight=1)
-
-        # Colonne gauche : Hash + Filtres
-        left_frame = ctk.CTkFrame(tab)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=0)
-
-        self._create_hash_options(left_frame)
-        self._create_filter_options(left_frame)
-
-        # Colonne droite : Conservation + Performance + Rapports
-        right_frame = ctk.CTkFrame(tab)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
-
-        self._create_conservation_options(right_frame)
-        self._create_performance_options(right_frame)
-        self._create_report_options(right_frame)
 
     def _create_hash_options(self, parent):
         """Options de hashing."""
@@ -530,55 +539,58 @@ class DuplicatesFrame(ctk.CTkFrame):
     # =========================================================================
 
     def _create_actions_section(self):
-        """Section d'actions en bas."""
-        actions_frame = ctk.CTkFrame(self)
-        actions_frame.grid(row=2, column=0, sticky="sew", padx=10, pady=(5, 10))
+        """Section d'actions en bas — refonte UI v3.
 
-        # Progression
-        progress_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
-        progress_frame.pack(fill="x", padx=10, pady=(10, 5))
+        Layout :
+          ProgressBar
+          Label progression
+          [Annuler]                  spacer        [Rechercher] [Exécuter]
+          (gauche, destructive)                    (droite, action principale)
+        """
+        actions_frame = ctk.CTkFrame(self, fg_color="transparent")
+        actions_frame.grid(row=2, column=0, sticky="ew",
+                           padx=PAD_M, pady=(0, PAD_M))
+        actions_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ctk.CTkProgressBar(progress_frame)
-        self.progress_bar.pack(fill="x", side="top")
+        # Barre de progression visible dès l'init
+        self.progress_bar = ctk.CTkProgressBar(actions_frame, height=14)
+        self.progress_bar.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
         self.progress_bar.set(0)
 
-        self.progress_label = ctk.CTkLabel(progress_frame, text="Pret")
-        self.progress_label.pack(pady=3)
+        # Label progression compact
+        self.progress_label = ctk.CTkLabel(
+            actions_frame, text="Prêt",
+            font=font_label(), anchor="w", text_color=LABEL_MUTED,
+        )
+        self.progress_label.grid(row=1, column=0, sticky="ew", pady=(0, PAD_S))
 
-        # Boutons
-        buttons_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
-        buttons_frame.pack(fill="x", padx=10, pady=(5, 10))
+        # Rangée de boutons : annuler à gauche, principales à droite
+        buttons = ctk.CTkFrame(actions_frame, fg_color="transparent")
+        buttons.grid(row=2, column=0, sticky="ew")
+        buttons.columnconfigure(1, weight=1)  # spacer entre gauche et droite
 
-        self.search_button = ctk.CTkButton(
-            buttons_frame,
-            text="Rechercher les doublons",
+        # Bouton annuler à gauche (destructif rouge)
+        self.cancel_button = danger_button(
+            buttons, text="❌ Annuler",
+            command=self._cancel_operation, state="disabled",
+        )
+        self.cancel_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
+
+        # Action recherche (neutre/info) — toujours active
+        self.search_button = neutral_button(
+            buttons, text="🔍 Rechercher les doublons",
             command=self._start_scan,
-            font=ctk.CTkFont(weight="bold"),
-            height=36
         )
-        self.search_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.search_button.configure(font=font_label(weight="bold"))
+        self.search_button.grid(row=0, column=2, padx=(0, PAD_S), sticky="e")
 
-        self.execute_button = ctk.CTkButton(
-            buttons_frame,
-            text="Simuler les actions",
-            command=self._execute_actions,
-            state="disabled",
-            fg_color="#28a745",
-            hover_color="#218838",
-            height=36
+        # Action principale exécution (vert primary, height 40)
+        # NB : la couleur change selon le mode via _on_mode_change
+        self.execute_button = primary_button(
+            buttons, text="Simuler les actions",
+            command=self._execute_actions, state="disabled",
         )
-        self.execute_button.pack(side="left", padx=5, expand=True, fill="x")
-
-        self.cancel_button = ctk.CTkButton(
-            buttons_frame,
-            text="Annuler",
-            command=self._cancel_operation,
-            state="disabled",
-            fg_color="#dc3545",
-            hover_color="#c82333",
-            height=36
-        )
-        self.cancel_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.execute_button.grid(row=0, column=3, sticky="e")
 
     # =========================================================================
     # EVENT HANDLERS
@@ -601,15 +613,23 @@ class DuplicatesFrame(ctk.CTkFrame):
         }
         self.execute_button.configure(text=mode_labels.get(mode, "Executer"))
 
-        # Couleur du bouton selon dangerosité
+        # Couleur du bouton selon dangerosité — palette design system
         if mode == "DELETE":
-            self.execute_button.configure(fg_color="#dc3545", hover_color="#c82333")
+            self.execute_button.configure(
+                fg_color=COLOR_DANGER, hover_color=COLOR_DANGER_HOVER,
+            )
         elif mode == "TRASH":
-            self.execute_button.configure(fg_color="#fd7e14", hover_color="#e36209")
+            self.execute_button.configure(
+                fg_color=COLOR_WARNING, hover_color=COLOR_WARNING_HOVER,
+            )
         elif mode == "MOVE":
-            self.execute_button.configure(fg_color="#007bff", hover_color="#0056b3")
-        else:
-            self.execute_button.configure(fg_color="#28a745", hover_color="#218838")
+            self.execute_button.configure(
+                fg_color=COLOR_INFO, hover_color=COLOR_INFO_HOVER,
+            )
+        else:  # DRY_RUN
+            self.execute_button.configure(
+                fg_color=COLOR_PRIMARY, hover_color=COLOR_PRIMARY_HOVER,
+            )
 
     def _browse_source(self):
         """Dialogue de sélection du dossier source."""

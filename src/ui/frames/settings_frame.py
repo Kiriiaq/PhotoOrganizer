@@ -3,39 +3,33 @@ Frame des paramètres.
 Configuration de l'application.
 """
 
-from typing import Optional, Callable
+from tkinter import messagebox
+from typing import Callable, Optional
 
 import customtkinter as ctk
-from tkinter import messagebox
 
-from utils.config import ConfigManager
+from ui.theme import (
+    BTN_H_STD,
+    CHECK_FG,
+    HINT_COLOR,
+    LABEL_MUTED,
+    PAD_L,
+    PAD_M,
+    PAD_S,
+    font_hint,
+    font_label,
+    font_section,
+    make_checkbox,
+    make_radio,
+    primary_button,
+    warning_button,
+)
 from utils.cache import get_cache
+from utils.config import ConfigManager
 
-# Style cohérent avec OrganizeFrame (cf. organize_frame.py pour la rationale).
-_FONT_SIZE = 13
-_FG = ("#1f6aa5", "#1f6aa5")
-_HOVER = ("#144870", "#144870")
-_BORDER = ("gray40", "gray60")
-
-
-def _make_checkbox(parent, **kwargs):
-    defaults = {
-        "font": ctk.CTkFont(size=_FONT_SIZE),
-        "fg_color": _FG, "hover_color": _HOVER,
-        "border_color": _BORDER, "border_width": 2,
-    }
-    defaults.update(kwargs)
-    return ctk.CTkCheckBox(parent, **defaults)
-
-
-def _make_radio(parent, **kwargs):
-    defaults = {
-        "font": ctk.CTkFont(size=_FONT_SIZE),
-        "fg_color": _FG, "hover_color": _HOVER,
-        "border_color": _BORDER, "border_width_unchecked": 2,
-    }
-    defaults.update(kwargs)
-    return ctk.CTkRadioButton(parent, **defaults)
+# Aliases retro-compat avec l'ancien nommage local
+_make_checkbox = make_checkbox
+_make_radio = make_radio
 
 
 class SettingsFrame(ctk.CTkFrame):
@@ -73,28 +67,96 @@ class SettingsFrame(ctk.CTkFrame):
         self._create_ui()
 
     def _create_ui(self):
-        """Crée l'interface utilisateur."""
-        # Scrollable frame pour toutes les options
+        """Refonte UI v3 : sections scrollables + boutons sticky bottom.
+
+        Layout :
+          ┌──────────────────────────────────────┐
+          │ ZONE SCROLL — toutes les sections     │ weight=1
+          ├──────────────────────────────────────┤
+          │ [🔄 Réinitialiser]   [💾 Sauvegarder] │ sticky bottom
+          └──────────────────────────────────────┘
+        """
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        # ZONE 1 : sections scrollables
         scrollable = ctk.CTkScrollableFrame(self)
-        scrollable.pack(fill="both", expand=True, padx=10, pady=10)
+        scrollable.grid(row=0, column=0, sticky="nsew", padx=PAD_M, pady=(PAD_M, PAD_S))
 
-        # Section Apparence
         self._create_appearance_section(scrollable)
-
-        # Section Comportement par défaut
         self._create_defaults_section(scrollable)
-
-        # Section Performance
+        self._create_schedule_section(scrollable)   # ← nouveau (déplacé d'Organize)
         self._create_performance_section(scrollable)
-
-        # Section API
         self._create_api_section(scrollable)
-
-        # Section Données
         self._create_data_section(scrollable)
 
-        # Boutons
-        self._create_buttons(scrollable)
+        # ZONE 2 : boutons sticky bottom (toujours visibles)
+        self._create_buttons_sticky()
+
+    def _create_schedule_section(self, parent):
+        """Section "Planification automatique" — déplacée depuis OrganizeFrame.
+
+        L'UI ici met juste à jour les vars de l'organize_frame ; le scheduler
+        est hébergé là-bas (via JobScheduler). On accède via la fenêtre racine
+        (`winfo_toplevel().organize_frame`) pour rester découplé.
+        """
+        section = ctk.CTkFrame(parent)
+        section.pack(fill="x", pady=PAD_M)
+
+        ctk.CTkLabel(
+            section, text="📅 Planification automatique quotidienne",
+            font=font_section(),
+        ).pack(anchor="w", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        ctk.CTkLabel(
+            section,
+            text="Tant que l'application est ouverte, organise automatiquement à l'heure indiquée.",
+            font=font_hint(), text_color=HINT_COLOR,
+        ).pack(anchor="w", padx=PAD_M, pady=(0, PAD_S))
+
+        # Référence à l'OrganizeFrame parent (créé avant SettingsFrame dans app.py)
+        # On accède aux vars via une méthode helper pour graceful degradation.
+        org_frame = self._get_organize_frame()
+        if org_frame is None:
+            ctk.CTkLabel(
+                section,
+                text="⚠️ OrganizeFrame indisponible — planification désactivée.",
+                text_color=LABEL_MUTED,
+            ).pack(anchor="w", padx=PAD_M, pady=(0, PAD_M))
+            return
+
+        # Toggle + heure
+        row = ctk.CTkFrame(section, fg_color="transparent")
+        row.pack(fill="x", padx=PAD_M, pady=PAD_S)
+
+        self.schedule_switch = ctk.CTkSwitch(
+            row,
+            text="Activer la planification quotidienne",
+            variable=org_frame.schedule_enabled,
+            command=org_frame._on_schedule_toggle,
+            font=font_label(),
+            progress_color=CHECK_FG,
+        )
+        self.schedule_switch.pack(side="left")
+
+        ctk.CTkLabel(row, text="Heure :",
+                     font=font_label()).pack(side="left", padx=(PAD_L, PAD_S))
+        ctk.CTkEntry(row, textvariable=org_frame.schedule_time,
+                     placeholder_text="HH:MM",
+                     width=80, height=BTN_H_STD).pack(side="left")
+
+        # Statut "Prochaine exécution : ..."
+        ctk.CTkLabel(
+            section, textvariable=org_frame.schedule_status_var,
+            font=font_label(), text_color=LABEL_MUTED, anchor="w",
+        ).pack(anchor="w", padx=PAD_M, pady=(0, PAD_M))
+
+    def _get_organize_frame(self):
+        """Retourne l'OrganizeFrame parent ou None s'il n'est pas accessible."""
+        try:
+            return self.winfo_toplevel().organize_frame
+        except AttributeError:
+            return None
 
     def _create_appearance_section(self, parent):
         """Crée la section Apparence."""
@@ -286,26 +348,23 @@ class SettingsFrame(ctk.CTkFrame):
             width=80
         ).pack(side="left", padx=10)
 
-    def _create_buttons(self, parent):
-        """Crée les boutons de sauvegarde."""
-        buttons_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        buttons_frame.pack(fill="x", pady=20)
+    def _create_buttons_sticky(self):
+        """Boutons sauvegarde / réinitialiser sticky bottom (toujours visibles)."""
+        buttons_frame = ctk.CTkFrame(self, fg_color="transparent")
+        buttons_frame.grid(row=1, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+        buttons_frame.columnconfigure(1, weight=1)  # spacer
 
-        ctk.CTkButton(
-            buttons_frame,
-            text="💾 Sauvegarder",
-            command=self._save_settings,
-            fg_color="green",
-            hover_color="darkgreen"
-        ).pack(side="left", padx=5, expand=True, fill="x")
-
-        ctk.CTkButton(
-            buttons_frame,
-            text="🔄 Réinitialiser",
+        # Réinitialiser à gauche (warning, secondaire)
+        warning_button(
+            buttons_frame, text="🔄 Réinitialiser",
             command=self._reset_settings,
-            fg_color="orange",
-            hover_color="darkorange"
-        ).pack(side="left", padx=5, expand=True, fill="x")
+        ).grid(row=0, column=0, sticky="w")
+
+        # Sauvegarder à droite (primary, action principale)
+        primary_button(
+            buttons_frame, text="💾 Sauvegarder",
+            command=self._save_settings,
+        ).grid(row=0, column=2, sticky="e")
 
     def _on_theme_change(self):
         """Gère le changement de thème."""

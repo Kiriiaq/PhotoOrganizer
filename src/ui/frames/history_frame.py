@@ -3,12 +3,23 @@ Frame d'historique et rollback.
 Interface pour voir l'historique et annuler les opérations.
 """
 
-from typing import Optional, Callable
+from tkinter import messagebox
+from typing import Callable, Optional
 
 import customtkinter as ctk
-from tkinter import messagebox
 
 from core.operations.file_manager import FileManager
+from ui.theme import (
+    LABEL_MUTED,
+    PAD_M,
+    PAD_S,
+    danger_button,
+    font_label,
+    font_mono,
+    font_section,
+    icon_button,
+    warning_button,
+)
 
 
 class HistoryFrame(ctk.CTkFrame):
@@ -39,105 +50,73 @@ class HistoryFrame(ctk.CTkFrame):
         self._refresh_history()
 
     def _create_ui(self):
-        """Crée l'interface utilisateur."""
+        """Refonte UI v3 : 3 zones compactes.
+
+        ┌──────────────────────────────────────────────┐
+        │ Titre + stats inline                          │  1 ligne
+        ├──────────────────────────────────────────────┤
+        │ history_textbox (toute la hauteur)            │  weight=1
+        ├──────────────────────────────────────────────┤
+        │ [↩️ Dernière] [↩️ Tout]   [🔄] [🗑️ Effacer]    │  1 ligne
+        └──────────────────────────────────────────────┘
+        """
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)  # textbox prend toute la hauteur
 
-        # En-tête
-        self._create_header()
+        # ZONE 1 : titre + stats sur une seule ligne
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
+        header.columnconfigure(0, weight=1)
 
-        # Liste des opérations
-        self._create_operations_list()
-
-        # Actions
-        self._create_actions_section()
-
-    def _create_header(self):
-        """Crée l'en-tête."""
-        header_frame = ctk.CTkFrame(self)
-        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-
-        ctk.CTkLabel(
-            header_frame,
-            text="📜 Historique des opérations",
-            font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(anchor="w", padx=10, pady=10)
-
-        info_label = ctk.CTkLabel(
-            header_frame,
-            text="Les opérations de la session actuelle sont listées ci-dessous.\n"
-                 "Vous pouvez annuler les opérations en sens inverse.",
-            justify="left"
+        title_label = ctk.CTkLabel(
+            header, text="📜 Historique des opérations",
+            font=font_section(), anchor="w",
         )
-        info_label.pack(anchor="w", padx=10, pady=(0, 10))
+        title_label.grid(row=0, column=0, sticky="w")
 
-    def _create_operations_list(self):
-        """Crée la liste des opérations."""
-        list_frame = ctk.CTkFrame(self)
-        list_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
-
-        # Statistiques
+        # Stats inline à droite, mises à jour par _refresh_history
         self.stats_label = ctk.CTkLabel(
-            list_frame,
-            text="Aucune opération dans cette session.",
-            font=ctk.CTkFont(size=12)
+            header, text="Aucune opération",
+            font=font_label(), anchor="e",
+            text_color=LABEL_MUTED,
         )
-        self.stats_label.pack(anchor="w", padx=10, pady=10)
+        self.stats_label.grid(row=0, column=1, sticky="e")
 
-        # Zone de texte pour l'historique
-        self.history_textbox = ctk.CTkTextbox(list_frame, height=300)
-        self.history_textbox.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-        # Bouton de rafraîchissement
-        ctk.CTkButton(
-            list_frame,
-            text="🔄 Rafraîchir",
-            command=self._refresh_history
-        ).pack(pady=10)
-
-    def _create_actions_section(self):
-        """Crée la section des actions."""
-        actions_frame = ctk.CTkFrame(self)
-        actions_frame.grid(row=2, column=0, sticky="sew", padx=10, pady=10)
-
-        # Avertissement
-        warning_label = ctk.CTkLabel(
-            actions_frame,
-            text="⚠️ L'annulation (rollback) restaure les fichiers à leur emplacement d'origine.",
-            text_color="orange"
+        # ZONE 2 : textbox plein écran
+        self.history_textbox = ctk.CTkTextbox(
+            self, font=font_mono(11),
         )
-        warning_label.pack(padx=10, pady=10)
+        self.history_textbox.grid(row=1, column=0, sticky="nsew",
+                                  padx=PAD_M, pady=PAD_S)
 
-        # Boutons
-        buttons_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
-        buttons_frame.pack(fill="x", padx=10, pady=10)
+        # ZONE 3 : boutons sticky bottom
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.grid(row=2, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_M))
+        actions.columnconfigure(2, weight=1)  # spacer entre rollback et clear
 
-        self.rollback_one_button = ctk.CTkButton(
-            buttons_frame,
-            text="↩️ Annuler dernière",
-            command=self._rollback_last,
-            state="disabled"
+        # Gauche : boutons rollback (warning orange = action sérieuse)
+        self.rollback_one_button = warning_button(
+            actions, text="↩️ Annuler dernière",
+            command=self._rollback_last, state="disabled",
         )
-        self.rollback_one_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.rollback_one_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
 
-        self.rollback_all_button = ctk.CTkButton(
-            buttons_frame,
-            text="↩️ Annuler tout",
-            command=self._rollback_all,
-            state="disabled",
-            fg_color="orange",
-            hover_color="darkorange"
+        self.rollback_all_button = warning_button(
+            actions, text="↩️ Annuler tout",
+            command=self._rollback_all, state="disabled",
         )
-        self.rollback_all_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.rollback_all_button.grid(row=0, column=1, padx=(0, PAD_S), sticky="w")
 
-        self.clear_button = ctk.CTkButton(
-            buttons_frame,
-            text="🗑️ Effacer historique",
+        # Droite : refresh (icon) + clear (danger)
+        icon_button(actions, text="🔄",
+                    command=self._refresh_history).grid(
+            row=0, column=3, padx=(0, PAD_S), sticky="e",
+        )
+        self.clear_button = danger_button(
+            actions, text="🗑️ Effacer",
             command=self._clear_history,
-            fg_color="red",
-            hover_color="darkred"
         )
-        self.clear_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.clear_button.grid(row=0, column=4, sticky="e")
 
     def _refresh_history(self):
         """Rafraîchit l'affichage de l'historique."""
@@ -149,13 +128,14 @@ class HistoryFrame(ctk.CTkFrame):
         errors = total - success
 
         if total > 0:
+            # Format compact pour la zone titre (1 ligne)
             self.stats_label.configure(
-                text=f"Session actuelle: {total} opérations ({success} réussies, {errors} erreurs)"
+                text=f"{total} op. — ✅ {success}  ❌ {errors}"
             )
             self.rollback_one_button.configure(state="normal")
             self.rollback_all_button.configure(state="normal")
         else:
-            self.stats_label.configure(text="Aucune opération dans cette session.")
+            self.stats_label.configure(text="Aucune opération")
             self.rollback_one_button.configure(state="disabled")
             self.rollback_all_button.configure(state="disabled")
 

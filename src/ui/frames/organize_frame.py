@@ -16,6 +16,25 @@ import customtkinter as ctk
 
 from core.metadata import extract_date, get_camera_info, get_exif_data, get_gps_coordinates
 from core.operations import FileManager, OrganizationOptions, SmartOrganizer
+
+# Design system unifié — couleurs, espacements, factories de boutons.
+# Importe en absolu (ui.theme) pour rester compatible avec PyInstaller.
+from ui.theme import (
+    BTN_H_STD,
+    HINT_COLOR,
+    LABEL_MUTED,
+    PAD_L,
+    PAD_M,
+    PAD_S,
+    SEPARATOR_COLOR,
+    danger_button,
+    font_hint,
+    font_label,
+    font_section,
+    icon_button,
+    neutral_button,
+    primary_button,
+)
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -274,112 +293,146 @@ class OrganizeFrame(ctk.CTkFrame):
         self.schedule_time.trace_add("write", lambda *_: self._on_schedule_time_change())
 
     def _create_ui(self):
-        """Crée l'interface utilisateur.
+        """Crée l'interface utilisateur en 3 zones (refonte UI v3).
 
-        Toute la zone scrolle quand la fenêtre est réduite : on enveloppe
-        les sections dans un ``CTkScrollableFrame`` qui prend toute la place
-        disponible. Les `_create_*_section` continuent de placer leurs
-        widgets en grille — la grille s'applique désormais sur l'intérieur
-        scrollable.
+        Layout :
+          ┌──────────────────────────────────────────────────────┐
+          │ ZONE TOP (fixe)        Sources / Dest / Compteur     │  ~110 px
+          ├──────────────────────────────────────────────────────┤
+          │ ZONE CENTRE (scroll si nécessaire) 2 colonnes         │  weight=1
+          │   • Critères d'organisation  | Action + Types         │
+          │   • [▼ Avancé] (collapsible) — filtres + comportements│
+          │   • Renommage (1 ligne template + presets)            │
+          ├──────────────────────────────────────────────────────┤
+          │ ZONE BOTTOM (fixe)     Progression + boutons d'action │  ~80 px
+          └──────────────────────────────────────────────────────┘
+
+        Bénéfices vs v2 :
+          - Compteur fichiers et boutons toujours visibles
+          - Action principale "Organiser" à droite (convention desktop)
+          - Section Planification déplacée vers Paramètres (config persistante)
         """
-        # Layout root du frame OrganizeFrame
+        # Layout root du frame OrganizeFrame : 3 lignes (top fixe / centre
+        # scrollable / bottom fixe). Seule la ligne du milieu prend du poids.
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
+        self.rowconfigure(0, weight=0)  # top fixe
+        self.rowconfigure(1, weight=1)  # centre scrollable expansif
+        self.rowconfigure(2, weight=0)  # bottom fixe
 
+        # ZONE TOP : Sources / Destination / Compteur fichiers (sticky)
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_M, 0))
+        top.columnconfigure(0, weight=1)
+        self._top_zone = top
+
+        # ZONE CENTRE : scrollable avec les options
         self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self._scroll.grid(row=0, column=0, sticky="nsew")
+        self._scroll.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
+        self._scroll.columnconfigure(0, weight=1, minsize=280)
+        self._scroll.columnconfigure(1, weight=1, minsize=280)
 
-        # Grille interne du scrollable
-        self._scroll.columnconfigure(0, weight=1, minsize=300)
-        self._scroll.columnconfigure(1, weight=1, minsize=300)
-        # row=2 = section actions (boutons + progression) — doit s'étirer
-        # mais sans absorber tout le scroll si l'utilisateur a peu d'espace.
-        self._scroll.rowconfigure(2, weight=0)
+        # ZONE BOTTOM : compteur + progress + boutons (sticky bottom)
+        bottom = ctk.CTkFrame(self, fg_color="transparent")
+        bottom.grid(row=2, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+        bottom.columnconfigure(0, weight=1)
+        self._bottom_zone = bottom
 
-        # Sections (parent commun = self._scroll)
-        self._create_folders_section()      # row=0
-        self._create_options_section()      # row=1 (critères + types)
-        self._create_advanced_section()     # row=2 (filtres + comportements)
-        # row=3 réservé bursts/incremental (intégrés dans advanced ci-dessus)
-        self._create_schedule_section()     # row=4 (planification quotidienne)
-        self._create_rename_section()       # row=5 (template + presets)
-        self._create_actions_section()      # row=6 (boutons + progression)
+        # Création des sections dans leur zone respective
+        self._create_folders_section()       # zone top
+        self._create_options_section()       # scroll row=0 (critères + types)
+        self._create_advanced_section()      # scroll row=1 (collapsible)
+        self._create_rename_section()        # scroll row=2 (1 ligne)
+        self._create_actions_section()       # zone bottom
+
+        # Section Planification déplacée vers SettingsFrame — l'attribut
+        # `schedule_status_var` reste utilisé par le scheduler.
 
     def _create_folders_section(self):
-        """Crée la section de sélection des dossiers."""
-        folders_frame = ctk.CTkFrame(self._scroll)
-        folders_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        """Section de sélection des dossiers en zone top fixe (toujours visible).
 
-        # Titre
-        title_row = ctk.CTkFrame(folders_frame, fg_color="transparent")
-        title_row.pack(fill="x", padx=10, pady=(10, 5))
-        ctk.CTkLabel(
-            title_row,
-            text="📁 Sélection des dossiers",
-            font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(side="left")
+        Compactée : titre + 1 ligne source + 1 ligne destination + 1 ligne
+        compteur fichiers. Pas de scroll possible sur ce bloc → l'utilisateur
+        voit immédiatement combien de fichiers sont prêts à être organisés.
+        """
+        parent = self._top_zone
+        folders = ctk.CTkFrame(parent)
+        folders.grid(row=0, column=0, sticky="ew")
+        folders.columnconfigure(1, weight=1)
 
-        # Hint sur les sources multiples + drag-and-drop
-        hint = "💡 Plusieurs sources : séparer par ;"
+        # Titre + hint inline (compact)
+        hint = "💡 Plusieurs sources : ;"
         if DND_AVAILABLE:
-            hint += "  •  Glisser-déposer un dossier supporté"
+            hint += "   •   Glisser-déposer un dossier supporté"
+        title_row = ctk.CTkFrame(folders, fg_color="transparent")
+        title_row.grid(row=0, column=0, columnspan=4, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
+        ctk.CTkLabel(
+            title_row, text="📁 Sélection des dossiers",
+            font=font_section(),
+        ).pack(side="left")
         ctk.CTkLabel(
             title_row, text=hint,
-            font=ctk.CTkFont(size=11),
-            text_color=("gray45", "gray65"),
+            font=font_hint(), text_color=HINT_COLOR,
         ).pack(side="right")
 
-        # Dossier source — accepte plusieurs chemins séparés par ';'
-        source_frame = ctk.CTkFrame(folders_frame, fg_color="transparent")
-        source_frame.pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkLabel(source_frame, text="Source(s) :", width=80).pack(side="left")
+        # Ligne Source(s) — accepte plusieurs chemins séparés par ';'
+        ctk.CTkLabel(folders, text="Source(s) :",
+                     font=font_label(), width=90, anchor="w",
+                     ).grid(row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
         self.source_entry = ctk.CTkEntry(
-            source_frame,
+            folders,
             textvariable=self.source_var,
-            placeholder_text="Sélectionnez le(s) dossier(s) source — séparés par ;"
+            placeholder_text="Sélectionnez le(s) dossier(s) source — séparés par ;",
+            height=BTN_H_STD,
         )
-        self.source_entry.pack(side="left", fill="x", expand=True, padx=5)
-        ctk.CTkButton(
-            source_frame,
-            text="📂", width=40,
-            command=self._browse_source
-        ).pack(side="left")
-        ctk.CTkButton(
-            source_frame,
-            text="+", width=40,
-            command=self._add_source_folder,
-        ).pack(side="left", padx=(2, 0))
+        self.source_entry.grid(row=1, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
+        icon_button(folders, text="📂", command=self._browse_source).grid(
+            row=1, column=2, padx=PAD_S, pady=PAD_S,
+        )
+        icon_button(folders, text="+", command=self._add_source_folder).grid(
+            row=1, column=3, padx=(0, PAD_M), pady=PAD_S,
+        )
 
-        # Dossier destination
-        dest_frame = ctk.CTkFrame(folders_frame, fg_color="transparent")
-        dest_frame.pack(fill="x", padx=10, pady=(5, 10))
-
-        ctk.CTkLabel(dest_frame, text="Destination :", width=80).pack(side="left")
+        # Ligne Destination
+        ctk.CTkLabel(folders, text="Destination :",
+                     font=font_label(), width=90, anchor="w",
+                     ).grid(row=2, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
         self.dest_entry = ctk.CTkEntry(
-            dest_frame,
+            folders,
             textvariable=self.dest_var,
-            placeholder_text="Sélectionnez le dossier destination..."
+            placeholder_text="Sélectionnez le dossier destination…",
+            height=BTN_H_STD,
         )
-        self.dest_entry.pack(side="left", fill="x", expand=True, padx=5)
-        ctk.CTkButton(
-            dest_frame, text="📂", width=40,
-            command=self._browse_dest
-        ).pack(side="left")
-        ctk.CTkButton(
-            dest_frame, text="📂 Ouvrir",
-            width=90,
+        self.dest_entry.grid(row=2, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
+        icon_button(folders, text="📂", command=self._browse_dest).grid(
+            row=2, column=2, padx=PAD_S, pady=PAD_S,
+        )
+        icon_button(
+            folders, text="↗",
             command=lambda: _open_folder(self.dest_var.get()),
-        ).pack(side="left", padx=(2, 0))
+        ).grid(row=2, column=3, padx=(0, PAD_M), pady=PAD_S)
+
+        # Ligne Compteur fichiers (toujours visible — fix T-030..033)
+        self.file_count_var = ctk.StringVar(value="Aucun dossier source sélectionné.")
+        self.file_count_label = ctk.CTkLabel(
+            folders,
+            textvariable=self.file_count_var,
+            font=font_label(),
+            anchor="w",
+            text_color=LABEL_MUTED,
+        )
+        self.file_count_label.grid(
+            row=3, column=0, columnspan=4,
+            sticky="ew", padx=PAD_M, pady=(0, PAD_M),
+        )
 
         # Activer le drag-and-drop si la lib est disponible
         self._setup_drag_drop()
 
     def _create_options_section(self):
-        """Crée la section des options."""
+        """Crée la section des options dans le scroll central (row=0)."""
         # Frame gauche - Critères d'organisation
         left_frame = ctk.CTkFrame(self._scroll)
-        left_frame.grid(row=1, column=0, sticky="nsew", padx=(10, 5), pady=5)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=PAD_S)
 
         ctk.CTkLabel(
             left_frame,
@@ -558,7 +611,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Frame droite - Options de traitement
         right_frame = ctk.CTkFrame(self._scroll)
-        right_frame.grid(row=1, column=1, sticky="nsew", padx=(5, 10), pady=5)
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=PAD_S)
 
         ctk.CTkLabel(
             right_frame,
@@ -626,323 +679,284 @@ class OrganizeFrame(ctk.CTkFrame):
     # Sections "avancées" (filtres + comportements + renommage + presets)
     # =================================================================
     def _create_advanced_section(self):
-        """Crée la section "Avancé" sur 2 colonnes (filtres + comportements)."""
-        # Colonne gauche : filtres pré-traitement (R1)
-        filters_frame = ctk.CTkFrame(self._scroll)
-        filters_frame.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=5)
+        """Section "Avancé" repliable (collapsed par défaut).
 
-        ctk.CTkLabel(
-            filters_frame,
-            text="🔍 Filtres pré-traitement",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(10, 5))
+        Regroupe en un seul panneau toutes les options secondaires :
+        filtres pré-traitement (R1), comportements (R2-R7), bursts (S1),
+        index, mode incrémental (S5).
 
-        # Période de prise de vue
-        date_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        date_row.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(date_row, text="Date min :", width=90, anchor="w").pack(side="left")
-        ctk.CTkEntry(date_row, textvariable=self.filter_date_min,
-                     placeholder_text="YYYY-MM-DD", width=120).pack(side="left", padx=2)
+        Le toggle texte ▶/▼ permet d'afficher/masquer le contenu — par
+        défaut masqué pour ne pas encombrer l'IHM ; les options gardent
+        leurs valeurs courantes même quand le panneau est replié.
+        """
+        # Container externe : occupe les 2 colonnes du scroll
+        wrapper = ctk.CTkFrame(self._scroll)
+        wrapper.grid(row=1, column=0, columnspan=2, sticky="ew",
+                     padx=PAD_S, pady=PAD_S)
+        wrapper.columnconfigure(0, weight=1)
 
-        date_row2 = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        date_row2.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(date_row2, text="Date max :", width=90, anchor="w").pack(side="left")
-        ctk.CTkEntry(date_row2, textvariable=self.filter_date_max,
-                     placeholder_text="YYYY-MM-DD", width=120).pack(side="left", padx=2)
+        # En-tête cliquable : titre + flèche, occupe toute la largeur
+        self._adv_collapsed = True  # état initial
+        self._adv_toggle_btn = ctk.CTkButton(
+            wrapper, text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)",
+            command=self._toggle_advanced_section,
+            anchor="w",
+            font=font_section(),
+            fg_color="transparent",
+            text_color=("gray10", "#DCE4EE"),
+            hover_color=("gray85", "gray25"),
+            height=BTN_H_STD,
+        )
+        self._adv_toggle_btn.grid(row=0, column=0, sticky="ew",
+                                  padx=PAD_M, pady=PAD_S)
 
-        # Taille
-        size_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        size_row.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(size_row, text="Taille min :", width=90, anchor="w").pack(side="left")
-        ctk.CTkEntry(size_row, textvariable=self.filter_size_min,
-                     placeholder_text="ex. 100KB", width=120).pack(side="left", padx=2)
+        # Container interne (caché par défaut) — 2 colonnes (filtres / comportements)
+        self._adv_content = ctk.CTkFrame(wrapper, fg_color="transparent")
+        # Pas de grid() ici → le panneau démarre invisible
+        self._adv_content.columnconfigure(0, weight=1, uniform="adv")
+        self._adv_content.columnconfigure(1, weight=1, uniform="adv")
 
-        size_row2 = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        size_row2.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(size_row2, text="Taille max :", width=90, anchor="w").pack(side="left")
-        ctk.CTkEntry(size_row2, textvariable=self.filter_size_max,
-                     placeholder_text="ex. 50MB", width=120).pack(side="left", padx=2)
+        # ===== Colonne gauche : filtres pré-traitement =====
+        filters = ctk.CTkFrame(self._adv_content, fg_color="transparent")
+        filters.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=0)
+
+        ctk.CTkLabel(filters, text="🔍 Filtres",
+                     font=font_label(weight="bold"),
+                     ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
+
+        for label, var, placeholder in [
+            ("Date min :",   self.filter_date_min,  "YYYY-MM-DD"),
+            ("Date max :",   self.filter_date_max,  "YYYY-MM-DD"),
+            ("Taille min :", self.filter_size_min,  "ex. 100KB"),
+            ("Taille max :", self.filter_size_max,  "ex. 50MB"),
+        ]:
+            row = ctk.CTkFrame(filters, fg_color="transparent")
+            row.pack(fill="x", padx=PAD_S, pady=2)
+            ctk.CTkLabel(row, text=label, width=86, anchor="w",
+                         font=font_label()).pack(side="left")
+            ctk.CTkEntry(row, textvariable=var, placeholder_text=placeholder,
+                         height=BTN_H_STD).pack(side="left", padx=PAD_S, fill="x", expand=True)
 
         # Note EXIF
-        rating_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        rating_row.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(rating_row, text="Note ≥ :", width=90, anchor="w").pack(side="left")
+        rating_row = ctk.CTkFrame(filters, fg_color="transparent")
+        rating_row.pack(fill="x", padx=PAD_S, pady=2)
+        ctk.CTkLabel(rating_row, text="Note ≥ :", width=86, anchor="w",
+                     font=font_label()).pack(side="left")
         ctk.CTkOptionMenu(
             rating_row, variable=self.filter_rating_min,
-            values=["0", "1", "2", "3", "4", "5"],
-            width=70,
+            values=["0", "1", "2", "3", "4", "5"], width=70, height=BTN_H_STD,
             command=lambda v: self.filter_rating_min.set(int(v)),
-        ).pack(side="left", padx=2)
-        ctk.CTkLabel(
-            rating_row, text="(0 = pas de filtre)",
-            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
-        ).pack(side="left", padx=8)
+        ).pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(rating_row, text="(0 = inactif)",
+                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
 
         # Mots-clés
-        kw_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
-        kw_row.pack(fill="x", padx=20, pady=(2, 10))
-        ctk.CTkLabel(kw_row, text="Mots-clés :", width=90, anchor="w").pack(side="left")
+        kw_row = ctk.CTkFrame(filters, fg_color="transparent")
+        kw_row.pack(fill="x", padx=PAD_S, pady=(2, PAD_S))
+        ctk.CTkLabel(kw_row, text="Mots-clés :", width=86, anchor="w",
+                     font=font_label()).pack(side="left")
         ctk.CTkEntry(kw_row, textvariable=self.filter_keywords,
-                     placeholder_text="separés par , (vacances, mariage, …)",
-                     ).pack(side="left", padx=2, fill="x", expand=True)
+                     placeholder_text="vacances, mariage, …", height=BTN_H_STD,
+                     ).pack(side="left", padx=PAD_S, fill="x", expand=True)
 
-        # Colonne droite : comportements + index
-        behaviors_frame = ctk.CTkFrame(self._scroll)
-        behaviors_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=5)
+        # ===== Colonne droite : comportements + bursts + incremental + index =====
+        behaviors = ctk.CTkFrame(self._adv_content, fg_color="transparent")
+        behaviors.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=0)
 
-        ctk.CTkLabel(
-            behaviors_frame,
-            text="🛠️ Comportements avancés",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(10, 5))
+        ctk.CTkLabel(behaviors, text="🛠️ Comportements",
+                     font=font_label(weight="bold"),
+                     ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
-        _make_checkbox(behaviors_frame,
-            text="Skip si fichier identique déjà présent",
-            variable=self.skip_if_identical,
-        ).pack(anchor="w", padx=20, pady=3)
+        # Liste compacte de toggles (tous regroupés visuellement)
+        for text, var in [
+            ("Skip si fichier identique déjà présent",          self.skip_if_identical),
+            ("Garder les paires RAW + JPEG ensemble",           self.keep_raw_jpeg_pairs),
+            ("Nettoyer les dossiers source vides (Déplacer)",   self.cleanup_empty_source),
+            ("Vérifier l'espace disque avant exécution",        self.validate_disk_space),
+            ("Notification système à la fin",                   self.notify_on_finish),
+            ("Mode incrémental (skip déjà organisés)",          self.incremental_mode),
+            ("Détection de rafales → sous-dossier Burst_NN/",   self.detect_bursts),
+        ]:
+            _make_checkbox(behaviors, text=text, variable=var
+                           ).pack(anchor="w", padx=PAD_M, pady=PAD_S)
 
-        _make_checkbox(behaviors_frame,
-            text="Garder les paires RAW + JPEG ensemble",
-            variable=self.keep_raw_jpeg_pairs,
-        ).pack(anchor="w", padx=20, pady=3)
-
-        _make_checkbox(behaviors_frame,
-            text="Nettoyer les dossiers source vides (mode Déplacer)",
-            variable=self.cleanup_empty_source,
-        ).pack(anchor="w", padx=20, pady=3)
-
-        _make_checkbox(behaviors_frame,
-            text="Vérifier l'espace disque avant exécution",
-            variable=self.validate_disk_space,
-        ).pack(anchor="w", padx=20, pady=3)
-
-        _make_checkbox(behaviors_frame,
-            text="Notification système à la fin",
-            variable=self.notify_on_finish,
-        ).pack(anchor="w", padx=20, pady=3)
-
-        # Index export
-        ctk.CTkFrame(behaviors_frame, height=2,
-                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
-        ctk.CTkLabel(
-            behaviors_frame, text="📋 Index post-organisation",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(0, 4))
-        idx_row = ctk.CTkFrame(behaviors_frame, fg_color="transparent")
-        idx_row.pack(fill="x", padx=20, pady=(0, 8))
-        _make_checkbox(idx_row, text="CSV", variable=self.export_index_csv).pack(side="left", padx=(0, 12))
-        _make_checkbox(idx_row, text="JSON", variable=self.export_index_json).pack(side="left")
-
-        # ---- Bursts S1 ----
-        ctk.CTkFrame(behaviors_frame, height=2,
-                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
-        ctk.CTkLabel(
-            behaviors_frame, text="📸 Détection de rafales (bursts)",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(0, 4))
-        _make_checkbox(behaviors_frame,
-            text="Regrouper les photos prises en rafale dans Burst_NN/",
-            variable=self.detect_bursts,
-        ).pack(anchor="w", padx=20, pady=3)
-
-        burst_row = ctk.CTkFrame(behaviors_frame, fg_color="transparent")
-        burst_row.pack(fill="x", padx=40, pady=(0, 4))
-        ctk.CTkLabel(burst_row, text="Écart max :", width=100, anchor="w").pack(side="left")
+        # Sous-options bursts inline (visibles tout le temps quand le panneau l'est)
+        burst_sub = ctk.CTkFrame(behaviors, fg_color="transparent")
+        burst_sub.pack(fill="x", padx=(28, PAD_S), pady=(0, PAD_S))
+        ctk.CTkLabel(burst_sub, text="Écart max :", width=80, anchor="w",
+                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
         ctk.CTkOptionMenu(
-            burst_row, variable=self.burst_threshold,
-            values=["1", "2", "3", "5", "10"], width=70,
+            burst_sub, variable=self.burst_threshold,
+            values=["1", "2", "3", "5", "10"], width=60, height=BTN_H_STD,
             command=lambda v: self.burst_threshold.set(int(v)),
-        ).pack(side="left", padx=2)
-        ctk.CTkLabel(burst_row, text="s",
-                     font=ctk.CTkFont(size=11),
-                     text_color=("gray45", "gray65")).pack(side="left", padx=(2, 12))
-        ctk.CTkLabel(burst_row, text="Min photos :", width=90, anchor="w").pack(side="left")
+        ).pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(burst_sub, text="s · Min :",
+                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
         ctk.CTkOptionMenu(
-            burst_row, variable=self.burst_min_count,
-            values=["2", "3", "4", "5", "8"], width=70,
+            burst_sub, variable=self.burst_min_count,
+            values=["2", "3", "4", "5", "8"], width=60, height=BTN_H_STD,
             command=lambda v: self.burst_min_count.set(int(v)),
-        ).pack(side="left", padx=2)
+        ).pack(side="left", padx=PAD_S)
 
-        # ---- Incremental S5 ----
-        ctk.CTkFrame(behaviors_frame, height=2,
-                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
-        ctk.CTkLabel(
-            behaviors_frame, text="⚡ Mode incrémental",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(0, 4))
-        _make_checkbox(behaviors_frame,
-            text="Skip les fichiers déjà organisés (cache hash partiel)",
-            variable=self.incremental_mode,
-        ).pack(anchor="w", padx=20, pady=3)
-        ctk.CTkLabel(
-            behaviors_frame,
-            text="    L'index est persisté dans <destination>/.photoorganizer_index.json",
-            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
-        ).pack(anchor="w", padx=20, pady=(0, 8))
+        # Index export — séparateur + 2 cases compactes en bas
+        ctk.CTkFrame(behaviors, height=1, fg_color=SEPARATOR_COLOR).pack(
+            fill="x", padx=PAD_M, pady=(PAD_S, PAD_S)
+        )
+        idx_row = ctk.CTkFrame(behaviors, fg_color="transparent")
+        idx_row.pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
+        ctk.CTkLabel(idx_row, text="📋 Index :",
+                     font=font_label()).pack(side="left", padx=(0, PAD_S))
+        _make_checkbox(idx_row, text="CSV",
+                       variable=self.export_index_csv).pack(side="left", padx=(0, PAD_M))
+        _make_checkbox(idx_row, text="JSON",
+                       variable=self.export_index_json).pack(side="left")
+
+    def _toggle_advanced_section(self):
+        """Bascule le panneau Avancé (collapse/expand)."""
+        if self._adv_collapsed:
+            # Affiche le contenu
+            self._adv_content.grid(row=1, column=0, sticky="ew",
+                                   padx=PAD_M, pady=(0, PAD_M))
+            self._adv_toggle_btn.configure(
+                text="▼  ⚙️ Options avancées (cliquez pour replier)"
+            )
+            self._adv_collapsed = False
+        else:
+            self._adv_content.grid_forget()
+            self._adv_toggle_btn.configure(
+                text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)"
+            )
+            self._adv_collapsed = True
 
     def _create_schedule_section(self):
-        """Section "Planification automatique" (Lot E5)."""
-        sched_frame = ctk.CTkFrame(self._scroll)
-        sched_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        """No-op : la section "Planification" a été déplacée dans SettingsFrame.
 
-        ctk.CTkLabel(
-            sched_frame,
-            text="📅 Planification automatique quotidienne",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(10, 5))
-
-        ctk.CTkLabel(
-            sched_frame,
-            text="Tant que l'application est ouverte, organise automatiquement à l'heure indiquée.",
-            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
-        ).pack(anchor="w", padx=10, pady=(0, 6))
-
-        row = ctk.CTkFrame(sched_frame, fg_color="transparent")
-        row.pack(fill="x", padx=20, pady=4)
-
-        self.schedule_switch = ctk.CTkSwitch(
-            row,
-            text="Activer la planification quotidienne",
-            variable=self.schedule_enabled,
-            command=self._on_schedule_toggle,
-            font=ctk.CTkFont(size=CHECKBOX_FONT_SIZE),
-            progress_color=CHECK_FG,
-        )
-        self.schedule_switch.pack(side="left")
-
-        ctk.CTkLabel(row, text="Heure :",
-                     font=ctk.CTkFont(size=LABEL_FONT_SIZE)).pack(side="left", padx=(20, 4))
-        ctk.CTkEntry(row, textvariable=self.schedule_time,
-                     placeholder_text="HH:MM", width=80).pack(side="left", padx=2)
-
-        ctk.CTkLabel(
-            sched_frame, textvariable=self.schedule_status_var,
-            font=ctk.CTkFont(size=12),
-            text_color=("gray30", "gray70"),
-        ).pack(anchor="w", padx=20, pady=(2, 10))
+        Les vars (schedule_enabled, schedule_time, schedule_status_var) restent
+        définies dans __init__ pour que SettingsFrame puisse y accéder via
+        l'instance OrganizeFrame partagée. Cette méthode est conservée pour
+        compatibilité avec d'éventuels appels externes mais ne crée plus de
+        widget — le UI vit dans Paramètres > Planification.
+        """
+        return  # intentionnel — voir docstring
 
     def _create_rename_section(self):
-        """Crée la section "Renommage par template" + Presets."""
-        rename_frame = ctk.CTkFrame(self._scroll)
-        rename_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        """Section "Renommage" compactée — 2 lignes au lieu de 6.
 
-        # --- Renommage Q4 ---
+        Layout :
+          🏷️ Renommage & Presets
+          [Preset ▼] [💾] [🗑]   |   Template [_______________]   →aperçu
+        """
+        rename = ctk.CTkFrame(self._scroll)
+        rename.grid(row=2, column=0, columnspan=2, sticky="ew",
+                    padx=PAD_S, pady=(PAD_S, 0))
+        rename.columnconfigure(4, weight=1)  # template entry s'étend
+
         ctk.CTkLabel(
-            rename_frame,
-            text="🏷️ Renommage par template (optionnel)",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(10, 5))
+            rename, text="🏷️ Renommage & Presets",
+            font=font_section(),
+        ).grid(row=0, column=0, columnspan=6, sticky="w",
+               padx=PAD_M, pady=(PAD_M, PAD_S))
 
-        tpl_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
-        tpl_row.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(tpl_row, text="Template :", width=90, anchor="w").pack(side="left")
+        # Ligne presets compacte
+        ctk.CTkLabel(rename, text="Preset :", font=font_label()).grid(
+            row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S,
+        )
+        self._preset_menu = ctk.CTkOptionMenu(
+            rename, variable=self.preset_name,
+            values=self._list_preset_names(),
+            command=self._on_preset_selected,
+            width=140, height=BTN_H_STD,
+        )
+        self._preset_menu.grid(row=1, column=1, padx=(0, PAD_S), pady=PAD_S, sticky="w")
+        icon_button(rename, text="💾", command=self._save_preset_dialog).grid(
+            row=1, column=2, padx=(0, PAD_S), pady=PAD_S,
+        )
+        icon_button(rename, text="🗑", command=self._delete_preset).grid(
+            row=1, column=3, padx=(0, PAD_L), pady=PAD_S,
+        )
+
+        # Template + aperçu sur la même ligne
+        ctk.CTkLabel(rename, text="Template :", font=font_label()).grid(
+            row=1, column=4, sticky="w", padx=(0, PAD_S), pady=PAD_S,
+        )
         ctk.CTkEntry(
-            tpl_row, textvariable=self.rename_template,
+            rename, textvariable=self.rename_template, height=BTN_H_STD,
             placeholder_text="ex. {date:%Y%m%d}_{counter:04d}_{original}",
-        ).pack(side="left", fill="x", expand=True, padx=2)
+        ).grid(row=1, column=5, sticky="ew", padx=(0, PAD_M), pady=PAD_S)
+        rename.columnconfigure(5, weight=1)  # entry expandable
 
-        # Aperçu live
+        # Hint + aperçu sur 1 ligne grise sous l'entry
         self.rename_preview_var = ctk.StringVar(value="(aucun template)")
-        preview_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
-        preview_row.pack(fill="x", padx=20, pady=2)
-        ctk.CTkLabel(preview_row, text="Aperçu :", width=90, anchor="w").pack(side="left")
-        ctk.CTkLabel(preview_row, textvariable=self.rename_preview_var,
-                     text_color=("gray30", "gray70")).pack(side="left", padx=2)
+        ctk.CTkLabel(
+            rename,
+            textvariable=self.rename_preview_var,
+            font=font_hint(), text_color=HINT_COLOR, anchor="w",
+        ).grid(row=2, column=4, columnspan=2, sticky="ew",
+               padx=(0, PAD_M), pady=(0, PAD_S))
         self.rename_template.trace_add("write", lambda *_: self._refresh_rename_preview())
 
         ctk.CTkLabel(
-            rename_frame,
-            text="Tokens : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
-            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
-        ).pack(anchor="w", padx=20, pady=(2, 8))
-
-        # --- Presets Q3 ---
-        ctk.CTkFrame(rename_frame, height=2,
-                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(4, 6))
-        ctk.CTkLabel(
-            rename_frame,
-            text="💾 Presets de configuration",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
-        ).pack(anchor="w", padx=10, pady=(0, 4))
-
-        preset_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
-        preset_row.pack(fill="x", padx=20, pady=(0, 10))
-        ctk.CTkLabel(preset_row, text="Preset :", width=90, anchor="w").pack(side="left")
-        self._preset_menu = ctk.CTkOptionMenu(
-            preset_row,
-            variable=self.preset_name,
-            values=self._list_preset_names(),
-            command=self._on_preset_selected,
-            width=160,
-        )
-        self._preset_menu.pack(side="left", padx=2)
-        ctk.CTkButton(preset_row, text="💾 Sauver…", width=100,
-                      command=self._save_preset_dialog).pack(side="left", padx=4)
-        ctk.CTkButton(preset_row, text="🗑 Suppr.", width=80,
-                      command=self._delete_preset).pack(side="left", padx=2)
+            rename,
+            text="Tokens disponibles : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
+            font=font_hint(), text_color=HINT_COLOR, anchor="w",
+        ).grid(row=3, column=0, columnspan=6, sticky="ew",
+               padx=PAD_M, pady=(0, PAD_M))
 
     def _create_actions_section(self):
-        """Crée la section des boutons d'action."""
-        actions_frame = ctk.CTkFrame(self._scroll)
-        actions_frame.grid(row=6, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        """Section actions en zone bottom fixe (toujours visible).
 
-        # Compteur de fichiers détectés (T-030..T-033 : visible dès la
-        # sélection du dossier source). Mis à jour par `_refresh_file_count`.
-        self.file_count_var = ctk.StringVar(value="Aucun dossier source sélectionné.")
-        self.file_count_label = ctk.CTkLabel(
-            actions_frame,
-            textvariable=self.file_count_var,
-            font=ctk.CTkFont(size=12, weight="bold"),
-            anchor="w",
-        )
-        self.file_count_label.pack(fill="x", padx=10, pady=(10, 2))
+        Layout :
+          ProgressBar (row 0)
+          Label progression (row 1)
+          [📊 Analyser] [👁 Aperçu]   <-spacer->   [❌ Annuler] [🚀 Organiser]
+                                                              (action principale à droite)
 
-        # Barre de progression — visible dès l'init, état initial 0%
-        self.progress_bar = ctk.CTkProgressBar(actions_frame, height=14)
-        self.progress_bar.pack(fill="x", padx=10, pady=(2, 5))
+        Le compteur fichiers est en zone TOP (sous Source/Destination), pas
+        ici — l'utilisateur le voit avant même de regarder les boutons.
+        """
+        parent = self._bottom_zone
+
+        # Barre de progression visible dès l'init
+        self.progress_bar = ctk.CTkProgressBar(parent, height=14)
+        self.progress_bar.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
         self.progress_bar.set(0)
 
         # Label de progression
-        self.progress_label = ctk.CTkLabel(actions_frame, text="Prêt")
-        self.progress_label.pack(padx=10, pady=5)
-
-        # Boutons
-        buttons_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
-        buttons_frame.pack(fill="x", padx=10, pady=10)
-
-        self.analyze_button = ctk.CTkButton(
-            buttons_frame,
-            text="📊 Analyser",
-            command=self._analyze_files
+        self.progress_label = ctk.CTkLabel(
+            parent, text="Prêt",
+            font=font_label(), anchor="w",
+            text_color=LABEL_MUTED,
         )
-        self.analyze_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.progress_label.grid(row=1, column=0, sticky="ew", pady=(0, PAD_S))
 
-        # Aperçu dry-run (Q2) — affiche l'arborescence finale sans rien copier
-        self.preview_button = ctk.CTkButton(
-            buttons_frame,
-            text="👁 Aperçu",
-            command=self._show_dry_run_preview,
-        )
-        self.preview_button.pack(side="left", padx=5, expand=True, fill="x")
+        # Rangée de boutons : actions secondaires à gauche, principales à droite
+        buttons = ctk.CTkFrame(parent, fg_color="transparent")
+        buttons.grid(row=2, column=0, sticky="ew")
+        # 4 colonnes : 2 boutons gauche, expanding spacer, 2 boutons droite
+        buttons.columnconfigure(2, weight=1)
 
-        self.organize_button = ctk.CTkButton(
-            buttons_frame,
-            text="🚀 Organiser",
-            command=self._organize_files,
-            fg_color="green",
-            hover_color="darkgreen"
+        # GAUCHE : actions secondaires (analyse, preview)
+        self.analyze_button = neutral_button(
+            buttons, text="📊 Analyser", command=self._analyze_files,
         )
-        self.organize_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.analyze_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
 
-        self.cancel_button = ctk.CTkButton(
-            buttons_frame,
-            text="❌ Annuler",
-            command=self._cancel_operation,
-            state="disabled",
-            fg_color="red",
-            hover_color="darkred"
+        self.preview_button = neutral_button(
+            buttons, text="👁 Aperçu", command=self._show_dry_run_preview,
         )
-        self.cancel_button.pack(side="left", padx=5, expand=True, fill="x")
+        self.preview_button.grid(row=0, column=1, padx=(0, PAD_S), sticky="w")
+
+        # DROITE : annuler (destructif) + action principale
+        self.cancel_button = danger_button(
+            buttons, text="❌ Annuler",
+            command=self._cancel_operation, state="disabled",
+        )
+        self.cancel_button.grid(row=0, column=3, padx=(0, PAD_S), sticky="e")
+
+        self.organize_button = primary_button(
+            buttons, text="🚀 Organiser", command=self._organize_files,
+        )
+        self.organize_button.grid(row=0, column=4, sticky="e")
 
     # ------------------------------------------------------------------
     # Ordre des critères en mode multicouche

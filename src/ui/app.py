@@ -3,26 +3,26 @@ Application principale PhotoOrganizer.
 Interface moderne avec CustomTkinter.
 """
 
+import logging
 import os
 import sys
-import logging
+from tkinter import messagebox
 from typing import Optional
 
 import customtkinter as ctk
-from tkinter import messagebox
 
 # Configuration du chemin
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from core.metadata.gps_processor import get_processor as get_gps_processor
+from core.operations.file_manager import FileManager
+from utils.cache import init_cache
 from utils.config import get_config
 from utils.logger import setup_logging
-from utils.cache import init_cache
-from core.operations.file_manager import FileManager
-from core.metadata.gps_processor import get_processor as get_gps_processor
 
-from .frames.organize_frame import OrganizeFrame
 from .frames.duplicates_frame import DuplicatesFrame
 from .frames.history_frame import HistoryFrame
+from .frames.organize_frame import OrganizeFrame
 from .frames.settings_frame import SettingsFrame
 
 logger = logging.getLogger(__name__)
@@ -74,10 +74,11 @@ class PhotoOrganizerApp(ctk.CTk):
         # Configuration de la fenêtre
         self.title(f"{self.APP_NAME} v{self.APP_VERSION}")
         self.geometry(f"{config.window_width}x{config.window_height}")
-        # minsize abaissé pour permettre une réduction agressive de la
-        # fenêtre. Le contenu est désormais scrollable (cf. _create_ui)
-        # donc tous les boutons restent atteignables même en petite taille.
-        self.minsize(640, 420)
+        # Refonte UI v3 : minsize relevé à 800×550 pour garantir le
+        # layout 3-zones de l'onglet Organisation (top fixe / centre /
+        # bottom fixe). En dessous, l'IHM devient inutilisable car les
+        # 3 zones se chevauchent.
+        self.minsize(800, 550)
 
         # Position de la fenêtre
         if config.window_x is not None and config.window_y is not None:
@@ -142,35 +143,46 @@ class PhotoOrganizerApp(ctk.CTk):
         self._create_status_bar()
 
     def _create_header(self):
-        """Crée l'en-tête de l'application."""
-        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        """En-tête de l'application — refonte UI v3.
 
-        # Titre
+        Titre 18pt + boutons icône-only carrés 32×40 (cohérent avec le
+        design system). Conserve la disposition titre-gauche / icônes-droite.
+        """
+        from ui.theme import (
+            BTN_H_STD,
+            BTN_W_ICON,
+            PAD_M,
+            PAD_S,
+            font_title,
+        )
+
+        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        # Titre (taille design system, plus discret que 24pt)
         title_label = ctk.CTkLabel(
             header_frame,
             text=f"📷 {self.APP_NAME}",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=font_title(),
         )
         title_label.pack(side="left")
 
-        # Bouton de thème
+        # Boutons icône-only à droite, hauteur normalisée 32
         self.theme_button = ctk.CTkButton(
             header_frame,
             text="🌙" if ctk.get_appearance_mode() == "Light" else "☀️",
-            width=40,
-            command=self._toggle_theme
+            width=BTN_W_ICON, height=BTN_H_STD,
+            command=self._toggle_theme,
         )
-        self.theme_button.pack(side="right", padx=5)
+        self.theme_button.pack(side="right", padx=PAD_S)
 
-        # Bouton d'aide
         help_button = ctk.CTkButton(
             header_frame,
             text="❓",
-            width=40,
-            command=self._show_about
+            width=BTN_W_ICON, height=BTN_H_STD,
+            command=self._show_about,
         )
-        help_button.pack(side="right", padx=5)
+        help_button.pack(side="right", padx=PAD_S)
 
     def _create_navigation(self):
         """Crée la navigation par onglets."""
