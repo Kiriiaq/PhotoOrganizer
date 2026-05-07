@@ -3,18 +3,104 @@ Frame d'organisation des fichiers.
 Interface principale pour organiser les photos et vidéos.
 """
 
-import os
 import logging
+import os
+import subprocess
+import sys
 import threading
-from typing import Optional, Callable, List
+from datetime import datetime
+from tkinter import filedialog, messagebox
+from typing import Callable, List, Optional
 
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
 
-from core.operations import FileManager, SmartOrganizer, OrganizationOptions
-from core.metadata import get_exif_data, extract_date, get_camera_info, get_gps_coordinates
+from core.metadata import extract_date, get_camera_info, get_exif_data, get_gps_coordinates
+from core.operations import FileManager, OrganizationOptions, SmartOrganizer
+from utils.config import get_config
 
 logger = logging.getLogger(__name__)
+
+# Drag-and-drop optionnel : la lib n'est pas dans requirements.txt par défaut.
+# Si absente, l'app fonctionne normalement, juste sans le glisser-déposer.
+try:
+    from tkinterdnd2 import DND_FILES  # noqa: F401
+    DND_AVAILABLE = True
+except ImportError:
+    DND_AVAILABLE = False
+    logger.debug("tkinterdnd2 absent : drag-and-drop desactive")
+
+
+def _open_folder(path: str):
+    """Ouvre un dossier dans l'explorateur natif (Windows / macOS / Linux)."""
+    if not path or not os.path.isdir(path):
+        logger.warning(f"_open_folder: chemin introuvable {path}")
+        return
+    try:
+        if sys.platform == 'win32':
+            os.startfile(path)
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', path])
+        else:
+            subprocess.Popen(['xdg-open', path])
+    except Exception as exc:
+        logger.warning(f"Impossible d'ouvrir {path}: {exc}")
+
+
+def _windows_toast(title: str, message: str):
+    """Notification non-modale fin d'organisation.
+
+    Tente une vraie toast Windows via plyer, sinon retombe sur un Toplevel
+    auto-dismiss après 4 s (cross-platform). Le but est de prévenir
+    l'utilisateur sans bloquer l'IHM.
+    """
+    try:
+        from plyer import notification
+        notification.notify(
+            title=title, message=message,
+            app_name='PhotoOrganizer', timeout=5,
+        )
+        return
+    except Exception as exc:
+        logger.debug(f"plyer notification indisponible : {exc}")
+
+    # Fallback : petit Toplevel discret. On le crée caché puis on le détruit
+    # automatiquement. (Ne pas dépendre d'une fenêtre parente pour rester
+    # appelable depuis n'importe où.)
+    try:
+        win = ctk.CTkToplevel()
+        win.title(title)
+        win.geometry("360x90+1400+50")
+        win.attributes('-topmost', True)
+        ctk.CTkLabel(
+            win, text=title, font=ctk.CTkFont(size=14, weight='bold'),
+        ).pack(padx=10, pady=(8, 2))
+        ctk.CTkLabel(win, text=message, wraplength=340).pack(padx=10, pady=(0, 8))
+        win.after(4000, win.destroy)
+    except Exception as exc:
+        logger.debug(f"Fallback toast Toplevel echoue : {exc}")
+
+
+def _parse_size_input(text: str) -> int:
+    """Parse une chaîne 'taille' (ex: '1.5 MB', '500KB', '2GB') en octets.
+
+    Retourne 0 si vide ou non parsable.
+    """
+    if not text:
+        return 0
+    text = text.strip().upper().replace(' ', '')
+    units = {'B': 1, 'KB': 1024, 'K': 1024,
+             'MB': 1024 ** 2, 'M': 1024 ** 2,
+             'GB': 1024 ** 3, 'G': 1024 ** 3}
+    for unit, mult in units.items():
+        if text.endswith(unit):
+            try:
+                return int(float(text[:-len(unit)]) * mult)
+            except ValueError:
+                return 0
+    try:
+        return int(text)
+    except ValueError:
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +212,29 @@ class OrganizeFrame(ctk.CTkFrame):
         self.include_raw = ctk.BooleanVar(value=True)
         self.include_videos = ctk.BooleanVar(value=False)
 
+        # ---- Filtres avancés (R1) ----
+        self.filter_date_min = ctk.StringVar(value="")  # YYYY-MM-DD
+        self.filter_date_max = ctk.StringVar(value="")
+        self.filter_size_min = ctk.StringVar(value="")  # ex: "100KB"
+        self.filter_size_max = ctk.StringVar(value="")
+        self.filter_rating_min = ctk.IntVar(value=0)    # 0..5
+        self.filter_keywords = ctk.StringVar(value="")  # CSV
+
+        # ---- Toggles avancés ----
+        self.skip_if_identical = ctk.BooleanVar(value=False)   # R2
+        self.keep_raw_jpeg_pairs = ctk.BooleanVar(value=False) # R3
+        self.cleanup_empty_source = ctk.BooleanVar(value=False)# R5
+        self.validate_disk_space = ctk.BooleanVar(value=True)  # R6
+        self.export_index_csv = ctk.BooleanVar(value=False)    # R7
+        self.export_index_json = ctk.BooleanVar(value=False)
+        self.notify_on_finish = ctk.BooleanVar(value=True)     # Q5
+
+        # ---- Renommage Q4 ----
+        self.rename_template = ctk.StringVar(value="")  # vide = pas de rename
+
+        # ---- Presets Q3 ----
+        self.preset_name = ctk.StringVar(value="(aucun)")
+
         self._create_ui()
 
         # Brancher le compteur de fichiers source — déclenche un scan léger
@@ -161,7 +270,9 @@ class OrganizeFrame(ctk.CTkFrame):
         # Sections (parent commun = self._scroll)
         self._create_folders_section()
         self._create_options_section()
-        self._create_actions_section()
+        self._create_advanced_section()    # row=2 (filtres + comportements)
+        self._create_rename_section()       # row=3 (template + presets)
+        self._create_actions_section()      # row=4 (boutons + progression)
 
     def _create_folders_section(self):
         """Crée la section de sélection des dossiers."""
@@ -169,36 +280,51 @@ class OrganizeFrame(ctk.CTkFrame):
         folders_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
 
         # Titre
-        title = ctk.CTkLabel(
-            folders_frame,
+        title_row = ctk.CTkFrame(folders_frame, fg_color="transparent")
+        title_row.pack(fill="x", padx=10, pady=(10, 5))
+        ctk.CTkLabel(
+            title_row,
             text="📁 Sélection des dossiers",
             font=ctk.CTkFont(size=16, weight="bold")
-        )
-        title.pack(anchor="w", padx=10, pady=(10, 5))
+        ).pack(side="left")
 
-        # Dossier source
+        # Hint sur les sources multiples + drag-and-drop
+        hint = "💡 Plusieurs sources : séparer par ;"
+        if DND_AVAILABLE:
+            hint += "  •  Glisser-déposer un dossier supporté"
+        ctk.CTkLabel(
+            title_row, text=hint,
+            font=ctk.CTkFont(size=11),
+            text_color=("gray45", "gray65"),
+        ).pack(side="right")
+
+        # Dossier source — accepte plusieurs chemins séparés par ';'
         source_frame = ctk.CTkFrame(folders_frame, fg_color="transparent")
         source_frame.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(source_frame, text="Source:", width=80).pack(side="left")
+        ctk.CTkLabel(source_frame, text="Source(s) :", width=80).pack(side="left")
         self.source_entry = ctk.CTkEntry(
             source_frame,
             textvariable=self.source_var,
-            placeholder_text="Sélectionnez le dossier source..."
+            placeholder_text="Sélectionnez le(s) dossier(s) source — séparés par ;"
         )
         self.source_entry.pack(side="left", fill="x", expand=True, padx=5)
         ctk.CTkButton(
             source_frame,
-            text="📂",
-            width=40,
+            text="📂", width=40,
             command=self._browse_source
         ).pack(side="left")
+        ctk.CTkButton(
+            source_frame,
+            text="+", width=40,
+            command=self._add_source_folder,
+        ).pack(side="left", padx=(2, 0))
 
         # Dossier destination
         dest_frame = ctk.CTkFrame(folders_frame, fg_color="transparent")
         dest_frame.pack(fill="x", padx=10, pady=(5, 10))
 
-        ctk.CTkLabel(dest_frame, text="Destination:", width=80).pack(side="left")
+        ctk.CTkLabel(dest_frame, text="Destination :", width=80).pack(side="left")
         self.dest_entry = ctk.CTkEntry(
             dest_frame,
             textvariable=self.dest_var,
@@ -206,11 +332,17 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.dest_entry.pack(side="left", fill="x", expand=True, padx=5)
         ctk.CTkButton(
-            dest_frame,
-            text="📂",
-            width=40,
+            dest_frame, text="📂", width=40,
             command=self._browse_dest
         ).pack(side="left")
+        ctk.CTkButton(
+            dest_frame, text="📂 Ouvrir",
+            width=90,
+            command=lambda: _open_folder(self.dest_var.get()),
+        ).pack(side="left", padx=(2, 0))
+
+        # Activer le drag-and-drop si la lib est disponible
+        self._setup_drag_drop()
 
     def _create_options_section(self):
         """Crée la section des options."""
@@ -397,10 +529,181 @@ class OrganizeFrame(ctk.CTkFrame):
             variable=self.include_videos
         ).pack(anchor="w", padx=20, pady=3)
 
+    # =================================================================
+    # Sections "avancées" (filtres + comportements + renommage + presets)
+    # =================================================================
+    def _create_advanced_section(self):
+        """Crée la section "Avancé" sur 2 colonnes (filtres + comportements)."""
+        # Colonne gauche : filtres pré-traitement (R1)
+        filters_frame = ctk.CTkFrame(self._scroll)
+        filters_frame.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=5)
+
+        ctk.CTkLabel(
+            filters_frame,
+            text="🔍 Filtres pré-traitement",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        # Période de prise de vue
+        date_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        date_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(date_row, text="Date min :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(date_row, textvariable=self.filter_date_min,
+                     placeholder_text="YYYY-MM-DD", width=120).pack(side="left", padx=2)
+
+        date_row2 = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        date_row2.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(date_row2, text="Date max :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(date_row2, textvariable=self.filter_date_max,
+                     placeholder_text="YYYY-MM-DD", width=120).pack(side="left", padx=2)
+
+        # Taille
+        size_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        size_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(size_row, text="Taille min :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(size_row, textvariable=self.filter_size_min,
+                     placeholder_text="ex. 100KB", width=120).pack(side="left", padx=2)
+
+        size_row2 = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        size_row2.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(size_row2, text="Taille max :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(size_row2, textvariable=self.filter_size_max,
+                     placeholder_text="ex. 50MB", width=120).pack(side="left", padx=2)
+
+        # Note EXIF
+        rating_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        rating_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(rating_row, text="Note ≥ :", width=90, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(
+            rating_row, variable=self.filter_rating_min,
+            values=["0", "1", "2", "3", "4", "5"],
+            width=70,
+            command=lambda v: self.filter_rating_min.set(int(v)),
+        ).pack(side="left", padx=2)
+        ctk.CTkLabel(
+            rating_row, text="(0 = pas de filtre)",
+            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+        ).pack(side="left", padx=8)
+
+        # Mots-clés
+        kw_row = ctk.CTkFrame(filters_frame, fg_color="transparent")
+        kw_row.pack(fill="x", padx=20, pady=(2, 10))
+        ctk.CTkLabel(kw_row, text="Mots-clés :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(kw_row, textvariable=self.filter_keywords,
+                     placeholder_text="separés par , (vacances, mariage, …)",
+                     ).pack(side="left", padx=2, fill="x", expand=True)
+
+        # Colonne droite : comportements + index
+        behaviors_frame = ctk.CTkFrame(self._scroll)
+        behaviors_frame.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=5)
+
+        ctk.CTkLabel(
+            behaviors_frame,
+            text="🛠️ Comportements avancés",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        _make_checkbox(behaviors_frame,
+            text="Skip si fichier identique déjà présent",
+            variable=self.skip_if_identical,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        _make_checkbox(behaviors_frame,
+            text="Garder les paires RAW + JPEG ensemble",
+            variable=self.keep_raw_jpeg_pairs,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        _make_checkbox(behaviors_frame,
+            text="Nettoyer les dossiers source vides (mode Déplacer)",
+            variable=self.cleanup_empty_source,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        _make_checkbox(behaviors_frame,
+            text="Vérifier l'espace disque avant exécution",
+            variable=self.validate_disk_space,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        _make_checkbox(behaviors_frame,
+            text="Notification système à la fin",
+            variable=self.notify_on_finish,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        # Index export
+        ctk.CTkFrame(behaviors_frame, height=2,
+                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
+        ctk.CTkLabel(
+            behaviors_frame, text="📋 Index post-organisation",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(0, 4))
+        idx_row = ctk.CTkFrame(behaviors_frame, fg_color="transparent")
+        idx_row.pack(fill="x", padx=20, pady=(0, 8))
+        _make_checkbox(idx_row, text="CSV", variable=self.export_index_csv).pack(side="left", padx=(0, 12))
+        _make_checkbox(idx_row, text="JSON", variable=self.export_index_json).pack(side="left")
+
+    def _create_rename_section(self):
+        """Crée la section "Renommage par template" + Presets."""
+        rename_frame = ctk.CTkFrame(self._scroll)
+        rename_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+
+        # --- Renommage Q4 ---
+        ctk.CTkLabel(
+            rename_frame,
+            text="🏷️ Renommage par template (optionnel)",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        tpl_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
+        tpl_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(tpl_row, text="Template :", width=90, anchor="w").pack(side="left")
+        ctk.CTkEntry(
+            tpl_row, textvariable=self.rename_template,
+            placeholder_text="ex. {date:%Y%m%d}_{counter:04d}_{original}",
+        ).pack(side="left", fill="x", expand=True, padx=2)
+
+        # Aperçu live
+        self.rename_preview_var = ctk.StringVar(value="(aucun template)")
+        preview_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
+        preview_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(preview_row, text="Aperçu :", width=90, anchor="w").pack(side="left")
+        ctk.CTkLabel(preview_row, textvariable=self.rename_preview_var,
+                     text_color=("gray30", "gray70")).pack(side="left", padx=2)
+        self.rename_template.trace_add("write", lambda *_: self._refresh_rename_preview())
+
+        ctk.CTkLabel(
+            rename_frame,
+            text="Tokens : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
+            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+        ).pack(anchor="w", padx=20, pady=(2, 8))
+
+        # --- Presets Q3 ---
+        ctk.CTkFrame(rename_frame, height=2,
+                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(4, 6))
+        ctk.CTkLabel(
+            rename_frame,
+            text="💾 Presets de configuration",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(0, 4))
+
+        preset_row = ctk.CTkFrame(rename_frame, fg_color="transparent")
+        preset_row.pack(fill="x", padx=20, pady=(0, 10))
+        ctk.CTkLabel(preset_row, text="Preset :", width=90, anchor="w").pack(side="left")
+        self._preset_menu = ctk.CTkOptionMenu(
+            preset_row,
+            variable=self.preset_name,
+            values=self._list_preset_names(),
+            command=self._on_preset_selected,
+            width=160,
+        )
+        self._preset_menu.pack(side="left", padx=2)
+        ctk.CTkButton(preset_row, text="💾 Sauver…", width=100,
+                      command=self._save_preset_dialog).pack(side="left", padx=4)
+        ctk.CTkButton(preset_row, text="🗑 Suppr.", width=80,
+                      command=self._delete_preset).pack(side="left", padx=2)
+
     def _create_actions_section(self):
         """Crée la section des boutons d'action."""
         actions_frame = ctk.CTkFrame(self._scroll)
-        actions_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        actions_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
 
         # Compteur de fichiers détectés (T-030..T-033 : visible dès la
         # sélection du dossier source). Mis à jour par `_refresh_file_count`.
@@ -432,6 +735,14 @@ class OrganizeFrame(ctk.CTkFrame):
             command=self._analyze_files
         )
         self.analyze_button.pack(side="left", padx=5, expand=True, fill="x")
+
+        # Aperçu dry-run (Q2) — affiche l'arborescence finale sans rien copier
+        self.preview_button = ctk.CTkButton(
+            buttons_frame,
+            text="👁 Aperçu",
+            command=self._show_dry_run_preview,
+        )
+        self.preview_button.pack(side="left", padx=5, expand=True, fill="x")
 
         self.organize_button = ctk.CTkButton(
             buttons_frame,
@@ -560,18 +871,246 @@ class OrganizeFrame(ctk.CTkFrame):
         if folder:
             self.dest_var.set(folder)
 
+    def _add_source_folder(self):
+        """Ajoute un dossier source supplémentaire (séparateur ;) — Lot R4."""
+        folder = filedialog.askdirectory(title="Ajouter un dossier source")
+        if not folder:
+            return
+        current = self.source_var.get().strip()
+        if current:
+            # Éviter les doublons
+            existing = {p.strip() for p in current.split(';') if p.strip()}
+            if folder not in existing:
+                self.source_var.set(f"{current};{folder}")
+        else:
+            self.source_var.set(folder)
+
+    def _split_sources(self) -> List[str]:
+        """Découpe le source_var en liste de chemins (R4)."""
+        raw = self.source_var.get().strip()
+        if not raw:
+            return []
+        return [p.strip() for p in raw.split(';') if p.strip()]
+
+    def _setup_drag_drop(self):
+        """Active le drag-and-drop si tkinterdnd2 est installé (Lot Q1).
+
+        Sans tkinterdnd2 (cas par défaut sans dépendance), la méthode
+        n'a aucun effet visible : l'app reste fonctionnelle, juste sans DnD.
+        """
+        if not DND_AVAILABLE:
+            return
+        try:
+            from tkinterdnd2 import DND_FILES
+            for entry, var in (
+                (self.source_entry, self.source_var),
+                (self.dest_entry, self.dest_var),
+            ):
+                # NB: source_entry/dest_entry sont des CTkEntry qui exposent
+                # le tkinter.Entry sous-jacent via _entry. tkinterdnd2 attache
+                # le drop sur le widget tkinter natif.
+                tk_widget = getattr(entry, "_entry", entry)
+                tk_widget.drop_target_register(DND_FILES)
+
+                def _on_drop(event, v=var, is_source=(var is self.source_var)):
+                    # event.data peut contenir plusieurs paths séparés par ' '.
+                    # Sur Windows, paths avec espaces sont entourés de {}.
+                    raw = event.data
+                    paths = self._parse_dnd_paths(raw)
+                    folders = [p for p in paths if os.path.isdir(p)]
+                    if not folders:
+                        return
+                    if is_source and len(folders) > 1:
+                        v.set(';'.join(folders))
+                    else:
+                        v.set(folders[0])
+
+                tk_widget.dnd_bind('<<Drop>>', _on_drop)
+            logger.debug("Drag-and-drop active sur source/dest entries")
+        except Exception as exc:
+            logger.warning(f"Echec setup drag-and-drop : {exc}")
+
+    @staticmethod
+    def _parse_dnd_paths(raw: str) -> List[str]:
+        """Parse la string DnD (paths séparés par espace, accolades autour
+        des paths avec espaces sous Windows)."""
+        out, buf, in_brace = [], "", False
+        for c in raw:
+            if c == '{':
+                in_brace = True
+            elif c == '}':
+                in_brace = False
+                if buf:
+                    out.append(buf)
+                    buf = ""
+            elif c == ' ' and not in_brace:
+                if buf:
+                    out.append(buf)
+                    buf = ""
+            else:
+                buf += c
+        if buf:
+            out.append(buf)
+        return out
+
+    # --------------------------- Renommage Q4 ---------------------------
+    def _refresh_rename_preview(self):
+        """Aperçu live du template de renommage."""
+        tpl = self.rename_template.get().strip()
+        if not tpl:
+            self.rename_preview_var.set("(aucun template — nom d'origine conservé)")
+            return
+        try:
+            sample = SmartOrganizer._apply_rename_template(
+                "IMG_0001.jpg", tpl,
+                date_taken=datetime(2026, 5, 7, 14, 30),
+                make="Sony", model="ILCE-7M3",
+                counter=42,
+            )
+            self.rename_preview_var.set(f"IMG_0001.jpg → {sample}")
+        except Exception as exc:
+            self.rename_preview_var.set(f"⚠️ Template invalide : {exc}")
+
+    # --------------------------- Presets Q3 ---------------------------
+    def _list_preset_names(self) -> List[str]:
+        try:
+            names = get_config().list_presets()
+        except Exception as exc:
+            logger.warning(f"list_presets : {exc}")
+            names = []
+        return ["(aucun)"] + sorted(names)
+
+    def _on_preset_selected(self, name: str):
+        if name == "(aucun)":
+            return
+        try:
+            data = get_config().load_preset(name)
+        except Exception as exc:
+            messagebox.showerror("Preset", f"Chargement échoué : {exc}")
+            return
+        if not data:
+            return
+        # Appliquer chaque clé connue
+        mapping = {
+            'organize_by_date': self.organize_by_date,
+            'organize_by_camera': self.organize_by_camera,
+            'multilayer': self.multilayer,
+            'copy_not_move': self.copy_not_move,
+            'date_format': self.date_format,
+            'recursive': self.recursive,
+            'include_images': self.include_images,
+            'include_raw': self.include_raw,
+            'include_videos': self.include_videos,
+            'filter_date_min': self.filter_date_min,
+            'filter_date_max': self.filter_date_max,
+            'filter_size_min': self.filter_size_min,
+            'filter_size_max': self.filter_size_max,
+            'filter_rating_min': self.filter_rating_min,
+            'filter_keywords': self.filter_keywords,
+            'skip_if_identical': self.skip_if_identical,
+            'keep_raw_jpeg_pairs': self.keep_raw_jpeg_pairs,
+            'cleanup_empty_source': self.cleanup_empty_source,
+            'validate_disk_space': self.validate_disk_space,
+            'export_index_csv': self.export_index_csv,
+            'export_index_json': self.export_index_json,
+            'notify_on_finish': self.notify_on_finish,
+            'rename_template': self.rename_template,
+        }
+        for k, var in mapping.items():
+            if k in data:
+                try:
+                    var.set(data[k])
+                except Exception:
+                    pass
+        if 'criteria_order' in data:
+            order = data['criteria_order']
+            if isinstance(order, list) and all(c in self._criteria_order for c in order):
+                self._criteria_order = list(order)
+                self._render_criteria_order()
+        logger.info(f"Preset '{name}' charge")
+
+    def _save_preset_dialog(self):
+        # Petit dialog inline via simpledialog — léger et natif tkinter
+        from tkinter import simpledialog
+        name = simpledialog.askstring(
+            "Sauvegarder le preset", "Nom du preset :",
+            parent=self.winfo_toplevel(),
+        )
+        if not name:
+            return
+        name = name.strip()
+        if not name:
+            return
+        data = {
+            'organize_by_date': self.organize_by_date.get(),
+            'organize_by_camera': self.organize_by_camera.get(),
+            'multilayer': self.multilayer.get(),
+            'copy_not_move': self.copy_not_move.get(),
+            'date_format': self.date_format.get(),
+            'recursive': self.recursive.get(),
+            'include_images': self.include_images.get(),
+            'include_raw': self.include_raw.get(),
+            'include_videos': self.include_videos.get(),
+            'criteria_order': list(self._criteria_order),
+            'filter_date_min': self.filter_date_min.get(),
+            'filter_date_max': self.filter_date_max.get(),
+            'filter_size_min': self.filter_size_min.get(),
+            'filter_size_max': self.filter_size_max.get(),
+            'filter_rating_min': self.filter_rating_min.get(),
+            'filter_keywords': self.filter_keywords.get(),
+            'skip_if_identical': self.skip_if_identical.get(),
+            'keep_raw_jpeg_pairs': self.keep_raw_jpeg_pairs.get(),
+            'cleanup_empty_source': self.cleanup_empty_source.get(),
+            'validate_disk_space': self.validate_disk_space.get(),
+            'export_index_csv': self.export_index_csv.get(),
+            'export_index_json': self.export_index_json.get(),
+            'notify_on_finish': self.notify_on_finish.get(),
+            'rename_template': self.rename_template.get(),
+        }
+        try:
+            get_config().save_preset(name, data)
+            self._refresh_preset_menu(select=name)
+            messagebox.showinfo("Preset", f"Preset '{name}' enregistré.")
+        except Exception as exc:
+            messagebox.showerror("Preset", f"Sauvegarde échouée : {exc}")
+
+    def _delete_preset(self):
+        name = self.preset_name.get()
+        if name == "(aucun)":
+            return
+        if not messagebox.askyesno("Suppression", f"Supprimer le preset « {name} » ?"):
+            return
+        try:
+            get_config().delete_preset(name)
+        except Exception as exc:
+            messagebox.showerror("Preset", f"Suppression échouée : {exc}")
+            return
+        self._refresh_preset_menu()
+
+    def _refresh_preset_menu(self, select: str = "(aucun)"):
+        self._preset_menu.configure(values=self._list_preset_names())
+        self.preset_name.set(select)
+
     def _get_options(self) -> OrganizationOptions:
         """Retourne les options d'organisation actuelles.
 
-        ``criteria_order`` est remonté tel qu'affiché (incluant les critères
-        désactivés). Le SmartOrganizer ignore de toute façon ceux dont la
-        case correspondante n'est pas cochée — le maintien dans la liste
-        permet à l'utilisateur de les réactiver sans perdre son ordre.
-
-        La fonctionnalité GPS étant retirée de l'IHM, ``organize_by_location``
-        est forcé à False et ``max_distance_km``/``use_geocoding`` reprennent
-        les valeurs par défaut du dataclass.
+        Inclut les filtres pré-traitement, les comportements avancés, le
+        template de renommage et les flags d'export d'index.
         """
+        # Parse dates filtre
+        def _parse_date(s: str) -> Optional[datetime]:
+            s = (s or "").strip()
+            if not s:
+                return None
+            for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y'):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    continue
+            return None
+
+        keywords = [k.strip() for k in self.filter_keywords.get().split(',') if k.strip()]
+
         return OrganizationOptions(
             organize_by_date=self.organize_by_date.get(),
             organize_by_camera=self.organize_by_camera.get(),
@@ -580,21 +1119,57 @@ class OrganizeFrame(ctk.CTkFrame):
             criteria_order=list(self._criteria_order),
             copy_not_move=self.copy_not_move.get(),
             date_format=self.date_format.get(),
+            # Filtres
+            date_min=_parse_date(self.filter_date_min.get()),
+            date_max=_parse_date(self.filter_date_max.get()),
+            size_min_bytes=_parse_size_input(self.filter_size_min.get()),
+            size_max_bytes=_parse_size_input(self.filter_size_max.get()) or None,
+            rating_min=self.filter_rating_min.get(),
+            keywords_filter=keywords,
+            # Comportements
+            skip_if_identical=self.skip_if_identical.get(),
+            keep_raw_jpeg_pairs=self.keep_raw_jpeg_pairs.get(),
+            cleanup_empty_source=self.cleanup_empty_source.get(),
+            validate_disk_space=self.validate_disk_space.get(),
+            # Renommage
+            rename_template=(self.rename_template.get().strip() or None),
+            # Index
+            export_index_csv=self.export_index_csv.get(),
+            export_index_json=self.export_index_json.get(),
         )
 
     def _get_files(self) -> List[str]:
-        """Récupère la liste des fichiers à traiter (synchrone)."""
-        source = self.source_var.get()
-        if not source or not os.path.isdir(source):
+        """Récupère la liste des fichiers à traiter sur **toutes les sources**.
+
+        R4 : prend en charge plusieurs sources séparées par ';' dans le champ.
+        Les chemins inexistants sont ignorés silencieusement (logs debug).
+        Les doublons inter-sources sont dédupliqués pour ne pas traiter
+        deux fois le même chemin physique.
+        """
+        sources = self._split_sources()
+        if not sources:
             return []
 
-        return self.file_manager.list_files(
-            source,
-            recursive=self.recursive.get(),
-            include_images=self.include_images.get(),
-            include_raw=self.include_raw.get(),
-            include_videos=self.include_videos.get()
-        )
+        all_files: List[str] = []
+        seen: set = set()
+        for src in sources:
+            if not os.path.isdir(src):
+                logger.debug(f"Source ignoree (inexistante) : {src}")
+                continue
+            files = self.file_manager.list_files(
+                src,
+                recursive=self.recursive.get(),
+                include_images=self.include_images.get(),
+                include_raw=self.include_raw.get(),
+                include_videos=self.include_videos.get(),
+            )
+            for f in files:
+                norm = os.path.normcase(os.path.abspath(f))
+                if norm in seen:
+                    continue
+                seen.add(norm)
+                all_files.append(f)
+        return all_files
 
     def _refresh_file_count(self):
         """Met à jour le compteur de fichiers détectés sous les boutons.
@@ -830,19 +1405,185 @@ Distribution par appareil:
         self.after(0, show)
 
     def _show_organization_results(self, result):
-        """Affiche les résultats de l'organisation."""
-        message = f"""
-Organisation terminée!
-
-Total: {result.total}
-Traités: {result.processed}
-Ignorés: {result.skipped}
-Erreurs: {result.errors}
-"""
+        """Affiche les résultats de l'organisation avec :
+        - une notification système non-modale (Q5)
+        - un dialog modal résumé + bouton « Ouvrir destination » (Q6).
+        """
+        summary = (
+            f"Total : {result.total}  •  Traités : {result.processed}\n"
+            f"Ignorés : {result.skipped}  •  Erreurs : {result.errors}"
+        )
+        full_message = f"Organisation terminée!\n\n{summary}"
         if result.error_messages:
-            message += "\nErreurs:\n" + "\n".join(result.error_messages[:5])
+            full_message += "\n\nErreurs:\n" + "\n".join(result.error_messages[:5])
             if len(result.error_messages) > 5:
-                message += f"\n... et {len(result.error_messages) - 5} autres erreurs"
+                full_message += (
+                    f"\n... et {len(result.error_messages) - 5} autres erreurs"
+                )
 
-        messagebox.showinfo("Organisation terminée", message)
+        # Q5 — Notification système non-modale (fond + barre des tâches)
+        if self.notify_on_finish.get():
+            try:
+                _windows_toast("PhotoOrganizer", summary.replace('\n', ' • '))
+            except Exception as exc:
+                logger.debug(f"toast non envoye : {exc}")
+
+        # Modal récap avec bouton « Ouvrir destination »
+        self._show_results_modal(full_message, dest=self.dest_var.get())
         self._update_progress("Organisation terminée", 1)
+
+    def _show_results_modal(self, message: str, dest: str):
+        """Modal résumé custom (au lieu de messagebox basique) avec un
+        bouton « 📂 Ouvrir destination » qui ouvre l'explorateur natif.
+        """
+        win = ctk.CTkToplevel(self)
+        win.title("Organisation terminée")
+        win.geometry("520x320")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+
+        ctk.CTkLabel(
+            win, text="✅ Organisation terminée",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(padx=12, pady=(12, 6), anchor="w")
+
+        textbox = ctk.CTkTextbox(win, height=180)
+        textbox.pack(fill="both", expand=True, padx=12, pady=4)
+        textbox.insert("end", message)
+        textbox.configure(state="disabled")
+
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=12, pady=(4, 12))
+
+        if dest:
+            ctk.CTkButton(
+                btn_row, text="📂 Ouvrir destination",
+                command=lambda: _open_folder(dest),
+            ).pack(side="left", padx=4, expand=True, fill="x")
+        ctk.CTkButton(btn_row, text="Fermer", command=win.destroy).pack(
+            side="left", padx=4, expand=True, fill="x"
+        )
+
+    def _show_dry_run_preview(self):
+        """Q2 — Aperçu dry-run : applique les options pour les 100 premiers
+        fichiers et affiche l'arborescence cible dans une modale, **sans
+        copier ni déplacer aucun fichier**.
+        """
+        sources = self._split_sources()
+        dest = self.dest_var.get().strip()
+        if not sources:
+            messagebox.showerror("Aperçu", "Sélectionnez au moins un dossier source.")
+            return
+        if not dest:
+            messagebox.showerror("Aperçu", "Sélectionnez le dossier destination.")
+            return
+
+        files = self._get_files()
+        if not files:
+            messagebox.showinfo("Aperçu", "Aucun fichier détecté avec ces filtres.")
+            return
+
+        options = self._get_options()
+        # On applique les filtres pré-traitement comme en réel
+        organizer = SmartOrganizer(file_manager=self.file_manager)
+        eligible = [f for f in files if organizer._passes_filters(f, options)]
+
+        # Détection paires si demandé (impact visuel)
+        pairs = (
+            organizer._detect_raw_jpeg_pairs(eligible)
+            if options.keep_raw_jpeg_pairs else {}
+        )
+
+        # Pour chaque fichier, calculer le chemin cible (sans copier)
+        sample = eligible[:100]
+        tree: dict = {}
+        counter = 0
+        for fp in sample:
+            counter += 1
+            try:
+                exif = get_exif_data(fp)
+                date_taken = extract_date(fp, exif)
+                make, model = get_camera_info(exif, fp)
+                path = dest
+                # Critères dans l'ordre choisi
+                if options.multilayer:
+                    crits = options.criteria_order
+                elif options.organize_by_date:
+                    crits = ['date']
+                elif options.organize_by_camera:
+                    crits = ['camera']
+                else:
+                    crits = []
+                for c in crits:
+                    if c == 'date' and options.organize_by_date:
+                        if date_taken:
+                            y, m, d = (str(date_taken.year),
+                                       f"{date_taken.month:02d}",
+                                       f"{date_taken.day:02d}")
+                            mapping = {
+                                "year/month/day": [y, m, f"{y}_{m}_{d}"],
+                                "year/month": [y, f"{y}_{m}"],
+                                "year": [y],
+                                "year_month_day": [f"{y}_{m}_{d}"],
+                                "year_month": [f"{y}_{m}"],
+                            }
+                            for seg in mapping.get(options.date_format, [y, m, f"{y}_{m}_{d}"]):
+                                path = os.path.join(path, seg)
+                        else:
+                            path = os.path.join(path, "Sans date")
+                    elif c == 'camera' and options.organize_by_camera:
+                        cam = (f"{make} {model}".strip()
+                               if (make != 'Unknown' or model != 'Unknown')
+                               else "Appareil inconnu")
+                        path = os.path.join(path, cam.replace('/', '_'))
+
+                # Renommage
+                fname = os.path.basename(fp)
+                if options.rename_template:
+                    try:
+                        fname = SmartOrganizer._apply_rename_template(
+                            fname, options.rename_template,
+                            date_taken, make, model, counter,
+                        )
+                    except Exception:
+                        pass
+            except Exception as exc:
+                logger.debug(f"preview erreur : {exc}")
+                path = os.path.join(dest, "(erreur)")
+                fname = os.path.basename(fp)
+
+            tree.setdefault(path, []).append(fname)
+
+        # Modale d'affichage
+        win = ctk.CTkToplevel(self)
+        win.title("Aperçu dry-run (sans modification disque)")
+        win.geometry("760x540")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+
+        header_text = (
+            f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
+        )
+        if options.keep_raw_jpeg_pairs and pairs:
+            header_text += f"  •  {len(pairs)} paire(s) RAW+JPEG détectée(s)"
+        header_text += f"\n📁 Destination : {dest}"
+        if len(eligible) > 100:
+            header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
+        ctk.CTkLabel(win, text=header_text, justify="left", anchor="w").pack(
+            fill="x", padx=12, pady=(12, 4)
+        )
+
+        textbox = ctk.CTkTextbox(win, font=ctk.CTkFont(family="Consolas", size=11))
+        textbox.pack(fill="both", expand=True, padx=12, pady=4)
+        for folder in sorted(tree.keys()):
+            rel = os.path.relpath(folder, dest) if dest in folder else folder
+            textbox.insert("end", f"\n📁 {rel}/  ({len(tree[folder])} fichiers)\n")
+            for f in tree[folder][:10]:
+                textbox.insert("end", f"   • {f}\n")
+            if len(tree[folder]) > 10:
+                textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
+        textbox.configure(state="disabled")
+
+        ctk.CTkButton(win, text="Fermer", command=win.destroy).pack(
+            padx=12, pady=(4, 12)
+        )

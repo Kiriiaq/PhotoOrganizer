@@ -31,6 +31,10 @@ HIDDEN_IMPORTS = [
     # `yaml` est un import DUR dans src/config/duplicate_config.py:14 — sans
     # lui le simple chargement du module duplicate_manager casse au démarrage.
     "yaml",
+    # `tkinterdnd2` (drag-and-drop) et `plyer` (toasts Windows) sont
+    # optionnels au runtime mais on les bundle si présents dans l'env de
+    # build. Si absents, le code retombe sur les fallbacks (try/except).
+    "tkinterdnd2", "plyer", "plyer.platforms.win.notification",
     # `requests` est importé tardivement par gps_processor.get_location_name.
     # Même si le géocodage n'est plus exposé par l'IHM, `load_config_from_yaml`
     # peut activer location → on garde le module bundlé pour ne pas
