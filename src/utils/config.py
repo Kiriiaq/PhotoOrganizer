@@ -54,6 +54,15 @@ class AppConfig:
     # API Keys
     positionstack_api_key: str = ""
 
+    # ---- Planification automatique (Lot E5) ----
+    # Une seule planification quotidienne ; pour des règles plus fines
+    # l'utilisateur peut combiner avec le Planificateur Windows natif.
+    schedule_enabled: bool = False
+    schedule_time: str = "23:00"            # format HH:MM
+    schedule_source: str = ""               # source(s), séparées par ;
+    schedule_destination: str = ""
+    schedule_preset: str = ""               # nom du preset à appliquer (vide = défauts)
+
 
 class ConfigManager:
     """Gestionnaire de configuration."""

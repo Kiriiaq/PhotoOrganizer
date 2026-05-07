@@ -202,6 +202,114 @@ def test_rename_template(tmp_path):
         f"got: {[f.name for f in files]}"
 
 
+def test_burst_detection_groups_close_photos(tmp_path):
+    """Lot S1 : 3 photos prises < 3 s d'écart → sous-dossier Burst_01."""
+    from PIL import Image
+    import piexif
+    from datetime import datetime as dt
+
+    def make_photo(name: str, when: dt):
+        path = tmp_path / name
+        img = Image.new("RGB", (50, 50))
+        exif_dict = {
+            "Exif": {
+                piexif.ExifIFD.DateTimeOriginal: when.strftime("%Y:%m:%d %H:%M:%S").encode()
+            },
+        }
+        img.save(path, exif=piexif.dump(exif_dict))
+        return path
+
+    base = dt(2026, 5, 7, 12, 0, 0)
+    p1 = make_photo("a.jpg", base)
+    p2 = make_photo("b.jpg", base.replace(second=1))
+    p3 = make_photo("c.jpg", base.replace(second=2))
+    # une photo isolée 1 minute plus tard → pas de burst
+    p4 = make_photo("z.jpg", base.replace(minute=1))
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=True, organize_by_camera=False,
+        date_format='year',
+        detect_bursts=True,
+        burst_threshold_seconds=3, burst_min_count=3,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(p1), str(p2), str(p3), str(p4)], str(dest), opts)
+    assert res.processed == 4
+    # On doit avoir un dossier 2026/Burst_01 contenant 3 fichiers
+    burst_dir = dest / "2026" / "Burst_01"
+    assert burst_dir.is_dir(), f"Burst_01 manquant — content: {list(dest.rglob('*'))}"
+    assert len(list(burst_dir.glob("*.jpg"))) == 3
+    # Et le fichier isolé reste à la racine de 2026/
+    isolated = list((dest / "2026").glob("*.jpg"))
+    assert len(isolated) == 1
+
+
+def test_incremental_mode_skips_known_files(tmp_path):
+    """Lot S5 : un 2e run ignore les fichiers déjà indexés à destination."""
+    from PIL import Image
+    src = tmp_path / "p.jpg"
+    Image.new("RGB", (60, 60)).save(src)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        incremental_mode=True,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+
+    # 1er run : 1 fichier traité, l'index est créé
+    r1 = org.organize([str(src)], str(dest), opts)
+    assert r1.processed == 1
+    assert (dest / ".photoorganizer_index.json").exists()
+
+    # 2e run sur la même source → skip via index incrémental
+    org2 = SmartOrganizer()
+    r2 = org2.organize([str(src)], str(dest), opts)
+    assert r2.processed == 0
+    assert r2.skipped == 1
+
+
+def test_scheduler_configure_and_next_run():
+    """Lot E5 : le scheduler calcule un prochain trigger cohérent."""
+    import sys, os
+    sys.path.insert(0, os.path.abspath('src'))
+    from core.scheduler import JobScheduler
+    from datetime import datetime, timedelta
+
+    fired = []
+    sched = JobScheduler(callback=lambda: fired.append(1), poll_seconds=5)
+
+    sched.configure(True, "23:30")
+    assert sched.is_enabled()
+    nxt = sched.get_next_run()
+    assert nxt is not None
+    # Doit être dans les 24 h à venir
+    assert datetime.now() <= nxt <= datetime.now() + timedelta(days=1)
+    # H/M doivent matcher
+    assert nxt.hour == 23 and nxt.minute == 30
+
+    sched.configure(False, "23:30")
+    assert not sched.is_enabled()
+    sched.stop()
+
+
+def test_scheduler_rejects_invalid_time():
+    """Heure mal formatée → désactivé silencieusement."""
+    import sys, os
+    sys.path.insert(0, os.path.abspath('src'))
+    from core.scheduler import JobScheduler
+
+    sched = JobScheduler(callback=lambda: None)
+    sched.configure(True, "9999:99")
+    assert not sched.is_enabled()
+    sched.configure(True, "")
+    assert not sched.is_enabled()
+    sched.stop()
+
+
 def test_export_index_csv_json(tmp_path):
     """Lot R7 : export d'un index CSV et JSON dans la destination."""
     from PIL import Image

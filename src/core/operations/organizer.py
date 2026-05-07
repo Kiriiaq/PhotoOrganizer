@@ -68,6 +68,21 @@ class OrganizationOptions:
     export_index_csv: bool = False
     export_index_json: bool = False
 
+    # ---- Détection de bursts / rafales (S1) ----
+    # Si actif, les photos prises à moins de ``burst_threshold_seconds``
+    # d'écart sont regroupées dans un sous-dossier ``Burst_NN/`` à
+    # l'intérieur de leur dossier de destination habituel. Seuils par
+    # défaut : 3 photos minimum, dans une fenêtre de 3 secondes.
+    detect_bursts: bool = False
+    burst_threshold_seconds: int = 3
+    burst_min_count: int = 3
+
+    # ---- Mode incrémental (S5) ----
+    # Persiste un index ``.photoorganizer_index.json`` dans la destination,
+    # indexé par hash partiel (head+tail BLAKE2). Au lancement suivant,
+    # tout fichier source dont le hash est déjà dans l'index est ignoré.
+    incremental_mode: bool = False
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'OrganizationOptions':
         """Crée une instance depuis un dictionnaire (utilisé par les presets)."""
@@ -120,6 +135,12 @@ class SmartOrganizer:
         self._raw_jpeg_pairs: Dict[str, List[str]] = {}  # stem -> [paths]
         self._index_records: List[Dict[str, Any]] = []
         self._counter = 0  # pour les templates {counter:03d}
+        # S1 : map file_path -> burst_id (str ou None si solo). Calculé
+        # une fois par appel à organize() pour éviter de relire les EXIF.
+        self._burst_membership: Dict[str, Optional[str]] = {}
+        # S5 : set des hash deja organises (loade depuis l'index a
+        # destination). Sert au pre-filtrage avant copy/move.
+        self._known_hashes: set = set()
 
     def organize(
         self,
@@ -179,6 +200,33 @@ class SmartOrganizer:
         if options.keep_raw_jpeg_pairs:
             self._raw_jpeg_pairs = self._detect_raw_jpeg_pairs(eligible_files)
 
+        # 2 bis) Détection des bursts / rafales (Lot S1)
+        self._burst_membership.clear()
+        if options.detect_bursts:
+            self._burst_membership = self._detect_bursts(
+                eligible_files,
+                threshold_seconds=options.burst_threshold_seconds,
+                min_count=options.burst_min_count,
+            )
+
+        # 2 ter) Mode incrémental (Lot S5) : on charge l'index existant
+        # à destination et on filtre les fichiers déjà organisés.
+        self._known_hashes.clear()
+        if options.incremental_mode:
+            self._known_hashes = self._load_incremental_index(target_dir)
+            if self._known_hashes:
+                before = len(eligible_files)
+                eligible_files = [
+                    fp for fp in eligible_files
+                    if not self._is_already_indexed(fp)
+                ]
+                already = before - len(eligible_files)
+                if already:
+                    logger.info(
+                        f"Mode incremental : {already} fichier(s) deja indexes, ignores"
+                    )
+                    result.skipped += already
+
         # 3) Validation espace disque (Lot R6)
         if options.validate_disk_space:
             ok, msg = self._validate_disk_space(eligible_files, target_dir)
@@ -228,6 +276,12 @@ class SmartOrganizer:
         # 7) Export index (Lot R7)
         if options.export_index_csv or options.export_index_json:
             self._export_index(target_dir, options)
+
+        # 8) Mise à jour de l'index incrémental persistant (Lot S5).
+        # Le fichier reste à destination entre les exécutions et permet
+        # de skipper rapidement les fichiers déjà organisés au prochain run.
+        if options.incremental_mode and self._index_records:
+            self._save_incremental_index(target_dir)
 
         return result
 
@@ -281,6 +335,13 @@ class SmartOrganizer:
                     current_path, gps_coords, options.use_geocoding
                 )
 
+        # S1 — Sous-dossier Burst_NN/ si le fichier appartient à une rafale.
+        # On ne crée le sous-dossier QUE pour les vrais bursts (≥ min_count).
+        burst_id = self._burst_membership.get(file_path) if options.detect_bursts else None
+        if burst_id:
+            current_path = os.path.join(current_path, burst_id)
+            os.makedirs(current_path, exist_ok=True)
+
         # Déterminer le chemin final — appliquer le template de renommage
         # si configuré (Lot Q4), sinon garder le nom d'origine.
         original_name = os.path.basename(file_path)
@@ -327,18 +388,30 @@ class SmartOrganizer:
             )
 
         # Enregistrer dans l'index de session pour export ultérieur (R7)
+        # ainsi que pour le mode incrémental (S5) qui réutilise l'index.
         if operation.success:
             try:
                 size = os.path.getsize(operation.destination)
             except OSError:
                 size = 0
+            # Hash partiel (head+tail) pour le mode incrémental S5 — calculé
+            # uniquement si demandé pour ne pas pénaliser les organisations
+            # standard. C'est aussi la clé du cache .photoorganizer_index.json.
+            h = ''
+            if options.incremental_mode or options.export_index_csv or options.export_index_json:
+                try:
+                    h = _quick_hash(operation.destination)
+                except OSError:
+                    h = ''
             self._index_records.append({
                 'source':       file_path,
                 'destination':  operation.destination,
                 'date':         date_taken.isoformat() if date_taken else '',
                 'camera':       f"{make} {model}".strip(),
                 'size_bytes':   size,
+                'hash':         h,
                 'action':       operation.operation_type,
+                'burst_id':     burst_id or '',
             })
 
         # Companion RAW+JPEG (Lot R3) : si le fichier traité fait partie d'une
@@ -712,6 +785,132 @@ class SmartOrganizer:
                 logger.debug(f"cleanup ignore : {exc}")
         if cleaned:
             logger.info(f"Cleanup : {cleaned} dossier(s) source vides supprime(s)")
+
+    def _detect_bursts(
+        self,
+        file_paths: List[str],
+        threshold_seconds: int = 3,
+        min_count: int = 3,
+    ) -> Dict[str, Optional[str]]:
+        """Détecte les rafales (Lot S1) en groupant par DateTimeOriginal.
+
+        Algorithme : on extrait la date de prise de vue de chaque fichier,
+        on trie chronologiquement, puis on glisse une fenêtre. Quand l'écart
+        avec la photo précédente dépasse `threshold_seconds`, on clôt le
+        groupe courant. Les groupes de moins de `min_count` photos sont
+        considérés comme des prises uniques (membership = None).
+
+        Retourne : ``{file_path: burst_id_or_None}``. Les burst_id ont la
+        forme ``Burst_01``, ``Burst_02``, … (numérotation chronologique).
+        """
+        # Récupérer (path, date) pour chaque fichier
+        dated: List[Tuple[str, datetime]] = []
+        for fp in file_paths:
+            try:
+                exif = get_exif_data(fp)
+                d = extract_date(fp, exif)
+            except Exception:
+                d = None
+            if d is not None:
+                dated.append((fp, d))
+
+        if not dated:
+            return {}
+
+        # Trier chronologiquement
+        dated.sort(key=lambda t: t[1])
+
+        membership: Dict[str, Optional[str]] = {fp: None for fp in file_paths}
+        groups: List[List[str]] = []
+        current: List[str] = [dated[0][0]]
+        prev_date = dated[0][1]
+        for fp, d in dated[1:]:
+            delta = (d - prev_date).total_seconds()
+            if delta <= threshold_seconds:
+                current.append(fp)
+            else:
+                groups.append(current)
+                current = [fp]
+            prev_date = d
+        groups.append(current)
+
+        # Numéroter uniquement les groupes >= min_count
+        burst_index = 0
+        for grp in groups:
+            if len(grp) >= min_count:
+                burst_index += 1
+                burst_id = f"Burst_{burst_index:02d}"
+                for fp in grp:
+                    membership[fp] = burst_id
+
+        if burst_index:
+            logger.info(
+                f"Detection bursts : {burst_index} rafale(s) detectee(s) "
+                f"(seuil {threshold_seconds}s, min {min_count} photos)"
+            )
+        return membership
+
+    @staticmethod
+    def _incremental_index_path(target_dir: str) -> str:
+        """Emplacement canonique du cache incrémental (Lot S5)."""
+        return os.path.join(target_dir, '.photoorganizer_index.json')
+
+    def _load_incremental_index(self, target_dir: str) -> set:
+        """Charge l'index incrémental précédent et retourne le set des hash."""
+        path = self._incremental_index_path(target_dir)
+        if not os.path.exists(path):
+            return set()
+        try:
+            import json
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            hashes = {rec.get('hash') for rec in data if rec.get('hash')}
+            logger.info(
+                f"Index incremental charge : {len(hashes)} entree(s) connue(s)"
+            )
+            return hashes
+        except (OSError, ValueError) as exc:
+            logger.warning(f"Index incremental illisible ({exc}) — ignore")
+            return set()
+
+    def _save_incremental_index(self, target_dir: str):
+        """Persiste / met à jour l'index incrémental.
+
+        Fusionne avec l'index existant (les anciennes entrées sont conservées)
+        et déduplique sur le couple (hash, destination).
+        """
+        path = self._incremental_index_path(target_dir)
+        try:
+            import json
+            existing: List[Dict[str, Any]] = []
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        existing = json.load(f)
+                except (OSError, ValueError):
+                    existing = []
+            seen = {(rec.get('hash'), rec.get('destination')) for rec in existing}
+            for rec in self._index_records:
+                key = (rec.get('hash'), rec.get('destination'))
+                if rec.get('hash') and key not in seen:
+                    existing.append(rec)
+                    seen.add(key)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(existing, f, ensure_ascii=False, indent=2)
+            logger.info(
+                f"Index incremental sauvegarde : {len(existing)} entree(s) au total"
+            )
+        except OSError as exc:
+            logger.warning(f"Echec sauvegarde index incremental : {exc}")
+
+    def _is_already_indexed(self, file_path: str) -> bool:
+        """Vrai si le hash partiel du fichier est déjà connu (S5)."""
+        if not self._known_hashes:
+            return False
+        try:
+            return _quick_hash(file_path) in self._known_hashes
+        except OSError:
+            return False
 
     def _export_index(self, target_dir: str, options: OrganizationOptions):
         """Écrit un fichier d'index CSV et/ou JSON dans target_dir (R7)."""

@@ -229,6 +229,17 @@ class OrganizeFrame(ctk.CTkFrame):
         self.export_index_json = ctk.BooleanVar(value=False)
         self.notify_on_finish = ctk.BooleanVar(value=True)     # Q5
 
+        # ---- Bursts S1 + Incremental S5 ----
+        self.detect_bursts = ctk.BooleanVar(value=False)
+        self.burst_threshold = ctk.IntVar(value=3)             # secondes
+        self.burst_min_count = ctk.IntVar(value=3)
+        self.incremental_mode = ctk.BooleanVar(value=False)
+
+        # ---- Planification E5 ----
+        self.schedule_enabled = ctk.BooleanVar(value=False)
+        self.schedule_time = ctk.StringVar(value="23:00")
+        self.schedule_status_var = ctk.StringVar(value="Désactivée")
+
         # ---- Renommage Q4 ----
         self.rename_template = ctk.StringVar(value="")  # vide = pas de rename
 
@@ -243,6 +254,24 @@ class OrganizeFrame(ctk.CTkFrame):
         for v in (self.recursive, self.include_images, self.include_raw, self.include_videos):
             v.trace_add("write", lambda *_: self._refresh_file_count())
         self._refresh_file_count()
+
+        # ---- Initialiser le scheduler E5 ----
+        # Lazy import pour ne pas tirer la dépendance si la feature n'est
+        # jamais activée (et garder le démarrage rapide).
+        from core.scheduler import JobScheduler
+        self._scheduler = JobScheduler(callback=self._scheduled_run_callback)
+
+        # Restaurer l'état planifié depuis AppConfig
+        cfg = get_config().config
+        if getattr(cfg, 'schedule_enabled', False):
+            self.schedule_enabled.set(True)
+            self.schedule_time.set(getattr(cfg, 'schedule_time', '23:00'))
+            # Auto-démarrer
+            self._scheduler.configure(True, self.schedule_time.get())
+        # Mettre à jour le label statut
+        self._refresh_schedule_status()
+        # Persister à chaque modification de l'heure
+        self.schedule_time.trace_add("write", lambda *_: self._on_schedule_time_change())
 
     def _create_ui(self):
         """Crée l'interface utilisateur.
@@ -268,11 +297,13 @@ class OrganizeFrame(ctk.CTkFrame):
         self._scroll.rowconfigure(2, weight=0)
 
         # Sections (parent commun = self._scroll)
-        self._create_folders_section()
-        self._create_options_section()
-        self._create_advanced_section()    # row=2 (filtres + comportements)
-        self._create_rename_section()       # row=3 (template + presets)
-        self._create_actions_section()      # row=4 (boutons + progression)
+        self._create_folders_section()      # row=0
+        self._create_options_section()      # row=1 (critères + types)
+        self._create_advanced_section()     # row=2 (filtres + comportements)
+        # row=3 réservé bursts/incremental (intégrés dans advanced ci-dessus)
+        self._create_schedule_section()     # row=4 (planification quotidienne)
+        self._create_rename_section()       # row=5 (template + presets)
+        self._create_actions_section()      # row=6 (boutons + progression)
 
     def _create_folders_section(self):
         """Crée la section de sélection des dossiers."""
@@ -640,10 +671,98 @@ class OrganizeFrame(ctk.CTkFrame):
         _make_checkbox(idx_row, text="CSV", variable=self.export_index_csv).pack(side="left", padx=(0, 12))
         _make_checkbox(idx_row, text="JSON", variable=self.export_index_json).pack(side="left")
 
+        # ---- Bursts S1 ----
+        ctk.CTkFrame(behaviors_frame, height=2,
+                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
+        ctk.CTkLabel(
+            behaviors_frame, text="📸 Détection de rafales (bursts)",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(0, 4))
+        _make_checkbox(behaviors_frame,
+            text="Regrouper les photos prises en rafale dans Burst_NN/",
+            variable=self.detect_bursts,
+        ).pack(anchor="w", padx=20, pady=3)
+
+        burst_row = ctk.CTkFrame(behaviors_frame, fg_color="transparent")
+        burst_row.pack(fill="x", padx=40, pady=(0, 4))
+        ctk.CTkLabel(burst_row, text="Écart max :", width=100, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(
+            burst_row, variable=self.burst_threshold,
+            values=["1", "2", "3", "5", "10"], width=70,
+            command=lambda v: self.burst_threshold.set(int(v)),
+        ).pack(side="left", padx=2)
+        ctk.CTkLabel(burst_row, text="s",
+                     font=ctk.CTkFont(size=11),
+                     text_color=("gray45", "gray65")).pack(side="left", padx=(2, 12))
+        ctk.CTkLabel(burst_row, text="Min photos :", width=90, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(
+            burst_row, variable=self.burst_min_count,
+            values=["2", "3", "4", "5", "8"], width=70,
+            command=lambda v: self.burst_min_count.set(int(v)),
+        ).pack(side="left", padx=2)
+
+        # ---- Incremental S5 ----
+        ctk.CTkFrame(behaviors_frame, height=2,
+                     fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(8, 4))
+        ctk.CTkLabel(
+            behaviors_frame, text="⚡ Mode incrémental",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(0, 4))
+        _make_checkbox(behaviors_frame,
+            text="Skip les fichiers déjà organisés (cache hash partiel)",
+            variable=self.incremental_mode,
+        ).pack(anchor="w", padx=20, pady=3)
+        ctk.CTkLabel(
+            behaviors_frame,
+            text="    L'index est persisté dans <destination>/.photoorganizer_index.json",
+            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+        ).pack(anchor="w", padx=20, pady=(0, 8))
+
+    def _create_schedule_section(self):
+        """Section "Planification automatique" (Lot E5)."""
+        sched_frame = ctk.CTkFrame(self._scroll)
+        sched_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+
+        ctk.CTkLabel(
+            sched_frame,
+            text="📅 Planification automatique quotidienne",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        ctk.CTkLabel(
+            sched_frame,
+            text="Tant que l'application est ouverte, organise automatiquement à l'heure indiquée.",
+            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+        ).pack(anchor="w", padx=10, pady=(0, 6))
+
+        row = ctk.CTkFrame(sched_frame, fg_color="transparent")
+        row.pack(fill="x", padx=20, pady=4)
+
+        self.schedule_switch = ctk.CTkSwitch(
+            row,
+            text="Activer la planification quotidienne",
+            variable=self.schedule_enabled,
+            command=self._on_schedule_toggle,
+            font=ctk.CTkFont(size=CHECKBOX_FONT_SIZE),
+            progress_color=CHECK_FG,
+        )
+        self.schedule_switch.pack(side="left")
+
+        ctk.CTkLabel(row, text="Heure :",
+                     font=ctk.CTkFont(size=LABEL_FONT_SIZE)).pack(side="left", padx=(20, 4))
+        ctk.CTkEntry(row, textvariable=self.schedule_time,
+                     placeholder_text="HH:MM", width=80).pack(side="left", padx=2)
+
+        ctk.CTkLabel(
+            sched_frame, textvariable=self.schedule_status_var,
+            font=ctk.CTkFont(size=12),
+            text_color=("gray30", "gray70"),
+        ).pack(anchor="w", padx=20, pady=(2, 10))
+
     def _create_rename_section(self):
         """Crée la section "Renommage par template" + Presets."""
         rename_frame = ctk.CTkFrame(self._scroll)
-        rename_frame.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        rename_frame.grid(row=5, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
 
         # --- Renommage Q4 ---
         ctk.CTkLabel(
@@ -703,7 +822,7 @@ class OrganizeFrame(ctk.CTkFrame):
     def _create_actions_section(self):
         """Crée la section des boutons d'action."""
         actions_frame = ctk.CTkFrame(self._scroll)
-        actions_frame.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+        actions_frame.grid(row=6, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
 
         # Compteur de fichiers détectés (T-030..T-033 : visible dès la
         # sélection du dossier source). Mis à jour par `_refresh_file_count`.
@@ -1091,6 +1210,60 @@ class OrganizeFrame(ctk.CTkFrame):
         self._preset_menu.configure(values=self._list_preset_names())
         self.preset_name.set(select)
 
+    # ---------------------------- Scheduler E5 ----------------------------
+    def _on_schedule_toggle(self):
+        """Active/désactive la planification quotidienne (Lot E5).
+
+        Persiste dans AppConfig pour restauration au prochain démarrage et
+        configure le JobScheduler. Si l'heure est invalide, on neutralise.
+        """
+        enabled = self.schedule_enabled.get()
+        time_str = self.schedule_time.get().strip()
+        cfg = get_config()
+        cfg.set('schedule_enabled', enabled)
+        cfg.set('schedule_time', time_str)
+        # Source / destination courantes mémorisées pour le run automatique.
+        cfg.set('schedule_source', self.source_var.get())
+        cfg.set('schedule_destination', self.dest_var.get())
+        cfg.set('schedule_preset', self.preset_name.get())
+        self._scheduler.configure(enabled, time_str)
+        self._refresh_schedule_status()
+
+    def _on_schedule_time_change(self):
+        """Reconfigure le scheduler quand l'utilisateur modifie l'heure."""
+        cfg = get_config()
+        cfg.set('schedule_time', self.schedule_time.get().strip())
+        if self.schedule_enabled.get():
+            self._scheduler.configure(True, self.schedule_time.get())
+        self._refresh_schedule_status()
+
+    def _refresh_schedule_status(self):
+        """Met à jour le label de statut "Prochaine exécution : ..."."""
+        if not self.schedule_enabled.get():
+            self.schedule_status_var.set("⏸ Désactivée")
+            return
+        nxt = self._scheduler.get_next_run()
+        if nxt is None:
+            self.schedule_status_var.set("⚠️ Heure invalide (utiliser HH:MM)")
+        else:
+            self.schedule_status_var.set(
+                f"⏰ Prochaine exécution : {nxt.strftime('%Y-%m-%d %H:%M')}"
+            )
+
+    def _scheduled_run_callback(self):
+        """Callback appelé par le JobScheduler à l'heure planifiée.
+
+        Doit rester thread-safe : on délègue à l'UI thread via ``after()``
+        et on n'appelle pas directement les widgets ici.
+        """
+        logger.info("Scheduled run triggered by JobScheduler")
+        # On déclenche l'organisation avec les paramètres courants.
+        # Si pas de source/dest configurés, on log juste et on saute.
+        try:
+            self.after(0, self._organize_files)
+        except Exception as exc:
+            logger.warning(f"Scheduled run dispatch failed: {exc}")
+
     def _get_options(self) -> OrganizationOptions:
         """Retourne les options d'organisation actuelles.
 
@@ -1136,6 +1309,11 @@ class OrganizeFrame(ctk.CTkFrame):
             # Index
             export_index_csv=self.export_index_csv.get(),
             export_index_json=self.export_index_json.get(),
+            # Bursts S1 + Incremental S5
+            detect_bursts=self.detect_bursts.get(),
+            burst_threshold_seconds=self.burst_threshold.get(),
+            burst_min_count=self.burst_min_count.get(),
+            incremental_mode=self.incremental_mode.get(),
         )
 
     def _get_files(self) -> List[str]:
