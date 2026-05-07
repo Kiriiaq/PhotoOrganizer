@@ -11,12 +11,10 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 from src.config.duplicate_config import (
     ExecutionResult,
-    DuplicateGroupDecision,
-    FileDecision,
     FileAction,
     ExecutionMode,
 )

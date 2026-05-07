@@ -12,9 +12,7 @@ import logging
 import fnmatch
 from pathlib import Path
 from datetime import datetime
-from typing import List, Optional, Callable, Dict, Set, Tuple
-from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Optional, Callable, Dict, Tuple
 
 from src.config.duplicate_config import (
     DuplicateManagerConfig,
@@ -339,26 +337,54 @@ class DuplicateManager:
                         if self._should_include_file(full_path):
                             all_files.append(full_path)
 
-            except PermissionError as e:
+            except PermissionError:
                 logger.debug(f"Permission denied: {current_dir}")
             except OSError as e:
                 logger.debug(f"Error scanning {current_dir}: {e}")
 
         return all_files
 
+    # Dossiers système à exclure du scan : corbeilles Windows / Linux / macOS
+    # et marqueurs de système de fichiers internes. La comparaison est
+    # case-insensitive et s'effectue sur le composant final ET sur l'ensemble
+    # des composants du chemin pour bloquer aussi `C:\$Recycle.Bin\S-1-...`.
+    _SYSTEM_EXCLUDED_FOLDER_NAMES = frozenset([
+        "$recycle.bin",                # Windows (NTFS, par utilisateur)
+        "recycler",                    # Windows (FAT/anciennes)
+        "system volume information",   # Windows volume metadata
+        ".trash", ".trashes",          # macOS / Linux
+        "$trash",                      # variante observée
+        ".spotlight-v100", ".fseventsd", ".tempitems",  # macOS
+    ])
+
+    def _is_system_folder(self, folder_path: str) -> bool:
+        """Retourne True si un quelconque composant du chemin est un dossier
+        système (corbeille, métadonnées de volume…) ou suit le pattern
+        ``.Trash-<uid>`` (XDG)."""
+        parts_lower = {p.lower() for p in Path(folder_path).parts}
+        if parts_lower & self._SYSTEM_EXCLUDED_FOLDER_NAMES:
+            return True
+        if any(p.startswith(".trash-") for p in parts_lower):
+            return True
+        return False
+
     def _should_include_folder(self, folder_path: str) -> bool:
         """Check if a folder should be included in scan."""
+        # 1) Exclusion automatique des dossiers système (corbeilles…)
+        if self._is_system_folder(folder_path):
+            logger.debug(f"Dossier systeme ignore: {folder_path}")
+            return False
+
         folder_path_normalized = folder_path.replace('\\', '/')
 
-        # Check exclude patterns
+        # 2) Patterns exclude utilisateur
         for pattern in self.config.folders.exclude:
             if fnmatch.fnmatch(folder_path_normalized, pattern):
                 return False
-            # Also check just the folder name
             if fnmatch.fnmatch(Path(folder_path).name, pattern.split('/')[-1]):
                 return False
 
-        # Check include patterns (if specified)
+        # 3) Patterns include (si renseignés)
         if self.config.folders.include:
             for pattern in self.config.folders.include:
                 if fnmatch.fnmatch(folder_path_normalized, pattern):
@@ -369,7 +395,11 @@ class DuplicateManager:
 
     def _should_include_file(self, file_path: str) -> bool:
         """Check if a file should be included in scan."""
-        # Check extension filters
+        # Garde-fou : un fichier dans un dossier système ne doit jamais
+        # être inclus, même si la traversée a contourné le filtre dossier.
+        if self._is_system_folder(file_path):
+            return False
+
         ext = Path(file_path).suffix.lower()
 
         if self.config.extensions.exclude and ext in self.config.extensions.exclude:
@@ -378,7 +408,6 @@ class DuplicateManager:
         if self.config.extensions.include and ext not in self.config.extensions.include:
             return False
 
-        # Check file size
         try:
             size = os.path.getsize(file_path)
             if size < self.config.min_file_size:

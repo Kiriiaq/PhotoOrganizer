@@ -6,7 +6,6 @@ Extraction, conversion et géocodage inverse.
 import math
 import logging
 from typing import Dict, Any, Optional, Tuple, List
-from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +181,7 @@ class GPSProcessor:
         try:
             import requests
 
-            url = f"https://nominatim.openstreetmap.org/reverse"
+            url = "https://nominatim.openstreetmap.org/reverse"
             params = {
                 'format': 'json',
                 'lat': lat,

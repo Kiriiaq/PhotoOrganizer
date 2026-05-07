@@ -7,15 +7,13 @@ the duplicate detection workflow with support for quick hashes and full hashes.
 """
 
 import os
-import json
-import hashlib
 import logging
 import sqlite3
 import threading
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple, List
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 

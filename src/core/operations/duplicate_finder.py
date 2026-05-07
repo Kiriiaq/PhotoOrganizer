@@ -10,9 +10,8 @@ Optimized with 4MB chunk size for large files and optional hash caching.
 import os
 import hashlib
 import logging
-from typing import Dict, List, Optional, Callable, Tuple
+from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading

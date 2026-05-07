@@ -68,8 +68,13 @@ class MetadataCache:
             return Path.home() / '.cache' / 'PhotoOrganizer'
 
     def _get_cache_key(self, file_path: str) -> str:
-        """Génère une clé de cache unique pour un fichier."""
-        return hashlib.md5(file_path.encode()).hexdigest()
+        """Génère une clé de cache unique pour un fichier.
+
+        On utilise MD5 ici uniquement comme fonction de hachage non
+        cryptographique (clé de cache local). ``usedforsecurity=False``
+        désamorce les flags Bandit B324 et permet à FIPS d'autoriser md5.
+        """
+        return hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()
 
     def _get_cache_file(self, cache_key: str) -> Path:
         """Retourne le chemin du fichier de cache."""
@@ -250,8 +255,38 @@ _cache: Optional[MetadataCache] = None
 
 
 def get_cache() -> MetadataCache:
-    """Retourne l'instance globale du cache."""
+    """Retourne l'instance globale du cache (singleton lazy)."""
     global _cache
     if _cache is None:
         _cache = MetadataCache()
+    return _cache
+
+
+def init_cache(
+    ttl_hours: Optional[int] = None,
+    max_size_mb: Optional[int] = None,
+    cache_dir: Optional[str] = None,
+) -> MetadataCache:
+    """Initialise (ou réinitialise) le cache global avec des paramètres explicites.
+
+    Appelé au démarrage de l'application avec les valeurs de ``AppConfig``
+    pour que le TTL et la taille max reflètent les préférences utilisateur.
+
+    Args:
+        ttl_hours: Durée de vie des entrées en heures.
+        max_size_mb: Taille maximale du cache disque en Mo.
+        cache_dir: Répertoire de cache (auto-détecté si None).
+
+    Returns:
+        L'instance globale du cache.
+    """
+    global _cache
+    kwargs = {}
+    if ttl_hours is not None:
+        kwargs["ttl_hours"] = ttl_hours
+    if max_size_mb is not None:
+        kwargs["max_size_mb"] = max_size_mb
+    if cache_dir is not None:
+        kwargs["cache_dir"] = cache_dir
+    _cache = MetadataCache(**kwargs)
     return _cache

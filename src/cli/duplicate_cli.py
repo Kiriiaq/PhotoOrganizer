@@ -41,12 +41,6 @@ except ImportError:
 
 from src.config.duplicate_config import (
     DuplicateManagerConfig,
-    FolderFilter,
-    ExtensionFilter,
-    ConservationPolicy,
-    HashingConfig,
-    PerformanceConfig,
-    LoggingConfig,
     ExecutionMode,
     ConservationCriterion,
     HashAlgorithm,

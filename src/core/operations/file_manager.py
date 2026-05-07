@@ -6,8 +6,7 @@ Copie, déplacement et opérations de base.
 import os
 import shutil
 import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -247,41 +246,113 @@ class FileManager:
         return self._operations_history.copy()
 
     def rollback_last(self) -> bool:
-        """Annule la dernière opération."""
+        """Annule la dernière opération réversible.
+
+        Les opérations en erreur initialement sont retirées sans tentative
+        de rollback. Si le rollback échoue, on remet l'opération en pile
+        pour qu'elle reste visible (avec un message d'erreur mis à jour).
+        """
         if not self._operations_history:
             return False
 
+        # Chercher la dernière opération réussie
         operation = self._operations_history.pop()
+        while not operation.success and self._operations_history:
+            operation = self._operations_history.pop()
 
-        if operation.operation_type == 'copy':
-            # Supprimer le fichier copié
-            try:
+        if not operation.success:
+            return False
+
+        try:
+            if operation.operation_type == 'copy':
                 if os.path.exists(operation.destination):
                     os.remove(operation.destination)
+                self._cleanup_empty_dir(operation.destination)
                 return True
-            except Exception as e:
-                logger.error(f"Erreur rollback copie: {e}")
-                return False
 
-        elif operation.operation_type == 'move':
-            # Déplacer le fichier à son emplacement original
+            if operation.operation_type == 'move':
+                if not os.path.exists(operation.destination):
+                    return True
+                source_dir = os.path.dirname(operation.source)
+                if source_dir:
+                    os.makedirs(source_dir, exist_ok=True)
+                shutil.move(operation.destination, operation.source)
+                self._cleanup_empty_dir(operation.destination)
+                return True
+
+            logger.warning(f"Rollback non supporte pour: {operation.operation_type}")
+            operation.error = f"rollback non supporte pour {operation.operation_type}"
+            self._operations_history.append(operation)
+            return False
+
+        except Exception as e:
+            logger.error(f"Erreur rollback {operation.operation_type}: {e}")
+            operation.error = f"rollback echoue: {e}"
+            self._operations_history.append(operation)
+            return False
+
+    def _cleanup_empty_dir(self, path: str):
+        """Supprime silencieusement les dossiers vides après rollback."""
+        try:
+            directory = os.path.dirname(path)
+            while directory and os.path.isdir(directory):
+                if not os.listdir(directory):
+                    os.rmdir(directory)
+                    directory = os.path.dirname(directory)
+                else:
+                    break
+        except Exception as e:
+            logger.debug(f"cleanup dossier vide ignore: {e}")
+
+    def rollback_all(self) -> Dict[str, int]:
+        """Annule toutes les opérations de la session (LIFO).
+
+        Returns:
+            dict avec 'success', 'failed', 'skipped', 'total' tels que
+            ``success + failed + skipped == total``.
+        """
+        ops = list(reversed(self._operations_history))
+        total = len(ops)
+        self._operations_history.clear()
+
+        success = 0
+        failed = 0
+        skipped = 0
+
+        for op in ops:
+            if not op.success:
+                skipped += 1
+                continue
             try:
-                if os.path.exists(operation.destination):
-                    shutil.move(operation.destination, operation.source)
-                return True
+                if op.operation_type == 'copy':
+                    if os.path.exists(op.destination):
+                        os.remove(op.destination)
+                    self._cleanup_empty_dir(op.destination)
+                    success += 1
+                elif op.operation_type == 'move':
+                    if not os.path.exists(op.destination):
+                        success += 1
+                    else:
+                        source_dir = os.path.dirname(op.source)
+                        if source_dir:
+                            os.makedirs(source_dir, exist_ok=True)
+                        shutil.move(op.destination, op.source)
+                        self._cleanup_empty_dir(op.destination)
+                        success += 1
+                else:
+                    logger.warning(
+                        f"Rollback non supporte pour: {op.operation_type}"
+                    )
+                    failed += 1
             except Exception as e:
-                logger.error(f"Erreur rollback déplacement: {e}")
-                return False
+                logger.error(f"Erreur rollback {op.operation_type}: {e}")
+                failed += 1
 
-        return False
+        return {"success": success, "failed": failed, "skipped": skipped, "total": total}
 
-    def rollback_all(self) -> int:
-        """Annule toutes les opérations de la session."""
-        count = 0
-        while self._operations_history:
-            if self.rollback_last():
-                count += 1
-        return count
+    def clear_history(self):
+        """Efface l'historique sans annuler aucune opération."""
+        self._operations_history.clear()
 
 
 # Instance globale

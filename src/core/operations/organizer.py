@@ -8,7 +8,6 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable, Tuple
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from ..metadata import get_exif_data, extract_date, get_camera_info, get_gps_coordinates
 from ..metadata.gps_processor import get_processor as get_gps_processor

@@ -59,7 +59,11 @@ class ExifExtractor:
         self._cache: Dict[str, Dict] = {}
 
     def _find_exiftool(self) -> Optional[str]:
-        """Recherche ExifTool dans les emplacements courants."""
+        """Recherche ExifTool dans les emplacements courants.
+
+        Robuste : ignore les chemins vides, attrape OSError (cf. WinError
+        87 quand l'exécutable n'est pas trouvé du tout dans PATH).
+        """
         possible_paths = [
             os.environ.get('EXIFTOOL_PATH', ''),
             'exiftool',
@@ -68,7 +72,9 @@ class ExifExtractor:
         ]
 
         for path in possible_paths:
-            if path and os.path.exists(path):
+            if not path:
+                continue
+            if os.path.exists(path):
                 return path
             try:
                 result = subprocess.run(
@@ -79,7 +85,7 @@ class ExifExtractor:
                 )
                 if result.returncode == 0:
                     return path
-            except (FileNotFoundError, subprocess.TimeoutExpired):
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
                 continue
 
         return None
