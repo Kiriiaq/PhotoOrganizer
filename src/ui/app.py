@@ -38,6 +38,14 @@ class PhotoOrganizerApp(ctk.CTk):
         """Initialise l'application."""
         super().__init__()
 
+        # Activation du drag-and-drop (tkinterdnd2) sur la racine Tk.
+        # Comme on hérite de ctk.CTk (et non de TkinterDnD.Tk()), on doit
+        # charger le package Tcl `tkdnd` à la main puis brancher le mixin
+        # `DnDWrapper` sur notre classe pour que les widgets enfants
+        # héritent de drop_target_register/dnd_bind. Si tkinterdnd2 n'est
+        # pas installé OU si le chargement échoue, on continue sans DnD.
+        self._enable_tk_dnd()
+
         # Configuration
         self.config_manager = get_config()
         config = self.config_manager.config
@@ -341,6 +349,44 @@ Licence MIT
     # ------------------------------------------------------------------
     # Icône Windows / Linux
     # ------------------------------------------------------------------
+    def _enable_tk_dnd(self):
+        """Active le drag-and-drop via tkinterdnd2 sur la racine Tk.
+
+        Comme on hérite de ``ctk.CTk`` (et non de ``TkinterDnD.Tk()``), il
+        faut charger le package Tcl ``tkdnd`` à la main puis brancher le
+        mixin ``DnDWrapper`` sur notre classe pour que les widgets enfants
+        héritent de ``drop_target_register`` / ``dnd_bind``.
+
+        Implémentation : on délègue à ``TkinterDnD._require(self)`` qui
+        sélectionne proprement la sous-archi (win-x64, linux-arm64, …) en
+        fonction de la plateforme. Échec gracieux si tkinterdnd2 absent.
+        """
+        try:
+            import tkinterdnd2
+            from tkinterdnd2 import TkinterDnD
+        except ImportError:
+            logger.debug("tkinterdnd2 absent — DnD desactive")
+            return
+
+        # En mode EXE PyInstaller, tkinterdnd2.__file__ pointe vers le
+        # dossier d'extraction _MEIPASS, donc `tkdnd/` y est présent
+        # (cf. --add-data dans build.py). Rien de spécial à faire ici.
+        try:
+            self.TkdndVersion = TkinterDnD._require(self)
+            # Brancher les méthodes DnDWrapper sur la classe Tk pour que
+            # tous les widgets enfants héritent de drop_target_register /
+            # dnd_bind sans modifier individuellement chaque widget.
+            wrapper = TkinterDnD.DnDWrapper
+            for name in dir(wrapper):
+                if name.startswith('_'):
+                    continue
+                method = getattr(wrapper, name)
+                if callable(method):
+                    setattr(type(self), name, method)
+            logger.info(f"Drag-and-drop active (tkdnd {self.TkdndVersion})")
+        except Exception as exc:
+            logger.warning(f"DnD non active : {exc}")
+
     def _install_icon(self):
         """Charge l'icône de l'application (titre, barre des tâches Windows).
 

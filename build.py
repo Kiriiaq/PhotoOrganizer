@@ -178,6 +178,22 @@ def build(*, light: bool = False, debug: bool = False) -> Path:
         if src_path.exists():
             cmd.extend(["--add-data", f"{src_path}{os.pathsep}{data_dir}"])
 
+    # tkinterdnd2 a besoin de ses binaires Tcl natifs (`tkdnd*.dll`) à côté
+    # du module Python. PyInstaller ne les détecte pas automatiquement, on
+    # les pousse explicitement dans le bundle pour que le drag-and-drop
+    # fonctionne dans l'EXE final. Si la lib n'est pas installée, l'app
+    # retombe gracieusement sans DnD (try/except dans organize_frame.py).
+    try:
+        import tkinterdnd2 as _tkdnd
+        tkdnd_dir = os.path.join(_tkdnd.__path__[0], "tkdnd")
+        if os.path.isdir(tkdnd_dir):
+            cmd.extend([
+                "--add-data",
+                f"{tkdnd_dir}{os.pathsep}tkinterdnd2/tkdnd",
+            ])
+    except ImportError:
+        pass
+
     cmd.append(str(project_dir / "main.py"))
 
     mode = "debug" if debug else ("light (no libs)" if light else "release")
