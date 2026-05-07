@@ -202,6 +202,105 @@ def test_rename_template(tmp_path):
         f"got: {[f.name for f in files]}"
 
 
+def test_organize_by_location_falls_back_when_no_gps(tmp_path):
+    """Sans EXIF GPS, le fichier va dans 'Sans localisation GPS' et le
+    compteur ``files_without_gps`` est incrémenté."""
+    from PIL import Image
+    src = tmp_path / "no_gps.jpg"
+    Image.new("RGB", (40, 40)).save(src)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        organize_by_location=True, use_geocoding=False,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(src)], str(dest), opts)
+    assert res.processed == 1
+    assert (dest / "Sans localisation GPS").is_dir()
+    assert res.files_without_gps == 1
+    assert res.files_with_gps == 0
+
+
+def test_organize_by_location_raw_coords_when_geocoding_disabled(tmp_path):
+    """Avec GPS et géocodage off, le dossier porte le nom Lat_x_Lon_y."""
+    from PIL import Image
+    import piexif
+
+    src = tmp_path / "with_gps.jpg"
+    img = Image.new("RGB", (50, 50))
+
+    # GPS Paris ~ 48.8566 N, 2.3522 E (encodé en rationnels EXIF)
+    def to_dms(deg):
+        d = int(deg)
+        m_full = (deg - d) * 60
+        m = int(m_full)
+        s = (m_full - m) * 60
+        return ((d, 1), (m, 1), (int(s * 1000), 1000))
+
+    gps_ifd = {
+        piexif.GPSIFD.GPSLatitudeRef:  b'N',
+        piexif.GPSIFD.GPSLatitude:      to_dms(48.8566),
+        piexif.GPSIFD.GPSLongitudeRef: b'E',
+        piexif.GPSIFD.GPSLongitude:     to_dms(2.3522),
+    }
+    exif_bytes = piexif.dump({"GPS": gps_ifd})
+    img.save(src, exif=exif_bytes)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        organize_by_location=True, use_geocoding=False,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(src)], str(dest), opts)
+    assert res.processed == 1
+    assert res.files_with_gps == 1
+    assert res.files_raw_coords == 1
+    # Le dossier doit s'appeler "Lat_48.8566_Lon_2.3522" (ou suffixe sanitisé)
+    children = [c.name for c in dest.iterdir()]
+    assert any(c.startswith("Lat_") for c in children), f"got: {children}"
+
+
+def test_organize_by_location_offline_fallback(tmp_path, monkeypatch):
+    """Si gps_processor.get_location_name lève (réseau down), on retombe
+    silencieusement sur Lat_x_Lon_y au lieu de planter."""
+    from PIL import Image
+    import piexif
+
+    src = tmp_path / "p.jpg"
+    img = Image.new("RGB", (40, 40))
+    gps_ifd = {
+        piexif.GPSIFD.GPSLatitudeRef:  b'N',
+        piexif.GPSIFD.GPSLatitude:      ((45, 1), (45, 1), (0, 1)),
+        piexif.GPSIFD.GPSLongitudeRef: b'E',
+        piexif.GPSIFD.GPSLongitude:     ((4, 1), (45, 1), (0, 1)),
+    }
+    img.save(src, exif=piexif.dump({"GPS": gps_ifd}))
+
+    org = SmartOrganizer()
+    # Forcer get_location_name à lever — simule un timeout ou l'absence d'internet
+    monkeypatch.setattr(
+        org.gps_processor, 'get_location_name',
+        lambda lat, lon: (_ for _ in ()).throw(RuntimeError("offline"))
+    )
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        organize_by_location=True, use_geocoding=True,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(src)], str(dest), opts)
+    assert res.processed == 1
+    # Le fichier doit être dans Lat_x_Lon_y, pas dans 'Sans localisation GPS'
+    assert res.files_with_gps == 1
+    assert res.files_raw_coords == 1
+    assert res.files_geocoded == 0
+    assert any(p.name.startswith("Lat_") for p in dest.iterdir())
+
+
 def test_burst_detection_groups_close_photos(tmp_path):
     """Lot S1 : 3 photos prises < 3 s d'écart → sous-dossier Burst_01."""
     from PIL import Image

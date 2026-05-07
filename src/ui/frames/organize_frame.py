@@ -191,19 +191,19 @@ class OrganizeFrame(ctk.CTkFrame):
         # `multilayer` est ON). Le SmartOrganizer applique les critères dans
         # cet ordre — ex. ['date', 'camera'] crée
         #   YYYY / MM / YYYY_MM_DD / Canon EOS R5 / photo.jpg
-        # tandis que ['camera', 'date'] crée
-        #   Canon EOS R5 / YYYY / MM / YYYY_MM_DD / photo.jpg
-        # NB : la fonctionnalité GPS / localisation a été retirée de l'IHM.
-        self._criteria_order: List[str] = ['date', 'camera']
+        # tandis que ['camera', 'date', 'location'] crée
+        #   Canon EOS R5 / YYYY / MM / YYYY_MM_DD / Paris / photo.jpg
+        self._criteria_order: List[str] = ['date', 'camera', 'location']
         self._criteria_rows: dict = {}  # key -> (frame, label, up_btn, down_btn)
 
         # Options d'organisation
         self.organize_by_date = ctk.BooleanVar(value=True)
         self.organize_by_camera = ctk.BooleanVar(value=False)
-        # GPS retiré de l'IHM : on conserve une variable interne à False pour
-        # rester compatible avec OrganizationOptions, mais aucune commande UI
-        # ne peut plus l'activer.
         self.organize_by_location = ctk.BooleanVar(value=False)
+        self.use_geocoding = ctk.BooleanVar(value=True)
+        self.max_distance = ctk.DoubleVar(value=1.0)
+        # Libellé numérique affiché à côté du slider distance max
+        self.max_distance_label_var = ctk.StringVar(value="1.0 km")
         self.multilayer = ctk.BooleanVar(value=False)
         self.copy_not_move = ctk.BooleanVar(value=True)
         self.date_format = ctk.StringVar(value="year/month/day")
@@ -416,10 +416,72 @@ class OrganizeFrame(ctk.CTkFrame):
             variable=self.organize_by_camera
         ).pack(anchor="w", padx=20, pady=3)
 
-        # NB : la fonctionnalité GPS / localisation a été retirée de l'IHM
-        # (jugée hors-scope pour la version courante). Le code core
-        # (`gps_processor`) reste en place pour ne pas régresser les tests
-        # mais aucun widget ne l'expose à l'utilisateur.
+        # Organiser par localisation GPS
+        _make_checkbox(
+            left_frame,
+            text="Par localisation GPS",
+            variable=self.organize_by_location
+        ).pack(anchor="w", padx=20, pady=3)
+
+        # Sous-options GPS — cachées si organize_by_location est OFF
+        self.gps_options_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+        # Affichage initial déclenché plus bas via _refresh_gps_options_visibility
+        gps_top = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
+        gps_top.pack(fill="x", padx=20, pady=2)
+        _make_checkbox(
+            gps_top, text="Géocodage (nom du lieu)",
+            variable=self.use_geocoding,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            gps_top,
+            text="(sinon : Lat_x_Lon_y brutes)",
+            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+        ).pack(side="left", padx=8)
+
+        # Slider distance max — pas large 1 km au glissement, ajustement
+        # fin 100 m via boutons ◀ / ▶ (Lot R6 du worktree d'origine).
+        gps_slider = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
+        gps_slider.pack(fill="x", padx=20, pady=(2, 6))
+        ctk.CTkLabel(
+            gps_slider, text="Distance max :",
+            font=ctk.CTkFont(size=LABEL_FONT_SIZE),
+        ).pack(side="left", padx=(0, 5))
+
+        ctk.CTkButton(
+            gps_slider, text="◀", width=28,
+            command=lambda: self._step_max_distance(-self.MAX_DIST_FINE_STEP),
+        ).pack(side="left", padx=(0, 2))
+
+        self.max_distance_slider = ctk.CTkSlider(
+            gps_slider, from_=0, to=50,
+            number_of_steps=50,                 # pas 1 km au glissement
+            variable=self.max_distance, width=160,
+            command=self._on_max_distance_change,
+        )
+        self.max_distance_slider.pack(side="left", padx=(0, 2))
+
+        ctk.CTkButton(
+            gps_slider, text="▶", width=28,
+            command=lambda: self._step_max_distance(self.MAX_DIST_FINE_STEP),
+        ).pack(side="left", padx=(2, 5))
+
+        ctk.CTkLabel(
+            gps_slider, textvariable=self.max_distance_label_var,
+            width=64, anchor="w",
+            font=ctk.CTkFont(size=LABEL_FONT_SIZE, weight="bold"),
+        ).pack(side="left")
+
+        # Sync libellé initial + trace pour mise à jour live
+        self._on_max_distance_change(self.max_distance.get())
+        self.max_distance.trace_add(
+            "write",
+            lambda *_: self._on_max_distance_change(self.max_distance.get()),
+        )
+        # Affichage conditionnel des sous-options selon la case « Par localisation »
+        self.organize_by_location.trace_add(
+            "write", lambda *_: self._refresh_gps_options_visibility()
+        )
+        self._refresh_gps_options_visibility()
 
         # ---- Séparateur visuel + section « Organisation multicouche » -----
         # Cette option modifie significativement le comportement (combine
@@ -440,7 +502,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         self.multilayer_switch = ctk.CTkSwitch(
             multilayer_row,
-            text="Organisation multicouche (combine date + appareil)",
+            text="Organisation multicouche (combine date + appareil + GPS)",
             variable=self.multilayer,
             font=ctk.CTkFont(size=CHECKBOX_FONT_SIZE, weight="bold"),
             progress_color=CHECK_FG,
@@ -888,10 +950,12 @@ class OrganizeFrame(ctk.CTkFrame):
     CRITERIA_LABELS = {
         'date':     ('📅', 'Date'),
         'camera':   ('📷', 'Appareil'),
+        'location': ('🌍', 'Localisation'),
     }
     CRITERIA_ENABLE_VAR = {
         'date':     'organize_by_date',
         'camera':   'organize_by_camera',
+        'location': 'organize_by_location',
     }
 
     def _update_criteria_visibility(self):
@@ -977,6 +1041,46 @@ class OrganizeFrame(ctk.CTkFrame):
         order = self._criteria_order
         order[idx], order[new_idx] = order[new_idx], order[idx]
         self._render_criteria_order()
+
+    # ----------------------------- GPS / Localisation -----------------------------
+    # Bornes et précision du slider de distance max (km)
+    MAX_DIST_MIN = 0.0
+    MAX_DIST_MAX = 50.0
+    MAX_DIST_FINE_STEP = 0.1   # pas 100 m via les boutons ◀ / ▶
+    MAX_DIST_PRECISION = 10    # 1 / 0.1 → arrondi 100 m
+
+    def _snap_max_distance(self, value: float) -> float:
+        """Arrondit la valeur à 100 m près."""
+        return round(value * self.MAX_DIST_PRECISION) / self.MAX_DIST_PRECISION
+
+    def _on_max_distance_change(self, value):
+        """Met à jour le libellé numérique du slider de distance max."""
+        try:
+            km = float(value)
+        except (TypeError, ValueError):
+            km = 0.0
+        km = self._snap_max_distance(km)
+        self.max_distance_label_var.set(f"{km:.1f} km")
+
+    def _step_max_distance(self, delta: float):
+        """Ajuste finement la distance max via les boutons ◀ / ▶ (±100 m)."""
+        try:
+            current = float(self.max_distance.get())
+        except (TypeError, ValueError):
+            current = 0.0
+        new_val = max(self.MAX_DIST_MIN, min(self.MAX_DIST_MAX, current + delta))
+        new_val = self._snap_max_distance(new_val)
+        self.max_distance.set(new_val)
+        self._on_max_distance_change(new_val)
+
+    def _refresh_gps_options_visibility(self):
+        """Affiche/masque les sous-options GPS selon la case « Par localisation »."""
+        if self.organize_by_location.get():
+            # Re-pack juste après la case correspondante (on l'insère dans
+            # l'ordre naturel — ici, avant la section Avancée).
+            self.gps_options_frame.pack(fill="x", padx=20, pady=(0, 4))
+        else:
+            self.gps_options_frame.pack_forget()
 
     def _browse_source(self):
         """Ouvre le dialogue de sélection du dossier source."""
@@ -1287,7 +1391,9 @@ class OrganizeFrame(ctk.CTkFrame):
         return OrganizationOptions(
             organize_by_date=self.organize_by_date.get(),
             organize_by_camera=self.organize_by_camera.get(),
-            organize_by_location=False,
+            organize_by_location=self.organize_by_location.get(),
+            use_geocoding=self.use_geocoding.get(),
+            max_distance_km=self._snap_max_distance(self.max_distance.get()),
             multilayer=self.multilayer.get(),
             criteria_order=list(self._criteria_order),
             copy_not_move=self.copy_not_move.get(),
@@ -1592,6 +1698,21 @@ Distribution par appareil:
             f"Ignorés : {result.skipped}  •  Erreurs : {result.errors}"
         )
         full_message = f"Organisation terminée!\n\n{summary}"
+
+        # Bloc stats GPS si la localisation a été appliquée
+        with_gps = getattr(result, 'files_with_gps', 0)
+        without_gps = getattr(result, 'files_without_gps', 0)
+        if with_gps or without_gps:
+            geocoded = getattr(result, 'files_geocoded', 0)
+            raw_coords = getattr(result, 'files_raw_coords', 0)
+            full_message += (
+                f"\n\n🌍 Localisation GPS\n"
+                f"  Avec GPS    : {with_gps}\n"
+                f"  Sans GPS    : {without_gps}\n"
+                f"  Géocodées   : {geocoded}  (nom de lieu)\n"
+                f"  Coordonnées : {raw_coords}  (Lat_x_Lon_y, fallback)"
+            )
+
         if result.error_messages:
             full_message += "\n\nErreurs:\n" + "\n".join(result.error_messages[:5])
             if len(result.error_messages) > 5:

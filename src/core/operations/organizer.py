@@ -98,6 +98,11 @@ class OrganizationResult:
     errors: int = 0
     error_messages: List[str] = field(default_factory=list)
     operations: List[Dict] = field(default_factory=list)
+    # ---- Statistiques GPS pour la modale résultat ----
+    files_with_gps: int = 0
+    files_without_gps: int = 0
+    files_geocoded: int = 0       # nom de lieu résolu (Nominatim/PositionStack)
+    files_raw_coords: int = 0     # fallback Lat_x_Lon_y
 
 
 class SmartOrganizer:
@@ -258,7 +263,7 @@ class SmartOrganizer:
                 progress_callback(i + 1, total, os.path.basename(file_path))
 
             try:
-                success = self._process_file(file_path, target_dir, options)
+                success = self._process_file(file_path, target_dir, options, result=result)
                 if success:
                     result.processed += 1
                 else:
@@ -289,9 +294,14 @@ class SmartOrganizer:
         self,
         file_path: str,
         target_dir: str,
-        options: OrganizationOptions
+        options: OrganizationOptions,
+        result: Optional['OrganizationResult'] = None,
     ) -> bool:
-        """Traite un seul fichier."""
+        """Traite un seul fichier.
+
+        ``result`` (optionnel) reçoit les compteurs de stats GPS via
+        ``_apply_location_organization``.
+        """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Fichier inexistant: {file_path}")
 
@@ -332,7 +342,8 @@ class SmartOrganizer:
 
             elif criterion == 'location' and options.organize_by_location:
                 current_path = self._apply_location_organization(
-                    current_path, gps_coords, options.use_geocoding
+                    current_path, gps_coords, options.use_geocoding,
+                    result=result,
                 )
 
         # S1 — Sous-dossier Burst_NN/ si le fichier appartient à une rafale.
@@ -509,17 +520,54 @@ class SmartOrganizer:
         self,
         base_path: str,
         gps_coords: Tuple[Optional[float], Optional[float]],
-        use_geocoding: bool
+        use_geocoding: bool,
+        result: Optional['OrganizationResult'] = None,
     ) -> str:
-        """Applique l'organisation par localisation."""
+        """Applique l'organisation par localisation.
+
+        Mode hors-ligne intelligent (Lot E5+ amélioration GPS) : si le
+        géocodage est demandé mais échoue (timeout, pas d'internet, API
+        indisponible), on retombe automatiquement sur ``Lat_x_Lon_y`` au
+        lieu de placer le fichier dans « Sans localisation GPS ».
+
+        ``result`` est optionnel — si fourni, on incrémente les compteurs
+        ``files_with_gps`` / ``files_without_gps`` / ``files_geocoded`` /
+        ``files_raw_coords`` pour la modale stats.
+        """
         lat, lon = gps_coords
 
         if lat is None or lon is None:
             location_name = "Sans localisation GPS"
-        elif use_geocoding:
-            location_name = self.gps_processor.get_location_name(lat, lon)
+            if result is not None:
+                result.files_without_gps += 1
         else:
-            location_name = f"Lat_{lat:.4f}_Lon_{lon:.4f}"
+            if result is not None:
+                result.files_with_gps += 1
+            if use_geocoding:
+                # Tentative de géocodage avec fallback automatique sur
+                # les coordonnées brutes en cas d'erreur réseau ou API.
+                try:
+                    location_name = self.gps_processor.get_location_name(lat, lon)
+                    # `get_location_name` peut renvoyer None ou une chaîne
+                    # vide selon les implementations / pannes silencieuses.
+                    if not location_name or location_name.strip() in {
+                        "", "Inconnu", "Unknown",
+                    }:
+                        raise ValueError("nom de lieu vide")
+                    if result is not None:
+                        result.files_geocoded += 1
+                except Exception as exc:
+                    logger.debug(
+                        f"Geocodage indisponible pour ({lat:.4f}, {lon:.4f}) — "
+                        f"fallback Lat_x_Lon_y : {exc}"
+                    )
+                    location_name = f"Lat_{lat:.4f}_Lon_{lon:.4f}"
+                    if result is not None:
+                        result.files_raw_coords += 1
+            else:
+                location_name = f"Lat_{lat:.4f}_Lon_{lon:.4f}"
+                if result is not None:
+                    result.files_raw_coords += 1
 
         # Nettoyer le nom pour le système de fichiers
         location_name = self._sanitize_dirname(location_name)

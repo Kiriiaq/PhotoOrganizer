@@ -3,9 +3,9 @@ Module de traitement des données GPS.
 Extraction, conversion et géocodage inverse.
 """
 
-import math
 import logging
-from typing import Dict, Any, Optional, Tuple, List
+import math
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,35 @@ class GPSProcessor:
         return None, None
 
     def _to_decimal(self, value: Any) -> Optional[float]:
-        """Convertit une valeur GPS en degrés décimaux."""
+        """Convertit une valeur GPS en degrés décimaux.
+
+        Formats supportés :
+        - chaînes ``"48 deg 51' 24"`` (Pillow textual)
+        - tuples ``(d, m, s)`` (Pillow IFDRational ou nombres)
+        - tuples piexif rationnels ``((48,1), (51,1), (24,1))`` où chaque
+          composante est elle-même un ``(numerator, denominator)``
+        - objets exposant ``numerator`` / ``denominator`` (Pillow)
+        - nombres directs
+        """
+        def _coerce(component: Any) -> float:
+            """Tente de transformer un composant en float, en gérant :
+            - tuples piexif rationnels ``(num, denom)``
+            - chaînes ``'num/denom'`` (sérialisation EXIF abrégée)
+            - objets numerator/denominator (Pillow IFDRational)
+            - nombres directs
+            """
+            if isinstance(component, tuple) and len(component) == 2:
+                num, denom = component
+                return float(num) / float(denom) if float(denom) != 0 else 0.0
+            if isinstance(component, str) and '/' in component:
+                num_str, denom_str = component.split('/', 1)
+                num = float(num_str.strip())
+                denom = float(denom_str.strip())
+                return num / denom if denom != 0 else 0.0
+            if hasattr(component, 'numerator') and hasattr(component, 'denominator'):
+                return float(component)
+            return float(component)
+
         try:
             # Si c'est une chaîne, parser
             if isinstance(value, str):
@@ -125,23 +153,32 @@ class GPSProcessor:
                     parts = value.replace('deg', '').replace("'", '').replace('"', '').split()
                     if len(parts) >= 3:
                         return float(parts[0]) + float(parts[1])/60 + float(parts[2])/3600
+                # Format string "[48, 51, 24]" ou "[48.0, 51.0, 24.0]"
+                # (sérialisation EXIF utilisée par get_exif_data)
+                stripped = value.strip()
+                if stripped.startswith('[') and stripped.endswith(']'):
+                    inner = stripped[1:-1]
+                    parts = [p.strip() for p in inner.split(',')]
+                    if len(parts) >= 3:
+                        d, m, s = (_coerce(p) for p in parts[:3])
+                        return d + m / 60 + s / 3600
                 # Essayer conversion directe
                 return float(value)
 
             # Liste ou tuple [degrés, minutes, secondes]
             if isinstance(value, (list, tuple)) and len(value) >= 3:
-                d = float(value[0])
-                m = float(value[1])
-                s = float(value[2])
-                return d + m/60 + s/3600
+                d = _coerce(value[0])
+                m = _coerce(value[1])
+                s = _coerce(value[2])
+                return d + m / 60 + s / 3600
 
-            # Ratio Pillow
+            # Ratio Pillow IFDRational
             if hasattr(value, 'numerator') and hasattr(value, 'denominator'):
                 return float(value)
 
             return float(value)
 
-        except (ValueError, TypeError, IndexError):
+        except (ValueError, TypeError, IndexError, ZeroDivisionError):
             return None
 
     def get_location_name(
