@@ -28,11 +28,15 @@ HIDDEN_IMPORTS = [
     "PIL", "PIL._imaging", "PIL._imagingft",
     "exifread", "piexif", "pillow_heif",
     "sqlite3", "_sqlite3",
-    # `requests` retiré car le géocodage GPS n'est plus exposé par l'IHM ;
-    # le module `gps_processor` reste mais ne se déclenche plus depuis l'UI.
-    # `send2trash`/`yaml`/`tqdm` ne sont pas obligatoires : l'app a des
-    # fallbacks (try/except ImportError) — ne pas les forcer pour ne pas
-    # tirer leur coût d'extraction au démarrage.
+    # `yaml` est un import DUR dans src/config/duplicate_config.py:14 — sans
+    # lui le simple chargement du module duplicate_manager casse au démarrage.
+    "yaml",
+    # `requests` est importé tardivement par gps_processor.get_location_name.
+    # Même si le géocodage n'est plus exposé par l'IHM, `load_config_from_yaml`
+    # peut activer location → on garde le module bundlé pour ne pas
+    # provoquer un ImportError différé.
+    "requests", "urllib3", "charset_normalizer", "idna",
+    # `send2trash` et `tqdm` ont des fallbacks try/except → non listés ici.
 ]
 
 # Modules à exclure même en build full : ne sont jamais utilisés et
@@ -46,10 +50,7 @@ EXCLUDE_MODULES = [
     "tornado", "zmq", "babel",
     "PyQt5", "PyQt6", "PySide2", "PySide6", "wx",
     "pytz", "dateutil",
-    # Géocodage retiré de l'IHM → on peut sortir requests/urllib3/charset_normalizer
-    # qui pèsent ~1.5 Mo combinés.
-    "requests", "urllib3", "charset_normalizer", "idna",
-    # Ces deux-là n'apparaissent jamais à l'exécution
+    # blake3 n'est pas obligatoire (fallback hashlib dans duplicate_finder)
     "blake3",
 ]
 
