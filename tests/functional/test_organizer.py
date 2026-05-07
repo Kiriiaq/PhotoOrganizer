@@ -139,6 +139,96 @@ def test_multilayer_respects_criteria_order(tmp_path):
     assert "Appareil inconnu" in children, f"Children: {children}"
 
 
+def test_size_filter_rejects_too_small(tmp_path):
+    """Lot R1 : filtre size_min_bytes rejette les fichiers trop petits."""
+    from PIL import Image
+    small = tmp_path / "small.jpg"
+    Image.new("RGB", (10, 10)).save(small)
+    big = tmp_path / "big.jpg"
+    Image.new("RGB", (1000, 1000)).save(big)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        size_min_bytes=10000,  # rejette small (< 10 Ko)
+        validate_disk_space=False,
+    )
+    res = org.organize([str(small), str(big)], str(tmp_path / "out"), opts)
+    assert res.processed == 1
+    assert res.skipped == 1
+
+
+def test_skip_if_identical(tmp_path):
+    """Lot R2 : skip_if_identical n'écrase pas un fichier identique existant."""
+    from PIL import Image
+    src = tmp_path / "p.jpg"
+    Image.new("RGB", (50, 50)).save(src)
+    dest_dir = tmp_path / "out"
+    dest_dir.mkdir()
+    # On copie une première fois manuellement le fichier identique
+    import shutil
+    shutil.copy2(src, dest_dir / "p.jpg")
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        skip_if_identical=True,
+        auto_rename=False,
+        validate_disk_space=False,
+    )
+    res = org.organize([str(src)], str(dest_dir), opts)
+    # 1 fichier détecté mais skip car identique déjà présent
+    assert res.processed == 0
+    assert res.skipped == 1
+
+
+def test_rename_template(tmp_path):
+    """Lot Q4 : le template de renommage est appliqué au fichier final."""
+    from PIL import Image
+    src = tmp_path / "IMG_0001.jpg"
+    Image.new("RGB", (50, 50)).save(src)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        rename_template="{counter:04d}_{original}",
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    org.organize([str(src)], str(dest), opts)
+    # Le fichier final s'appelle "0001_IMG_0001.jpg"
+    files = list(dest.iterdir())
+    assert any(f.name == "0001_IMG_0001.jpg" for f in files), \
+        f"got: {[f.name for f in files]}"
+
+
+def test_export_index_csv_json(tmp_path):
+    """Lot R7 : export d'un index CSV et JSON dans la destination."""
+    from PIL import Image
+    src = tmp_path / "p.jpg"
+    Image.new("RGB", (50, 50)).save(src)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False, organize_by_camera=False,
+        export_index_csv=True, export_index_json=True,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    org.organize([str(src)], str(dest), opts)
+
+    csv_files = list(dest.glob("_photoorganizer_index_*.csv"))
+    json_files = list(dest.glob("_photoorganizer_index_*.json"))
+    assert len(csv_files) == 1, f"expected 1 csv, got {csv_files}"
+    assert len(json_files) == 1
+    # Vérifier le contenu JSON
+    import json
+    data = json.loads(json_files[0].read_text(encoding='utf-8'))
+    assert len(data) == 1
+    assert data[0]['source'].endswith('p.jpg')
+    assert 'destination' in data[0]
+
+
 def test_multilayer_inverted_order(tmp_path):
     """Inverser l'ordre date/camera change la hiérarchie en sortie."""
     from PIL import Image
