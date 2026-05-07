@@ -12,6 +12,14 @@ import sys
 import os
 import logging
 
+# Configuration Windows pour l'icone dans la barre des taches
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PhotoOrganizer.v1.0")
+    except Exception:
+        pass
+
 # Debug mode via environment variable
 if os.environ.get("PHOTOORGANIZER_DEBUG") == "1":
     logging.basicConfig(level=logging.DEBUG)
