@@ -36,7 +36,7 @@ def check_dependencies():
         print("=" * 60)
         print("ERREUR: Dépendances manquantes")
         print("=" * 60)
-        print(f"\nVeuillez installer les packages suivants:\n")
+        print("\nVeuillez installer les packages suivants:\n")
         print(f"  pip install {' '.join(missing)}")
         print("\nOu installez toutes les dépendances avec:")
         print("  pip install -r requirements.txt")

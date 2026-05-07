@@ -11,6 +11,32 @@ from tkinter import messagebox
 from utils.config import ConfigManager
 from utils.cache import get_cache
 
+# Style cohérent avec OrganizeFrame (cf. organize_frame.py pour la rationale).
+_FONT_SIZE = 13
+_FG = ("#1f6aa5", "#1f6aa5")
+_HOVER = ("#144870", "#144870")
+_BORDER = ("gray40", "gray60")
+
+
+def _make_checkbox(parent, **kwargs):
+    defaults = {
+        "font": ctk.CTkFont(size=_FONT_SIZE),
+        "fg_color": _FG, "hover_color": _HOVER,
+        "border_color": _BORDER, "border_width": 2,
+    }
+    defaults.update(kwargs)
+    return ctk.CTkCheckBox(parent, **defaults)
+
+
+def _make_radio(parent, **kwargs):
+    defaults = {
+        "font": ctk.CTkFont(size=_FONT_SIZE),
+        "fg_color": _FG, "hover_color": _HOVER,
+        "border_color": _BORDER, "border_width_unchecked": 2,
+    }
+    defaults.update(kwargs)
+    return ctk.CTkRadioButton(parent, **defaults)
+
 
 class SettingsFrame(ctk.CTkFrame):
     """Frame des paramètres de l'application."""
@@ -86,21 +112,21 @@ class SettingsFrame(ctk.CTkFrame):
         theme_frame.pack(fill="x", padx=10, pady=5)
 
         ctk.CTkLabel(theme_frame, text="Thème:").pack(side="left", padx=5)
-        ctk.CTkRadioButton(
+        _make_radio(
             theme_frame,
             text="Sombre",
             variable=self.theme_var,
             value="dark",
             command=self._on_theme_change
         ).pack(side="left", padx=10)
-        ctk.CTkRadioButton(
+        _make_radio(
             theme_frame,
             text="Clair",
             variable=self.theme_var,
             value="light",
             command=self._on_theme_change
         ).pack(side="left", padx=10)
-        ctk.CTkRadioButton(
+        _make_radio(
             theme_frame,
             text="Système",
             variable=self.theme_var,
@@ -124,13 +150,13 @@ class SettingsFrame(ctk.CTkFrame):
         action_frame.pack(fill="x", padx=10, pady=5)
 
         ctk.CTkLabel(action_frame, text="Action par défaut:").pack(side="left", padx=5)
-        ctk.CTkRadioButton(
+        _make_radio(
             action_frame,
             text="Copier",
             variable=self.default_action_var,
             value="copy"
         ).pack(side="left", padx=10)
-        ctk.CTkRadioButton(
+        _make_radio(
             action_frame,
             text="Déplacer",
             variable=self.default_action_var,
@@ -138,7 +164,7 @@ class SettingsFrame(ctk.CTkFrame):
         ).pack(side="left", padx=10)
 
         # Récursif par défaut
-        ctk.CTkCheckBox(
+        _make_checkbox(
             section,
             text="Parcourir les sous-dossiers par défaut",
             variable=self.recursive_var
@@ -156,7 +182,7 @@ class SettingsFrame(ctk.CTkFrame):
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         # Cache
-        ctk.CTkCheckBox(
+        _make_checkbox(
             section,
             text="Activer le cache des métadonnées",
             variable=self.cache_enabled_var
@@ -195,7 +221,7 @@ class SettingsFrame(ctk.CTkFrame):
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         # Géocodage
-        ctk.CTkCheckBox(
+        _make_checkbox(
             section,
             text="Activer le géocodage inverse (noms de lieux)",
             variable=self.geocoding_var

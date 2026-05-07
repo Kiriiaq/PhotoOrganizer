@@ -3,14 +3,12 @@ Frame d'historique et rollback.
 Interface pour voir l'historique et annuler les opérations.
 """
 
-import os
 from typing import Optional, Callable
-from datetime import datetime
 
 import customtkinter as ctk
 from tkinter import messagebox
 
-from core.operations.file_manager import FileManager, FileOperation
+from core.operations.file_manager import FileManager
 
 
 class HistoryFrame(ctk.CTkFrame):
@@ -19,6 +17,7 @@ class HistoryFrame(ctk.CTkFrame):
     def __init__(
         self,
         parent,
+        file_manager: Optional[FileManager] = None,
         status_callback: Optional[Callable] = None
     ):
         """
@@ -26,14 +25,18 @@ class HistoryFrame(ctk.CTkFrame):
 
         Args:
             parent: Widget parent
+            file_manager: Gestionnaire de fichiers partagé (créé si None).
+                Doit obligatoirement être le **même** que celui des autres
+                frames pour que l'historique reflète les opérations réelles.
             status_callback: Callback pour la barre de statut
         """
         super().__init__(parent, fg_color="transparent")
 
         self.status_callback = status_callback or (lambda m, p=None: None)
-        self.file_manager = FileManager()
+        self.file_manager = file_manager or FileManager()
 
         self._create_ui()
+        self._refresh_history()
 
     def _create_ui(self):
         """Crée l'interface utilisateur."""
@@ -201,7 +204,11 @@ class HistoryFrame(ctk.CTkFrame):
         self._refresh_history()
 
     def _rollback_all(self):
-        """Annule toutes les opérations."""
+        """Annule toutes les opérations.
+
+        Affiche un compte-rendu détaillé : succès / échecs / ignorées
+        si ``rollback_all`` retourne le dict enrichi.
+        """
         operations = self.file_manager.get_operations_history()
 
         if not operations:
@@ -214,9 +221,24 @@ class HistoryFrame(ctk.CTkFrame):
         ):
             return
 
-        count = self.file_manager.rollback_all()
+        result = self.file_manager.rollback_all()
 
-        messagebox.showinfo("Succès", f"{count} opérations ont été annulées.")
+        # Rétro-compatibilité avec l'ancienne API qui renvoyait un int.
+        if isinstance(result, int):
+            summary = f"{result} opérations ont été annulées."
+            messagebox.showinfo("Succès", summary)
+        else:
+            summary = (
+                f"Rollback terminé sur {result.get('total', 0)} opération(s) :\n\n"
+                f"  ✅ Annulées : {result.get('success', 0)}\n"
+                f"  ❌ Échecs   : {result.get('failed', 0)}\n"
+                f"  ∅  Ignorées : {result.get('skipped', 0)}"
+            )
+            if result.get('failed', 0) > 0:
+                messagebox.showwarning("Rollback partiel", summary)
+            else:
+                messagebox.showinfo("Rollback terminé", summary)
+
         self._refresh_history()
 
     def _clear_history(self):
@@ -228,8 +250,12 @@ class HistoryFrame(ctk.CTkFrame):
         ):
             return
 
-        # Réinitialiser le gestionnaire
-        self.file_manager._operations_history.clear()
+        # Effacer via l'API publique (évite l'accès au _privé)
+        self.file_manager.clear_history()
 
         self._refresh_history()
         messagebox.showinfo("Succès", "L'historique a été effacé.")
+
+    def refresh(self):
+        """Rafraîchissement public, appelé au changement d'onglet."""
+        self._refresh_history()

@@ -6,21 +6,46 @@ Intègre toutes les fonctionnalités du DuplicateManager dans l'IHM.
 
 import os
 import sys
+import logging
 import threading
-from pathlib import Path
 from typing import Optional, Callable, List
-from datetime import datetime
 
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
+
+logger = logging.getLogger(__name__)
+
+# Style cohérent IHM (cf. organize_frame.py).
+_FONT_SIZE = 13
+_FG = ("#1f6aa5", "#1f6aa5")
+_HOVER = ("#144870", "#144870")
+_BORDER = ("gray40", "gray60")
+
+
+def _make_checkbox(parent, **kwargs):
+    defaults = {
+        "font": ctk.CTkFont(size=_FONT_SIZE),
+        "fg_color": _FG, "hover_color": _HOVER,
+        "border_color": _BORDER, "border_width": 2,
+    }
+    defaults.update(kwargs)
+    return ctk.CTkCheckBox(parent, **defaults)
+
+
+def _make_radio(parent, **kwargs):
+    defaults = {
+        "font": ctk.CTkFont(size=_FONT_SIZE),
+        "fg_color": _FG, "hover_color": _HOVER,
+        "border_color": _BORDER, "border_width_unchecked": 2,
+    }
+    defaults.update(kwargs)
+    return ctk.CTkRadioButton(parent, **defaults)
 
 # Ensure src is in path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from src.config.duplicate_config import (
     DuplicateManagerConfig,
-    FolderFilter,
-    ExtensionFilter,
     ConservationPolicy,
     HashingConfig,
     PerformanceConfig,
@@ -28,8 +53,6 @@ from src.config.duplicate_config import (
     ConservationCriterion,
     HashAlgorithm,
     FileAction,
-    FileDecision,
-    DuplicateGroupDecision,
     ExecutionResult,
     load_config_from_yaml,
     save_config_to_yaml,
@@ -46,12 +69,16 @@ class DuplicatesFrame(ctk.CTkFrame):
         self,
         parent,
         source_var: ctk.StringVar,
-        status_callback: Optional[Callable] = None
+        file_manager=None,
+        status_callback: Optional[Callable] = None,
+        navigate_callback: Optional[Callable[[str], None]] = None,
     ):
         super().__init__(parent, fg_color="transparent")
 
         self.source_var = source_var
+        self.file_manager = file_manager  # partagé avec OrganizeFrame/HistoryFrame
         self.status_callback = status_callback or (lambda m, p=None: None)
+        self.navigate_callback = navigate_callback or (lambda _t: None)
 
         self._cancel_requested = False
         self._operation_running = False
@@ -177,7 +204,7 @@ class DuplicatesFrame(ctk.CTkFrame):
             ("Corbeille", "TRASH"),
         ]
         for text, value in modes:
-            ctk.CTkRadioButton(
+            _make_radio(
                 mode_frame, text=text, variable=self.execution_mode, value=value,
                 command=self._on_mode_change
             ).pack(side="left", padx=8)
@@ -268,11 +295,11 @@ class DuplicatesFrame(ctk.CTkFrame):
         row2 = ctk.CTkFrame(group, fg_color="transparent")
         row2.pack(fill="x", padx=10, pady=(2, 10))
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row2, text="Mode rapide (hash partiel)", variable=self.quick_mode
         ).pack(side="left", padx=(0, 15))
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row2, text="Cache de hash", variable=self.use_cache
         ).pack(side="left")
 
@@ -290,16 +317,16 @@ class DuplicatesFrame(ctk.CTkFrame):
         types_row = ctk.CTkFrame(group, fg_color="transparent")
         types_row.pack(fill="x", padx=10, pady=2)
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             types_row, text="Images", variable=self.include_images
         ).pack(side="left", padx=(0, 10))
-        ctk.CTkCheckBox(
+        _make_checkbox(
             types_row, text="RAW", variable=self.include_raw
         ).pack(side="left", padx=10)
-        ctk.CTkCheckBox(
+        _make_checkbox(
             types_row, text="Videos", variable=self.include_videos
         ).pack(side="left", padx=10)
-        ctk.CTkCheckBox(
+        _make_checkbox(
             types_row, text="Recursif", variable=self.recursive
         ).pack(side="left", padx=10)
 
@@ -338,12 +365,12 @@ class DuplicatesFrame(ctk.CTkFrame):
         criteria_frame = ctk.CTkFrame(group, fg_color="transparent")
         criteria_frame.pack(fill="x", padx=10, pady=2)
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             criteria_frame, text="1. Dossier prioritaire",
             variable=self.use_priority_folder
         ).pack(anchor="w", pady=1)
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             criteria_frame, text="2. Extension preferee (.raw > .tiff > .jpg)",
             variable=self.use_preferred_ext
         ).pack(anchor="w", pady=1)
@@ -353,13 +380,13 @@ class DuplicatesFrame(ctk.CTkFrame):
         date_frame.pack(anchor="w", pady=1, fill="x")
 
         ctk.CTkLabel(date_frame, text="3. Date:").pack(side="left")
-        ctk.CTkRadioButton(
+        _make_radio(
             date_frame, text="Plus ancien", variable=self.date_criterion, value="oldest"
         ).pack(side="left", padx=8)
-        ctk.CTkRadioButton(
+        _make_radio(
             date_frame, text="Plus recent", variable=self.date_criterion, value="newest"
         ).pack(side="left", padx=8)
-        ctk.CTkRadioButton(
+        _make_radio(
             date_frame, text="Ignorer", variable=self.date_criterion, value="none"
         ).pack(side="left", padx=8)
 
@@ -368,13 +395,13 @@ class DuplicatesFrame(ctk.CTkFrame):
         path_frame.pack(anchor="w", pady=1, fill="x")
 
         ctk.CTkLabel(path_frame, text="4. Chemin:").pack(side="left")
-        ctk.CTkRadioButton(
+        _make_radio(
             path_frame, text="Plus court", variable=self.path_criterion, value="shortest"
         ).pack(side="left", padx=8)
-        ctk.CTkRadioButton(
+        _make_radio(
             path_frame, text="Plus long", variable=self.path_criterion, value="longest"
         ).pack(side="left", padx=8)
-        ctk.CTkRadioButton(
+        _make_radio(
             path_frame, text="Ignorer", variable=self.path_criterion, value="none"
         ).pack(side="left", padx=8)
 
@@ -417,7 +444,7 @@ class DuplicatesFrame(ctk.CTkFrame):
             command=lambda v: self.workers.set(int(v.split()[0]))
         ).pack(side="left", padx=10)
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row1, text="Verifier hash avant suppression",
             variable=self.verify_before_delete
         ).pack(side="left", padx=(20, 0))
@@ -435,13 +462,13 @@ class DuplicatesFrame(ctk.CTkFrame):
         row1 = ctk.CTkFrame(group, fg_color="transparent")
         row1.pack(fill="x", padx=10, pady=2)
 
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row1, text="CSV", variable=self.generate_csv
         ).pack(side="left", padx=(0, 15))
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row1, text="JSON", variable=self.generate_json
         ).pack(side="left", padx=15)
-        ctk.CTkCheckBox(
+        _make_checkbox(
             row1, text="TXT", variable=self.generate_txt
         ).pack(side="left", padx=15)
 
@@ -875,9 +902,14 @@ class DuplicatesFrame(ctk.CTkFrame):
                     1.0
                 )
 
-            except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
-                self._update_progress(f"Erreur: {e}", 0)
+            except Exception as exc:
+                # IMPORTANT : capter le message AVANT le `finally` car
+                # Python efface `exc` à la sortie du `except`. Sans la copie
+                # explicite la lambda passée à `self.after` lèverait NameError.
+                err_msg = str(exc)
+                logger.exception("Erreur durant le scan des doublons")
+                self.after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
+                self._update_progress(f"Erreur: {err_msg}", 0)
 
             finally:
                 self._set_running(False)
@@ -939,8 +971,10 @@ class DuplicatesFrame(ctk.CTkFrame):
                 self.after(0, lambda: self._show_execution_result(result))
                 self._update_progress("Execution terminee.", 1.0)
 
-            except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
+            except Exception as exc:
+                err_msg = str(exc)
+                logger.exception("Erreur durant l'execution des actions doublons")
+                self.after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
 
             finally:
                 self._set_running(False)
@@ -981,9 +1015,11 @@ class DuplicatesFrame(ctk.CTkFrame):
             if generated:
                 self._update_progress(f"Rapports generes dans: {output_dir}", None)
 
-        except Exception as e:
-            self.after(0, lambda: messagebox.showwarning(
-                "Rapports", f"Erreur lors de la generation des rapports:\n{e}"
+        except Exception as exc:
+            err_msg = str(exc)
+            logger.exception("Erreur generation rapports doublons")
+            self.after(0, lambda m=err_msg: messagebox.showwarning(
+                "Rapports", f"Erreur lors de la generation des rapports:\n{m}"
             ))
 
     # =========================================================================
