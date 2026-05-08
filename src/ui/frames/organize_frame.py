@@ -23,7 +23,6 @@ from ui.theme import (
     BTN_H_STD,
     HINT_COLOR,
     LABEL_MUTED,
-    PAD_L,
     PAD_M,
     PAD_S,
     SEPARATOR_COLOR,
@@ -35,6 +34,8 @@ from ui.theme import (
     neutral_button,
     primary_button,
 )
+from ui.tooltip import attach_tooltip
+from ui.tooltips_fr import ORGANIZE as TIPS
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -266,6 +267,10 @@ class OrganizeFrame(ctk.CTkFrame):
         self.preset_name = ctk.StringVar(value="(aucun)")
 
         self._create_ui()
+
+        # Attacher les tooltips à tous les widgets clés (centralisé dans
+        # tooltips_fr.ORGANIZE pour faciliter la maintenance des libellés).
+        self._attach_tooltips()
 
         # Brancher le compteur de fichiers source — déclenche un scan léger
         # à chaque changement du dossier source ou des filtres.
@@ -840,67 +845,182 @@ class OrganizeFrame(ctk.CTkFrame):
         return  # intentionnel — voir docstring
 
     def _create_rename_section(self):
-        """Section "Renommage" compactée — 2 lignes au lieu de 6.
+        """Section "Renommage" repliable avec layout 2 colonnes.
 
         Layout :
-          🏷️ Renommage & Presets
-          [Preset ▼] [💾] [🗑]   |   Template [_______________]   →aperçu
+          ▼ 🏷️ Renommage & Presets   ← bouton de pliage / dépliage
+          ┌────────────────────────┬──────────────────────────────────┐
+          │ Exemples (cliquables)   │ Template [_____________________]│
+          │  • Garder nom origine   │ Aperçu :                         │
+          │  • Date YYYYMMDD        │   IMG_0001.jpg → 20260507_…      │
+          │  • Date + compteur      │                                  │
+          │  • …                    │ Tokens : {original}, {ext}, …    │
+          │                         │                                  │
+          │  [Réinitialiser]        │ Preset : […▼] [💾] [🗑]           │
+          └────────────────────────┴──────────────────────────────────┘
+
+        L'état (replié/déplié) est persisté dans AppConfig.rename_collapsed.
         """
-        rename = ctk.CTkFrame(self._scroll)
-        rename.grid(row=2, column=0, columnspan=2, sticky="ew",
-                    padx=PAD_S, pady=(PAD_S, 0))
-        rename.columnconfigure(4, weight=1)  # template entry s'étend
+        # Container externe — wrapper qui contient le toggle + le contenu
+        wrapper = ctk.CTkFrame(self._scroll)
+        wrapper.grid(row=2, column=0, columnspan=2, sticky="ew",
+                     padx=PAD_S, pady=(PAD_S, 0))
+        wrapper.columnconfigure(0, weight=1)
+
+        # En-tête cliquable — toggle ▼ / ▶
+        self._rename_collapsed = bool(
+            getattr(get_config().config, 'rename_collapsed', False)
+        )
+        self._rename_toggle_btn = ctk.CTkButton(
+            wrapper,
+            text=self._rename_toggle_label(),
+            command=self._toggle_rename_section,
+            anchor="w",
+            font=font_section(),
+            fg_color="transparent",
+            text_color=("gray10", "#DCE4EE"),
+            hover_color=("gray85", "gray25"),
+            height=BTN_H_STD,
+        )
+        self._rename_toggle_btn.grid(row=0, column=0, sticky="ew",
+                                     padx=PAD_M, pady=PAD_S)
+
+        # Content frame (2 colonnes) — affiché ou caché selon état
+        self._rename_content = ctk.CTkFrame(wrapper, fg_color="transparent")
+        self._rename_content.columnconfigure(0, weight=1, uniform="rn")
+        self._rename_content.columnconfigure(1, weight=2, uniform="rn")
+
+        # ===== Colonne gauche : exemples cliquables =====
+        examples_box = ctk.CTkFrame(self._rename_content)
+        examples_box.grid(row=0, column=0, sticky="nsew",
+                          padx=(PAD_M, PAD_S), pady=(0, PAD_M))
 
         ctk.CTkLabel(
-            rename, text="🏷️ Renommage & Presets",
-            font=font_section(),
-        ).grid(row=0, column=0, columnspan=6, sticky="w",
-               padx=PAD_M, pady=(PAD_M, PAD_S))
+            examples_box, text="📋 Exemples cliquables",
+            font=font_label(weight="bold"),
+        ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
-        # Ligne presets compacte
-        ctk.CTkLabel(rename, text="Preset :", font=font_label()).grid(
-            row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S,
+        # Scrollable list (les 10 exemples, ~28 px par ligne)
+        from ui.prompt_examples import RENAME_TEMPLATES
+        examples_scroll = ctk.CTkScrollableFrame(
+            examples_box, height=180, fg_color="transparent",
         )
+        examples_scroll.pack(fill="both", expand=True, padx=PAD_S, pady=(0, PAD_S))
+
+        self._rename_example_btns = []
+        for tpl in RENAME_TEMPLATES:
+            row = ctk.CTkFrame(examples_scroll, fg_color="transparent")
+            row.pack(fill="x", pady=1)
+            btn = ctk.CTkButton(
+                row, text=f"• {tpl.label}",
+                anchor="w",
+                fg_color="transparent",
+                hover_color=("gray85", "gray25"),
+                text_color=("gray10", "#DCE4EE"),
+                command=lambda t=tpl.template: self._apply_rename_example(t),
+                height=24, font=font_label(),
+            )
+            btn.pack(fill="x")
+            self._rename_example_btns.append((btn, tpl))
+
+        # Bouton Réinitialiser
+        ctk.CTkButton(
+            examples_box, text="🔄 Réinitialiser",
+            command=lambda: self._apply_rename_example(""),
+            height=BTN_H_STD,
+            font=font_label(),
+        ).pack(fill="x", padx=PAD_S, pady=(PAD_S, PAD_S))
+
+        # ===== Colonne droite : zone d'édition + presets =====
+        edit_box = ctk.CTkFrame(self._rename_content)
+        edit_box.grid(row=0, column=1, sticky="nsew",
+                      padx=(0, PAD_M), pady=(0, PAD_M))
+        edit_box.columnconfigure(1, weight=1)
+
+        # Template entry (la "textbox" demandée par le prompt)
+        ctk.CTkLabel(edit_box, text="Template :",
+                     font=font_label()).grid(row=0, column=0, sticky="w",
+                                             padx=PAD_M, pady=(PAD_M, PAD_S))
+        self.rename_entry = ctk.CTkEntry(
+            edit_box, textvariable=self.rename_template,
+            placeholder_text="(vide = nom d'origine conservé)",
+            height=BTN_H_STD, font=font_label(),
+        )
+        self.rename_entry.grid(row=0, column=1, sticky="ew",
+                               padx=(0, PAD_M), pady=(PAD_M, PAD_S))
+
+        # Aperçu live
+        self.rename_preview_var = ctk.StringVar(value="(aucun template)")
+        ctk.CTkLabel(edit_box, text="Aperçu :",
+                     font=font_label()).grid(row=1, column=0, sticky="w",
+                                             padx=PAD_M, pady=PAD_S)
+        ctk.CTkLabel(
+            edit_box, textvariable=self.rename_preview_var,
+            font=font_hint(), text_color=HINT_COLOR, anchor="w", justify="left",
+        ).grid(row=1, column=1, sticky="ew", padx=(0, PAD_M), pady=PAD_S)
+        self.rename_template.trace_add(
+            "write", lambda *_: self._refresh_rename_preview()
+        )
+
+        # Tokens disponibles
+        ctk.CTkLabel(
+            edit_box,
+            text="Tokens : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
+            font=font_hint(), text_color=HINT_COLOR, anchor="w",
+        ).grid(row=2, column=0, columnspan=2, sticky="ew",
+               padx=PAD_M, pady=(PAD_S, PAD_M))
+
+        # Séparateur entre Renommage et Presets
+        ctk.CTkFrame(edit_box, height=1, fg_color=SEPARATOR_COLOR).grid(
+            row=3, column=0, columnspan=2, sticky="ew",
+            padx=PAD_M, pady=(0, PAD_S),
+        )
+
+        # Ligne Presets
+        ctk.CTkLabel(edit_box, text="Preset :",
+                     font=font_label()).grid(row=4, column=0, sticky="w",
+                                             padx=PAD_M, pady=(0, PAD_M))
+        preset_row = ctk.CTkFrame(edit_box, fg_color="transparent")
+        preset_row.grid(row=4, column=1, sticky="ew",
+                        padx=(0, PAD_M), pady=(0, PAD_M))
         self._preset_menu = ctk.CTkOptionMenu(
-            rename, variable=self.preset_name,
+            preset_row, variable=self.preset_name,
             values=self._list_preset_names(),
             command=self._on_preset_selected,
-            width=140, height=BTN_H_STD,
+            width=180, height=BTN_H_STD,
         )
-        self._preset_menu.grid(row=1, column=1, padx=(0, PAD_S), pady=PAD_S, sticky="w")
-        icon_button(rename, text="💾", command=self._save_preset_dialog).grid(
-            row=1, column=2, padx=(0, PAD_S), pady=PAD_S,
-        )
-        icon_button(rename, text="🗑", command=self._delete_preset).grid(
-            row=1, column=3, padx=(0, PAD_L), pady=PAD_S,
-        )
+        self._preset_menu.pack(side="left", padx=(0, PAD_S))
+        icon_button(preset_row, text="💾",
+                    command=self._save_preset_dialog).pack(side="left", padx=(0, PAD_S))
+        icon_button(preset_row, text="🗑",
+                    command=self._delete_preset).pack(side="left")
 
-        # Template + aperçu sur la même ligne
-        ctk.CTkLabel(rename, text="Template :", font=font_label()).grid(
-            row=1, column=4, sticky="w", padx=(0, PAD_S), pady=PAD_S,
-        )
-        ctk.CTkEntry(
-            rename, textvariable=self.rename_template, height=BTN_H_STD,
-            placeholder_text="ex. {date:%Y%m%d}_{counter:04d}_{original}",
-        ).grid(row=1, column=5, sticky="ew", padx=(0, PAD_M), pady=PAD_S)
-        rename.columnconfigure(5, weight=1)  # entry expandable
+        # État initial
+        if not self._rename_collapsed:
+            self._rename_content.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
 
-        # Hint + aperçu sur 1 ligne grise sous l'entry
-        self.rename_preview_var = ctk.StringVar(value="(aucun template)")
-        ctk.CTkLabel(
-            rename,
-            textvariable=self.rename_preview_var,
-            font=font_hint(), text_color=HINT_COLOR, anchor="w",
-        ).grid(row=2, column=4, columnspan=2, sticky="ew",
-               padx=(0, PAD_M), pady=(0, PAD_S))
-        self.rename_template.trace_add("write", lambda *_: self._refresh_rename_preview())
+    def _rename_toggle_label(self) -> str:
+        return "▶  🏷️ Renommage & Presets" if self._rename_collapsed \
+               else "▼  🏷️ Renommage & Presets"
 
-        ctk.CTkLabel(
-            rename,
-            text="Tokens disponibles : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
-            font=font_hint(), text_color=HINT_COLOR, anchor="w",
-        ).grid(row=3, column=0, columnspan=6, sticky="ew",
-               padx=PAD_M, pady=(0, PAD_M))
+    def _toggle_rename_section(self):
+        """Bascule le panneau Renommage et persiste l'état."""
+        self._rename_collapsed = not self._rename_collapsed
+        if self._rename_collapsed:
+            self._rename_content.grid_forget()
+        else:
+            self._rename_content.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
+        self._rename_toggle_btn.configure(text=self._rename_toggle_label())
+        # Persistance
+        try:
+            get_config().set('rename_collapsed', self._rename_collapsed)
+        except Exception:
+            pass
+
+    def _apply_rename_example(self, template_str: str):
+        """Applique un exemple de template à la zone d'édition."""
+        self.rename_template.set(template_str)
+        # Le trace_add appelle automatiquement _refresh_rename_preview
 
     def _create_actions_section(self):
         """Section actions en zone bottom fixe (toujours visible).
@@ -1468,6 +1588,90 @@ class OrganizeFrame(ctk.CTkFrame):
                 seen.add(norm)
                 all_files.append(f)
         return all_files
+
+    def _attach_tooltips(self):
+        """Attache les info-bulles à tous les widgets clés du panneau.
+
+        Centralisé après ``_create_ui()`` pour éviter de polluer les méthodes
+        de construction. Les libellés viennent de ``tooltips_fr.ORGANIZE``.
+        """
+        # Champs Source/Destination
+        attach_tooltip(self.source_entry, TIPS["source_entry"])
+        attach_tooltip(self.dest_entry, TIPS["dest_entry"])
+        attach_tooltip(self.file_count_label, TIPS["file_count"])
+
+        # Cases / radios des critères et types
+        # On cherche par nom de variable plutôt que par référence directe
+        # (les cases ne sont pas toutes stockées comme attributs).
+        if hasattr(self, "multilayer_switch"):
+            attach_tooltip(self.multilayer_switch, TIPS["multilayer"])
+        if hasattr(self, "_adv_toggle_btn"):
+            attach_tooltip(self._adv_toggle_btn, TIPS["advanced_toggle"])
+        if hasattr(self, "_rename_toggle_btn"):
+            attach_tooltip(self._rename_toggle_btn, "Replier/déplier la section Renommage et Presets.")
+
+        # Sliders / entrées GPS
+        if hasattr(self, "max_distance_slider"):
+            attach_tooltip(self.max_distance_slider, TIPS["max_distance"])
+
+        # Renommage
+        if hasattr(self, "rename_entry"):
+            attach_tooltip(self.rename_entry, TIPS["rename_template"])
+
+        # Presets
+        if hasattr(self, "_preset_menu"):
+            attach_tooltip(self._preset_menu, TIPS["preset_menu"])
+
+        # Boutons d'action — zone bottom
+        attach_tooltip(self.analyze_button,  TIPS["btn_analyze"])
+        attach_tooltip(self.preview_button,  TIPS["btn_preview"])
+        attach_tooltip(self.organize_button, TIPS["btn_organize"])
+        attach_tooltip(self.cancel_button,   TIPS["btn_cancel"])
+
+        # Filtres avancés (parcours descendants pour trouver les Entry par
+        # textvariable — évite de stocker chaque widget individuellement)
+        self._attach_tooltips_to_filter_entries()
+
+    def _attach_tooltips_to_filter_entries(self):
+        """Attache les tooltips aux Entry des filtres avancés via leur var."""
+        var_to_tip = {
+            id(self.filter_date_min):   TIPS["filter_date_min"],
+            id(self.filter_date_max):   TIPS["filter_date_max"],
+            id(self.filter_size_min):   TIPS["filter_size_min"],
+            id(self.filter_size_max):   TIPS["filter_size_max"],
+            id(self.filter_keywords):   TIPS["filter_keywords"],
+        }
+        for child in self._iter_descendants(self):
+            try:
+                var_name = child.cget("textvariable")
+            except Exception:
+                continue
+            if not var_name:
+                continue
+            # Résolution de la var par nom Tcl → recherche dans nos vars
+            for var_id, tip in var_to_tip.items():
+                # On compare via le nom Tcl interne
+                try:
+                    matching = next(
+                        (v for v in (
+                            self.filter_date_min, self.filter_date_max,
+                            self.filter_size_min, self.filter_size_max,
+                            self.filter_keywords,
+                        ) if str(v) == var_name and id(v) == var_id),
+                        None,
+                    )
+                    if matching is not None:
+                        attach_tooltip(child, tip)
+                        break
+                except Exception:
+                    continue
+
+    @staticmethod
+    def _iter_descendants(widget):
+        """Yield récursivement tous les descendants Tk d'un widget."""
+        for child in widget.winfo_children():
+            yield child
+            yield from OrganizeFrame._iter_descendants(child)
 
     def _refresh_file_count(self):
         """Met à jour le compteur de fichiers détectés sous les boutons.

@@ -63,6 +63,9 @@ class AppConfig:
     schedule_destination: str = ""
     schedule_preset: str = ""               # nom du preset à appliquer (vide = défauts)
 
+    # ---- État UI persisté entre sessions ----
+    rename_collapsed: bool = False          # pliage de la section Renommage
+
 
 class ConfigManager:
     """Gestionnaire de configuration."""

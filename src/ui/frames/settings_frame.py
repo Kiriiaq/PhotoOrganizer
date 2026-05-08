@@ -31,6 +31,9 @@ from utils.config import ConfigManager
 _make_checkbox = make_checkbox
 _make_radio = make_radio
 
+from ui.tooltip import attach_tooltip
+from ui.tooltips_fr import SETTINGS as TIPS
+
 
 class SettingsFrame(ctk.CTkFrame):
     """Frame des paramètres de l'application."""
@@ -65,6 +68,12 @@ class SettingsFrame(ctk.CTkFrame):
         self.api_key_var = ctk.StringVar(value=self.config.positionstack_api_key)
 
         self._create_ui()
+        self._attach_tooltips()
+
+    def _attach_tooltips(self):
+        """Attache les info-bulles aux widgets clés du panneau Paramètres."""
+        if hasattr(self, "schedule_switch"):
+            attach_tooltip(self.schedule_switch, TIPS["schedule_enabled"])
 
     def _create_ui(self):
         """Refonte UI v3 : sections scrollables + boutons sticky bottom.

@@ -16,40 +16,10 @@ la fixture ``app`` (téléchargée plusieurs fois → marqueur ``slow`` n'est
 PAS appliqué car les tests doivent tourner à chaque CI).
 """
 
-import os
-import sys
-import pytest
+import customtkinter as ctk
 
-
-# Skip toute la suite si on n'a pas de display (ex: CI Linux headless)
-try:
-    import customtkinter as ctk
-    _root = ctk.CTk()
-    _root.destroy()
-    _HAS_DISPLAY = True
-except Exception:
-    _HAS_DISPLAY = False
-
-pytestmark = pytest.mark.skipif(
-    not _HAS_DISPLAY,
-    reason="Pas d'environnement graphique disponible (CI headless)",
-)
-
-
-@pytest.fixture(scope="module")
-def app():
-    """Fixture lourde — partagée pour tout le module pour éviter le coût
-    de démarrage CTk répété (chaque CTk() prend ~0.5s)."""
-    sys.path.insert(0, os.path.abspath('src'))
-    sys.path.insert(0, os.path.abspath('.'))
-    from ui.app import PhotoOrganizerApp
-    a = PhotoOrganizerApp()
-    a.geometry("1200x800")
-    for _ in range(3):
-        a.update_idletasks()
-        a.update()
-    yield a
-    a.destroy()
+# La fixture `app` est définie dans tests/conftest.py (session-scoped)
+# pour partager une seule instance Tk entre tous les modules UI smoke.
 
 
 # =============================================================================

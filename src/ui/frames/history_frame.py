@@ -20,6 +20,8 @@ from ui.theme import (
     icon_button,
     warning_button,
 )
+from ui.tooltip import attach_tooltip
+from ui.tooltips_fr import HISTORY as TIPS
 
 
 class HistoryFrame(ctk.CTkFrame):
@@ -47,7 +49,15 @@ class HistoryFrame(ctk.CTkFrame):
         self.file_manager = file_manager or FileManager()
 
         self._create_ui()
+        self._attach_tooltips()
         self._refresh_history()
+
+    def _attach_tooltips(self):
+        """Attache les info-bulles aux widgets clés du panneau Historique."""
+        attach_tooltip(self.history_textbox,      TIPS["history_textbox"])
+        attach_tooltip(self.rollback_one_button,  TIPS["rollback_one"])
+        attach_tooltip(self.rollback_all_button,  TIPS["rollback_all"])
+        attach_tooltip(self.clear_button,         TIPS["btn_clear"])
 
     def _create_ui(self):
         """Refonte UI v3 : 3 zones compactes.

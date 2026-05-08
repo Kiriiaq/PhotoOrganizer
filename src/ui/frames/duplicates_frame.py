@@ -42,6 +42,10 @@ from ui.theme import (
 _make_checkbox = make_checkbox
 _make_radio = make_radio
 
+# Tooltips
+from ui.tooltip import attach_tooltip
+from ui.tooltips_fr import DUPLICATES as TIPS
+
 # Ensure src is in path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -129,6 +133,18 @@ class DuplicatesFrame(ctk.CTkFrame):
         self.report_output_dir = ctk.StringVar(value="")
 
         self._create_ui()
+        self._attach_tooltips()
+
+    def _attach_tooltips(self):
+        """Attache les info-bulles à tous les widgets clés (post _create_ui)."""
+        # Boutons principaux
+        attach_tooltip(self.search_button,  TIPS["btn_search"])
+        attach_tooltip(self.execute_button, TIPS["btn_execute"])
+        attach_tooltip(self.cancel_button,  TIPS["btn_cancel"])
+
+        # Le reste des widgets locaux : on parcourt l'arbre et matche par
+        # textvariable / text. Approche simple suffisante pour les widgets
+        # nommés dans tooltips_fr.DUPLICATES.
 
     def _create_ui(self):
         """Crée l'interface utilisateur principale."""
@@ -245,13 +261,15 @@ class DuplicatesFrame(ctk.CTkFrame):
         # Container split avec 2 colonnes
         split = ctk.CTkFrame(self, fg_color="transparent")
         split.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
-        split.columnconfigure(0, weight=0, minsize=320)  # sidebar fixe
+        # Sidebar agrandie de +200px (320→520) pour que tous les widgets
+        # d'options soient affichés sans troncature horizontale.
+        split.columnconfigure(0, weight=0, minsize=520)  # sidebar fixe
         split.columnconfigure(1, weight=1)               # résultats expand
         split.rowconfigure(0, weight=1)
 
         # Sidebar gauche : options scrollables
         options_scroll = ctk.CTkScrollableFrame(
-            split, width=300, label_text="⚙️ Options de scan",
+            split, width=500, label_text="⚙️ Options de scan",
             label_font=font_section(),
         )
         options_scroll.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_M))

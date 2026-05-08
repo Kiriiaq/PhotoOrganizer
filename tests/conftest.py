@@ -47,3 +47,30 @@ def source_folder(temp_dir, sample_photos):
     for photo in sample_photos:
         shutil.copy(photo, source / photo.name)
     return source
+
+
+# ---------------------------------------------------------------------------
+# Fixture partagée pour tous les tests UI smoke (test_ui_v3, test_ux_v4, …).
+#
+# Une seule instance Tk est créée pour toute la session pytest. Recréer
+# un second Tk dans le même processus déclenche une TclError sur Python
+# 3.11+ ("invalid command name tcl_findLibrary"), donc tous les modules
+# UI doivent réutiliser cette fixture au lieu d'instancier leur propre Tk.
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def app():
+    """Instance unique de PhotoOrganizerApp partagée pour les tests UI."""
+    try:
+        from ui.app import PhotoOrganizerApp
+        a = PhotoOrganizerApp()
+    except Exception as exc:
+        pytest.skip(f"Pas d'environnement graphique : {exc}")
+    a.geometry("1400x900")
+    for _ in range(3):
+        a.update_idletasks()
+        a.update()
+    yield a
+    try:
+        a.destroy()
+    except Exception:
+        pass

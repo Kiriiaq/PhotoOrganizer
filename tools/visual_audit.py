@@ -148,8 +148,10 @@ def audit_layout_consistency(app):
 
     # Important : forcer le retour sur l'onglet Organisation pour que
     # winfo_ismapped() reflète bien l'état des widgets de OrganizeFrame.
+    # On boucle plusieurs cycles update car CTk a besoin de plusieurs
+    # tours de mainloop pour propager le mapping des widgets enfants.
     app.tabview.set("📁 Organisation")
-    for _ in range(2):
+    for _ in range(5):
         app.update_idletasks()
         app.update()
 
