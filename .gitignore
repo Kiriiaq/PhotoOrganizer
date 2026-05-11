@@ -120,3 +120,6 @@ site/
 # Claude Code
 .claude/
 tmpclaude-*
+
+# Dossier de qualification — sorties d'exécution
+test/outputs_reels/

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Validation IHM — PhotoOrganizer 2.0.0</title>
+<style>
+  /* ----------- Design sobre, imprimable, sans dépendance externe ---------- */
+  :root {
+    --bg:        #fafafa;
+    --panel:     #ffffff;
+    --text:      #222;
+    --muted:     #777;
+    --border:    #ddd;
+    --primary:   #1565C0;
+    --ok:        #2E7D32;
+    --nok:       #C62828;
+    --na:        #757575;
+    --header-bg: #1F6AA5;
+    --header-fg: #ffffff;
+    --row-alt:   #f4f8fc;
+    --section-bg:#E3F2FD;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    background: var(--bg); color: var(--text); margin: 0; padding: 20px;
+    line-height: 1.4;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; color: var(--primary); }
+  h2 { font-size: 16px; margin: 22px 0 8px; color: var(--header-bg); }
+  .subtitle { color: var(--muted); margin-bottom: 16px; }
+  .meta {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 18px; margin-bottom: 16px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;
+  }
+  .meta label { display: block; font-size: 12px; color: var(--muted); }
+  .meta input {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 13px; font-family: inherit;
+  }
+  .toolbar {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .toolbar button {
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--panel); cursor: pointer; font-size: 13px;
+    font-family: inherit; color: var(--text);
+  }
+  .toolbar button:hover { background: var(--section-bg); }
+  .toolbar button.primary {
+    background: var(--primary); color: white; border-color: var(--primary);
+  }
+  .toolbar button.danger {
+    background: var(--nok); color: white; border-color: var(--nok);
+  }
+  .progress-bar {
+    margin-left: auto; padding: 6px 12px; background: var(--section-bg);
+    border-radius: 4px; font-size: 13px; color: var(--text); font-weight: 600;
+  }
+  table {
+    width: 100%; border-collapse: collapse; background: var(--panel);
+    border: 1px solid var(--border); margin-bottom: 20px; font-size: 13px;
+  }
+  thead th {
+    background: var(--header-bg); color: var(--header-fg); padding: 8px 10px;
+    text-align: left; font-weight: 600; border: 1px solid #1a5a8e;
+    position: sticky; top: 0; z-index: 10;
+  }
+  tbody td {
+    padding: 8px 10px; border: 1px solid var(--border); vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr.section-row {
+    background: var(--section-bg); font-weight: 700; color: var(--header-bg);
+  }
+  .col-id        { width: 60px; font-family: 'Consolas', monospace; color: var(--muted); }
+  .col-widget    { width: 220px; font-weight: 600; }
+  .col-desc      { width: 280px; }
+  .col-attendu   { width: 260px; color: var(--muted); }
+  .col-status    { width: 110px; }
+  .col-observe   { width: 180px; }
+  .col-comment   { width: 200px; }
+  select.status {
+    width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
+    font-family: inherit; font-size: 12px;
+  }
+  select.status[data-value="OK"]      { background: #E8F5E9; color: var(--ok); font-weight: 600; }
+  select.status[data-value="NOK"]     { background: #FFEBEE; color: var(--nok); font-weight: 600; }
+  select.status[data-value="NA"]      { background: #F5F5F5; color: var(--na); }
+  input.field, textarea.field {
+    width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
+    font-family: inherit; font-size: 12px; resize: vertical;
+  }
+  textarea.field { min-height: 28px; }
+  details { margin-bottom: 16px; }
+  details summary {
+    cursor: pointer; padding: 8px 12px; background: var(--section-bg);
+    border-radius: 4px; font-weight: 600; color: var(--header-bg);
+  }
+  .export-area {
+    background: #f0f0f0; border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px; margin-top: 10px; font-family: 'Consolas', monospace;
+    font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow: auto;
+    display: none;
+  }
+  .export-area.visible { display: block; }
+  /* Imprimante : optimisations */
+  @media print {
+    body { background: white; padding: 0; }
+    .toolbar { display: none; }
+    .meta, table { box-shadow: none; page-break-inside: avoid; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🧪 Validation IHM — PhotoOrganizer 2.0.0</h1>
+<p class="subtitle">Checklist interactive de qualification visuelle. Cocher chaque widget après vérification.</p>
+
+<!-- En-tête métadonnées (saisies par le testeur) -->
+<div class="meta">
+  <div>
+    <label>Outil</label>
+    <input id="meta-tool" value="PhotoOrganizer">
+  </div>
+  <div>
+    <label>Version</label>
+    <input id="meta-version" value="2.0.0">
+  </div>
+  <div>
+    <label>Testeur</label>
+    <input id="meta-tester" placeholder="Nom complet">
+  </div>
+  <div>
+    <label>Date</label>
+    <input id="meta-date" type="date">
+  </div>
+  <div>
+    <label>Environnement</label>
+    <input id="meta-env" placeholder="Windows 11, écran 1920×1080…">
+  </div>
+  <div>
+    <label>Build hash</label>
+    <input id="meta-hash" placeholder="git rev-parse HEAD">
+  </div>
+</div>
+
+<!-- Toolbar : actions globales -->
+<div class="toolbar">
+  <button onclick="exportJSON()">📤 Exporter JSON</button>
+  <button onclick="exportMarkdown()" class="primary">📝 Générer résumé Markdown</button>
+  <button onclick="window.print()">🖨 Imprimer</button>
+  <button onclick="clearAll()" class="danger">🗑 Effacer tout</button>
+  <span class="progress-bar" id="progress">0 / 117 — 0 %</span>
+</div>
+
+<!-- Conteneur du tableau (rempli en JS) -->
+<div id="checklist"></div>
+
+<!-- Zone d'export (cachée par défaut) -->
+<div class="export-area" id="export-out"></div>
+
+<script>
+/* ========================================================================
+   Configuration : liste des 117 widgets à valider.
+   Réutilisable d'un outil à l'autre — modifier ``WIDGETS`` ci-dessous.
+   Format : { id, section, widget, desc, attendu }
+   ======================================================================== */
+const WIDGETS = [
+  // ----- App root -----
+  { id: "W01", section: "App root (header)", widget: "Bouton thème ☀️/🌙",       desc: "Header haut-droite",                     attendu: "Clic bascule clair/sombre, icône change" },
+  { id: "W02", section: "App root (header)", widget: "Bouton aide ❓",            desc: "Header haut-droite",                     attendu: "Ouvre modale À propos" },
+  { id: "W03", section: "App root (header)", widget: "Tabview 4 onglets",        desc: "📁 Organisation / 🔍 Doublons / 📜 Historique / ⚙️ Paramètres", attendu: "Navigation fluide, l'onglet actif est mis en évidence" },
+  { id: "W04", section: "App root (header)", widget: "Status bar",                desc: "Bas de fenêtre",                          attendu: "Affiche 'Prêt' au démarrage, message contextuel pendant ops" },
+  { id: "W05", section: "App root (header)", widget: "Status progress bar",      desc: "Bas de fenêtre, à droite",                attendu: "Visible uniquement pendant op en cours" },
+
+  // ----- Organisation : zone TOP -----
+  { id: "W06", section: "Organisation - Sources/Dest", widget: "Champ Source(s)",         desc: "CTkEntry zone TOP",                   attendu: "Saisie chemin, drag&drop accepté, séparateur ;" },
+  { id: "W07", section: "Organisation - Sources/Dest", widget: "Bouton 📂 Source",         desc: "À droite du champ Source",            attendu: "Ouvre dialog askdirectory" },
+  { id: "W08", section: "Organisation - Sources/Dest", widget: "Bouton + Source",         desc: "À droite du 📂 Source",               attendu: "Ouvre dialog, ajoute le chemin avec ';' devant l'existant" },
+  { id: "W09", section: "Organisation - Sources/Dest", widget: "Champ Destination",       desc: "CTkEntry zone TOP",                   attendu: "Saisie chemin, drag&drop accepté" },
+  { id: "W10", section: "Organisation - Sources/Dest", widget: "Bouton 📂 Destination",    desc: "À droite du champ Destination",       attendu: "Ouvre dialog askdirectory" },
+  { id: "W11", section: "Organisation - Sources/Dest", widget: "Bouton ↗ Ouvrir dest",    desc: "À droite du 📂 dest",                 attendu: "os.startfile(dest) — ouvre Explorer" },
+  { id: "W12", section: "Organisation - Sources/Dest", widget: "Compteur fichiers",       desc: "Sous Source/Dest",                    attendu: "« 📂 N fichier(s) prêt(s) » MAJ en temps réel" },
+
+  // ----- Organisation : critères (col. gauche) -----
+  { id: "W13", section: "Organisation - Critères", widget: "Case Par date",          desc: "Critère date EXIF",                       attendu: "Active critère, affecte arborescence" },
+  { id: "W14", section: "Organisation - Critères", widget: "OptionMenu format date", desc: "5 formats : year/month/day, etc.",        attendu: "Choix dropdown" },
+  { id: "W15", section: "Organisation - Critères", widget: "Case Par appareil",      desc: "Critère make/model EXIF",                 attendu: "Active critère camera" },
+  { id: "W16", section: "Organisation - Critères", widget: "Case Par GPS",           desc: "Critère localisation",                    attendu: "Active critère + révèle sous-options géocodage/distance" },
+  { id: "W17", section: "Organisation - Critères", widget: "Case Géocodage",         desc: "Sous-option de GPS",                      attendu: "Toggle entre nom de lieu / Lat_x_Lon_y" },
+  { id: "W18", section: "Organisation - Critères", widget: "Slider distance max",    desc: "0-50 km, pas 1 km",                       attendu: "Glissement met à jour le label" },
+  { id: "W19", section: "Organisation - Critères", widget: "Boutons ◀/▶ distance",   desc: "Pas fin 100 m",                           attendu: "Label change par tranches de 0.1 km" },
+  { id: "W20", section: "Organisation - Critères", widget: "Label distance live",    desc: "Affiche '1.3 km' etc.",                   attendu: "Synchro avec slider" },
+  { id: "W21", section: "Organisation - Critères", widget: "Switch multicouche",     desc: "Combine plusieurs critères",              attendu: "ON : révèle sous-panneau d'ordre" },
+  { id: "W22", section: "Organisation - Critères", widget: "Boutons ▲/▼ ordre",      desc: "Réordonne critères en multilayer",        attendu: "Cards bougent dans la liste" },
+
+  // ----- Organisation : options traitement (col. droite) -----
+  { id: "W23", section: "Organisation - Traitement", widget: "Radio Copier",            desc: "Action COPY",                              attendu: "Une seule des 2 cochée" },
+  { id: "W24", section: "Organisation - Traitement", widget: "Radio Déplacer",          desc: "Action MOVE",                              attendu: "Mutex avec Copier" },
+  { id: "W25", section: "Organisation - Traitement", widget: "Case Sous-dossiers",      desc: "Récursif on/off",                          attendu: "Affecte le scan" },
+  { id: "W26", section: "Organisation - Traitement", widget: "Case Images",             desc: "Inclut JPG/PNG/HEIC/…",                    attendu: "Filtre extensions" },
+  { id: "W27", section: "Organisation - Traitement", widget: "Case RAW",                desc: "Inclut ARW/CR2/NEF/…",                     attendu: "Filtre extensions" },
+  { id: "W28", section: "Organisation - Traitement", widget: "Case Vidéos",             desc: "Inclut MP4/MOV/…",                         attendu: "Filtre extensions" },
+
+  // ----- Organisation : panneau Avancé -----
+  { id: "W29", section: "Organisation - Avancé", widget: "Toggle ▶/▼ Avancé",       desc: "Bouton large, libellé clair",              attendu: "Clic : déplie/replie le contenu" },
+  { id: "W30", section: "Organisation - Avancé", widget: "Champ Date min",          desc: "YYYY-MM-DD",                               attendu: "Filtre photos antérieures rejetées" },
+  { id: "W31", section: "Organisation - Avancé", widget: "Champ Date max",          desc: "YYYY-MM-DD",                               attendu: "Filtre photos postérieures rejetées" },
+  { id: "W32", section: "Organisation - Avancé", widget: "Champ Taille min",        desc: "ex. '100KB'",                              attendu: "Filtre fichiers plus petits" },
+  { id: "W33", section: "Organisation - Avancé", widget: "Champ Taille max",        desc: "ex. '50MB'",                               attendu: "Filtre fichiers plus grands" },
+  { id: "W34", section: "Organisation - Avancé", widget: "OptionMenu Note ≥",       desc: "0-5",                                      attendu: "Filtre rating EXIF/XMP" },
+  { id: "W35", section: "Organisation - Avancé", widget: "Champ Mots-clés",         desc: "CSV (vacances, mariage)",                  attendu: "Filtre OR sur mots-clés EXIF" },
+  { id: "W36", section: "Organisation - Avancé", widget: "Case Skip si identique",  desc: "R2",                                       attendu: "Skip si hash dest == hash source" },
+  { id: "W37", section: "Organisation - Avancé", widget: "Case Pairs RAW+JPEG",     desc: "R3",                                       attendu: "Co-localise les paires même stem" },
+  { id: "W38", section: "Organisation - Avancé", widget: "Case Cleanup vides",      desc: "R5 (MOVE only)",                           attendu: "Supprime sous-dossiers source vides post-MOVE" },
+  { id: "W39", section: "Organisation - Avancé", widget: "Case Validate disk",      desc: "R6",                                       attendu: "Warning si espace dispo < total à copier" },
+  { id: "W40", section: "Organisation - Avancé", widget: "Case Notification",       desc: "Q5",                                       attendu: "Toast Windows à la fin" },
+  { id: "W41", section: "Organisation - Avancé", widget: "Case Mode incrémental",   desc: "S5",                                       attendu: "Cache .photoorganizer_index.json persistant" },
+  { id: "W42", section: "Organisation - Avancé", widget: "Case Bursts",             desc: "S1",                                       attendu: "Sous-dossier Burst_NN/ pour rafales" },
+  { id: "W43", section: "Organisation - Avancé", widget: "OptionMenu Burst écart",  desc: "1/2/3/5/10 s",                             attendu: "Seuil temporel pour grouper" },
+  { id: "W44", section: "Organisation - Avancé", widget: "OptionMenu Burst min",    desc: "2/3/4/5/8 photos",                         attendu: "Taille minimale pour rafale" },
+  { id: "W45", section: "Organisation - Avancé", widget: "Case Index CSV",          desc: "R7",                                       attendu: "Génère _photoorganizer_index_*.csv" },
+  { id: "W46", section: "Organisation - Avancé", widget: "Case Index JSON",         desc: "R7",                                       attendu: "Génère _photoorganizer_index_*.json" },
+
+  // ----- Organisation : Renommage -----
+  { id: "W47", section: "Organisation - Renommage", widget: "Toggle ▶/▼ Renommage", desc: "Bouton large repliable",                   attendu: "Clic : déplie/replie ; état persisté entre sessions" },
+  { id: "W48", section: "Organisation - Renommage", widget: "10 exemples cliquables", desc: "Liste scrollable",                         attendu: "Clic injecte le template dans le champ" },
+  { id: "W49", section: "Organisation - Renommage", widget: "Bouton Réinitialiser",  desc: "Sous la liste",                            attendu: "Vide le champ template" },
+  { id: "W50", section: "Organisation - Renommage", widget: "Champ Template",        desc: "Zone d'édition",                           attendu: "Saisie libre, tokens {date}, {original}, …" },
+  { id: "W51", section: "Organisation - Renommage", widget: "Aperçu live",           desc: "Sous le champ",                            attendu: "« IMG_0001.jpg → 20260507_… » MAJ en temps réel" },
+  { id: "W52", section: "Organisation - Renommage", widget: "OptionMenu Preset",     desc: "Liste presets sauvegardés",                attendu: "Charge le preset sélectionné" },
+  { id: "W53", section: "Organisation - Renommage", widget: "Bouton 💾 Sauver",      desc: "Icon à côté du menu",                      attendu: "simpledialog askstring + save preset" },
+  { id: "W54", section: "Organisation - Renommage", widget: "Bouton 🗑 Suppr",       desc: "Icon à côté",                              attendu: "Confirmation puis suppression" },
+
+  // ----- Organisation : zone BOTTOM (actions) -----
+  { id: "W55", section: "Organisation - Actions", widget: "ProgressBar",            desc: "Zone bottom",                              attendu: "Visible à 0% au démarrage, monte pendant op" },
+  { id: "W56", section: "Organisation - Actions", widget: "Label progression",      desc: "Sous progress bar",                        attendu: "« Organisation : 17/42 — file.jpg »" },
+  { id: "W57", section: "Organisation - Actions", widget: "Bouton 📊 Analyser",     desc: "Boutons gauche",                           attendu: "Lance analyse EXIF sans copier" },
+  { id: "W58", section: "Organisation - Actions", widget: "Bouton 👁 Aperçu",       desc: "Boutons gauche",                           attendu: "Modale arborescence dry-run" },
+  { id: "W59", section: "Organisation - Actions", widget: "Bouton ❌ Annuler",       desc: "Boutons droite (rouge)",                   attendu: "Propage cancel() au SmartOrganizer" },
+  { id: "W60", section: "Organisation - Actions", widget: "Bouton 🚀 Organiser",    desc: "Boutons droite (vert, 40px)",              attendu: "Lance le pipeline complet" },
+
+  // ----- Doublons -----
+  { id: "W61", section: "Doublons - Header", widget: "Bouton Charger config",     desc: "Header",                                  attendu: "filedialog askopenfilename YAML" },
+  { id: "W62", section: "Doublons - Header", widget: "Bouton Sauver config",      desc: "Header",                                  attendu: "filedialog asksaveasfilename YAML" },
+  { id: "W63", section: "Doublons - Header", widget: "Champ Source",              desc: "CTkEntry",                                 attendu: "Saisie chemin dossier à scanner" },
+  { id: "W64", section: "Doublons - Header", widget: "Bouton Parcourir source",   desc: "À droite du champ",                       attendu: "Dialog askdirectory" },
+  { id: "W65", section: "Doublons - Header", widget: "Radio Simulation",          desc: "Mode DRY_RUN",                             attendu: "Aucune modif disque" },
+  { id: "W66", section: "Doublons - Header", widget: "Radio Supprimer",           desc: "Mode DELETE",                              attendu: "Suppression définitive ; bouton devient rouge" },
+  { id: "W67", section: "Doublons - Header", widget: "Radio Déplacer",            desc: "Mode MOVE",                                attendu: "Révèle champ Destination ; bouton devient bleu" },
+  { id: "W68", section: "Doublons - Header", widget: "Radio Corbeille",           desc: "Mode TRASH",                               attendu: "send2trash ; bouton devient orange" },
+  { id: "W69", section: "Doublons - Header", widget: "Champ Destination MOVE",    desc: "Visible si MOVE",                          attendu: "Saisie dossier destination" },
+  { id: "W70", section: "Doublons - Header", widget: "Bouton Parcourir dest",     desc: "À droite",                                 attendu: "Dialog askdirectory" },
+  { id: "W71", section: "Doublons - Sidebar", widget: "OptionMenu Algorithme",     desc: "sha256/sha1/md5/blake3",                   attendu: "Change algo de hash" },
+  { id: "W72", section: "Doublons - Sidebar", widget: "OptionMenu Chunks MB",      desc: "1/2/4/8/16",                               attendu: "Taille blocs lecture" },
+  { id: "W73", section: "Doublons - Sidebar", widget: "Case Mode rapide",          desc: "Hash partiel",                             attendu: "head+tail hash" },
+  { id: "W74", section: "Doublons - Sidebar", widget: "Case Cache hash",           desc: "SQLite",                                   attendu: "Réutilise hash session précédente" },
+  { id: "W75", section: "Doublons - Sidebar", widget: "Cases types fichiers",      desc: "Images/RAW/Vidéos",                        attendu: "Filtre extensions scan" },
+  { id: "W76", section: "Doublons - Sidebar", widget: "Case Récursif",             desc: "Sous-dossiers",                            attendu: "Scan profondeur" },
+  { id: "W77", section: "Doublons - Sidebar", widget: "Champ Taille min/max",      desc: "ex. '1KB' / '500MB'",                      attendu: "Filtres" },
+  { id: "W78", section: "Doublons - Sidebar", widget: "Case Dossier prioritaire",  desc: "Conservation rule 1",                      attendu: "Active critère prio folder" },
+  { id: "W79", section: "Doublons - Sidebar", widget: "Case Extension préférée",   desc: "Conservation rule 2 (RAW > TIFF > JPG)",   attendu: "Active critère préférence ext" },
+  { id: "W80", section: "Doublons - Sidebar", widget: "Radios Date conservation",  desc: "oldest/newest/none",                       attendu: "Si égalité ext, garde plus ancien/récent" },
+  { id: "W81", section: "Doublons - Sidebar", widget: "Radios Path conservation",  desc: "shortest/longest/none",                    attendu: "Si égalité date, plus court/long chemin" },
+  { id: "W82", section: "Doublons - Sidebar", widget: "Champ Dossiers prio",       desc: "Séparateur ;",                             attendu: "Liste chemins prioritaires" },
+  { id: "W83", section: "Doublons - Sidebar", widget: "Bouton + dossier prio",     desc: "Icon",                                     attendu: "Dialog askdirectory + concat ;" },
+  { id: "W84", section: "Doublons - Sidebar", widget: "OptionMenu Workers",        desc: "0/1/2/4/8",                                attendu: "Threads hashing parallèle" },
+  { id: "W85", section: "Doublons - Sidebar", widget: "Case Verify before del",    desc: "Recalcul hash",                            attendu: "Sécurité avant DELETE" },
+  { id: "W86", section: "Doublons - Sidebar", widget: "Cases CSV/JSON/TXT",        desc: "3 cases rapports",                         attendu: "Génère fichiers rapports correspondants" },
+  { id: "W87", section: "Doublons - Sidebar", widget: "Champ Dossier rapports",    desc: "Chemin",                                   attendu: "Saisie dossier output rapports" },
+  { id: "W88", section: "Doublons - Sidebar", widget: "Bouton ... rapports",       desc: "Icon",                                     attendu: "Dialog askdirectory" },
+  { id: "W89", section: "Doublons - Résultats", widget: "Tabview Resultats/Details", desc: "2 onglets",                                 attendu: "Switch entre vue récap et vue détaillée" },
+  { id: "W90", section: "Doublons - Résultats", widget: "Textbox résultats",        desc: "Liste groupes",                            attendu: "Format monospace, lecture seule" },
+  { id: "W91", section: "Doublons - Résultats", widget: "Textbox détails",          desc: "Décisions par fichier",                    attendu: "Format détaillé avec actions choisies" },
+  { id: "W92", section: "Doublons - Actions", widget: "ProgressBar",                desc: "Zone bas",                                 attendu: "Visible pendant scan" },
+  { id: "W93", section: "Doublons - Actions", widget: "Bouton 🔍 Rechercher",       desc: "Bouton neutre droite",                     attendu: "Lance scan + analyse" },
+  { id: "W94", section: "Doublons - Actions", widget: "Bouton Exécuter",            desc: "Bouton primary droite, couleur dynamique", attendu: "Selon mode : vert/rouge/orange/bleu" },
+  { id: "W95", section: "Doublons - Actions", widget: "Bouton ❌ Annuler",           desc: "Bouton danger gauche",                     attendu: "Propage cancel() au DuplicateManager" },
+
+  // ----- Historique -----
+  { id: "W96", section: "Historique", widget: "Label stats inline",          desc: "Titre + stats",                              attendu: "« 12 op. — ✅ 10 ❌ 2 » format compact" },
+  { id: "W97", section: "Historique", widget: "Textbox historique",          desc: "Plein écran",                                attendu: "Liste opérations format monospace" },
+  { id: "W98", section: "Historique", widget: "Bouton ↩️ Annuler dernière",  desc: "Bas, orange (warning)",                      attendu: "rollback_last() — désactivé si historique vide" },
+  { id: "W99", section: "Historique", widget: "Bouton ↩️ Annuler tout",      desc: "Bas, orange (warning)",                      attendu: "rollback_all() avec récap {ok, failed, skipped}" },
+  { id: "W100", section: "Historique", widget: "Bouton 🔄 Refresh",          desc: "Bas, icon",                                  attendu: "Recharge depuis FileManager" },
+  { id: "W101", section: "Historique", widget: "Bouton 🗑️ Effacer",         desc: "Bas, rouge (danger)",                        attendu: "Confirm puis clear sans toucher aux fichiers" },
+
+  // ----- Paramètres -----
+  { id: "W102", section: "Paramètres", widget: "Radios thème",               desc: "Sombre / Clair / Système",                   attendu: "Bascule live ; persiste après save" },
+  { id: "W103", section: "Paramètres", widget: "Radios action défaut",       desc: "Copier / Déplacer",                          attendu: "Détermine pré-coche dans Organize" },
+  { id: "W104", section: "Paramètres", widget: "Case récursif défaut",       desc: "",                                            attendu: "Détermine pré-coche dans Organize" },
+  { id: "W105", section: "Paramètres", widget: "Switch Planification",       desc: "Section dédiée",                              attendu: "Active scheduler quotidien" },
+  { id: "W106", section: "Paramètres", widget: "Champ Heure HH:MM",          desc: "Format HH:MM",                                attendu: "Validation au save" },
+  { id: "W107", section: "Paramètres", widget: "Label statut planning",      desc: "Sous le switch",                              attendu: "« Prochaine exécution : … 23:00 »" },
+  { id: "W108", section: "Paramètres", widget: "Case Cache activé",          desc: "Section Performance",                         attendu: "Active cache SQLite des métadonnées" },
+  { id: "W109", section: "Paramètres", widget: "Label stats cache",          desc: "« 1234 entrées, 12 MB disque »",              attendu: "Stats lisibles" },
+  { id: "W110", section: "Paramètres", widget: "Bouton 🗑 Vider cache",      desc: "Action destructive",                          attendu: "Confirm + clear" },
+  { id: "W111", section: "Paramètres", widget: "Case Géocodage",             desc: "Section API",                                 attendu: "Active géocodage inverse" },
+  { id: "W112", section: "Paramètres", widget: "Champ clé API",              desc: "show=*",                                      attendu: "Saisie masquée" },
+  { id: "W113", section: "Paramètres", widget: "OptionMenu niveau log",      desc: "DEBUG/INFO/WARNING/ERROR",                    attendu: "Persiste après save" },
+  { id: "W114", section: "Paramètres", widget: "Bouton Effacer récents",     desc: "",                                            attendu: "Confirm + vide recent_sources/destinations" },
+  { id: "W115", section: "Paramètres", widget: "Bouton 🔄 Réinitialiser",    desc: "Bottom, orange (warning)",                    attendu: "Confirm + reset_to_defaults" },
+  { id: "W116", section: "Paramètres", widget: "Bouton 💾 Sauvegarder",      desc: "Bottom, vert (primary)",                      attendu: "Save + messagebox confirmation" },
+  { id: "W117", section: "Paramètres", widget: "Switch + Heure auto-save",   desc: "Persistance immédiate",                       attendu: "Pas besoin de cliquer Sauvegarder pour planning" },
+];
+
+const STORAGE_KEY = "photoorganizer_validation_ihm_v1";
+
+/* ========================================================================
+   Build UI : génère le tableau et restaure l'état depuis localStorage
+   ======================================================================== */
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveState() {
+  const state = {
+    meta: {
+      tool:     document.getElementById("meta-tool").value,
+      version:  document.getElementById("meta-version").value,
+      tester:   document.getElementById("meta-tester").value,
+      date:     document.getElementById("meta-date").value,
+      env:      document.getElementById("meta-env").value,
+      hash:     document.getElementById("meta-hash").value,
+    },
+    widgets: {},
+  };
+  WIDGETS.forEach(w => {
+    state.widgets[w.id] = {
+      status:  document.querySelector(`select[data-widget="${w.id}"]`).value,
+      observe: document.querySelector(`input[data-widget="${w.id}"][data-field="observe"]`).value,
+      comment: document.querySelector(`textarea[data-widget="${w.id}"][data-field="comment"]`).value,
+    };
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = WIDGETS.length;
+  let done = 0;
+  WIDGETS.forEach(w => {
+    const status = document.querySelector(`select[data-widget="${w.id}"]`).value;
+    if (status === "OK" || status === "NOK" || status === "NA") done++;
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("progress").textContent = `${done} / ${total} — ${pct} %`;
+}
+
+function buildChecklist() {
+  const state = loadState();
+  // Restaurer métadonnées
+  if (state.meta) {
+    Object.entries(state.meta).forEach(([k, v]) => {
+      const el = document.getElementById(`meta-${k}`);
+      if (el) el.value = v;
+    });
+  }
+  // Date par défaut = aujourd'hui
+  const dateInput = document.getElementById("meta-date");
+  if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+
+  // Construire tableau groupé par section
+  const container = document.getElementById("checklist");
+  const sections = {};
+  WIDGETS.forEach(w => {
+    if (!sections[w.section]) sections[w.section] = [];
+    sections[w.section].push(w);
+  });
+
+  let html = '';
+  Object.entries(sections).forEach(([section, widgets]) => {
+    html += `<details open>
+      <summary>${section} <span style="color:#777;font-weight:normal;">(${widgets.length})</span></summary>
+      <table>
+        <thead>
+          <tr>
+            <th class="col-id">ID</th>
+            <th class="col-widget">Widget</th>
+            <th class="col-desc">Description</th>
+            <th class="col-attendu">Comportement attendu</th>
+            <th class="col-status">Statut</th>
+            <th class="col-observe">Valeur observée</th>
+            <th class="col-comment">Commentaire</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    widgets.forEach(w => {
+      const s = (state.widgets && state.widgets[w.id]) || {};
+      const status  = s.status  || "À faire";
+      const observe = s.observe || "";
+      const comment = s.comment || "";
+      html += `<tr>
+        <td class="col-id">${w.id}</td>
+        <td class="col-widget">${escapeHtml(w.widget)}</td>
+        <td class="col-desc">${escapeHtml(w.desc)}</td>
+        <td class="col-attendu">${escapeHtml(w.attendu)}</td>
+        <td>
+          <select class="status" data-widget="${w.id}" data-value="${status}" onchange="updateStatusColor(this); saveState();">
+            <option value="À faire" ${status === 'À faire' ? 'selected' : ''}>À faire</option>
+            <option value="OK"      ${status === 'OK' ? 'selected' : ''}>OK</option>
+            <option value="NOK"     ${status === 'NOK' ? 'selected' : ''}>NOK</option>
+            <option value="NA"      ${status === 'NA' ? 'selected' : ''}>NA</option>
+          </select>
+        </td>
+        <td><input class="field" data-widget="${w.id}" data-field="observe" value="${escapeHtml(observe)}" oninput="saveState()" placeholder="ex. couleur, position…"></td>
+        <td><textarea class="field" data-widget="${w.id}" data-field="comment" oninput="saveState()" placeholder="Notes…">${escapeHtml(comment)}</textarea></td>
+      </tr>`;
+    });
+    html += `</tbody></table></details>`;
+  });
+  container.innerHTML = html;
+
+  // Initial color update
+  document.querySelectorAll("select.status").forEach(updateStatusColor);
+  updateProgress();
+}
+
+function updateStatusColor(select) {
+  select.setAttribute("data-value", select.value);
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+/* ========================================================================
+   Persistence métadonnées sur changement
+   ======================================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  buildChecklist();
+  // Auto-save sur changement métadonnées
+  ["meta-tool", "meta-version", "meta-tester", "meta-date", "meta-env", "meta-hash"].forEach(id => {
+    document.getElementById(id).addEventListener("input", saveState);
+  });
+});
+
+/* ========================================================================
+   Export JSON / Markdown / Clear
+   ======================================================================== */
+function exportJSON() {
+  const state = loadState();
+  saveState();
+  const json = JSON.stringify(loadState(), null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `validation_ihm_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportMarkdown() {
+  saveState();
+  const state = loadState();
+  const meta = state.meta || {};
+  let md = `## Validation IHM — ${meta.tool || ""} ${meta.version || ""}\n\n`;
+  md += `| Champ | Valeur |\n|---|---|\n`;
+  md += `| Testeur | ${meta.tester || ""} |\n`;
+  md += `| Date | ${meta.date || ""} |\n`;
+  md += `| Environnement | ${meta.env || ""} |\n`;
+  md += `| Build hash | ${meta.hash || ""} |\n\n`;
+
+  // Synthèse
+  const counts = { "OK": 0, "NOK": 0, "NA": 0, "À faire": 0 };
+  WIDGETS.forEach(w => {
+    const s = (state.widgets || {})[w.id] || {};
+    const st = s.status || "À faire";
+    counts[st] = (counts[st] || 0) + 1;
+  });
+  const total = WIDGETS.length;
+  md += `### Synthèse\n\n`;
+  md += `| Statut | Nombre | Taux |\n|---|---|---|\n`;
+  Object.entries(counts).forEach(([k, v]) => {
+    const pct = total ? Math.round(v / total * 1000) / 10 : 0;
+    md += `| ${k} | ${v} | ${pct} % |\n`;
+  });
+
+  // Anomalies (NOK uniquement)
+  const noks = WIDGETS.filter(w => {
+    const s = (state.widgets || {})[w.id] || {};
+    return s.status === "NOK";
+  });
+  if (noks.length) {
+    md += `\n### Anomalies détectées\n\n`;
+    md += `| ID | Widget | Section | Observation | Commentaire |\n|---|---|---|---|---|\n`;
+    noks.forEach(w => {
+      const s = (state.widgets || {})[w.id] || {};
+      md += `| ${w.id} | ${w.widget.replace(/\|/g, '\\|')} | ${w.section.replace(/\|/g, '\\|')} | ${(s.observe || '').replace(/\|/g, '\\|')} | ${(s.comment || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`;
+    });
+  }
+
+  const out = document.getElementById("export-out");
+  out.textContent = md;
+  out.classList.add("visible");
+  // Copier dans le presse-papier si possible
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(md).then(() => {
+      alert("Markdown copié dans le presse-papier !");
+    }).catch(() => {});
+  }
+}
+
+function clearAll() {
+  if (!confirm("Effacer tous les statuts, observations et commentaires ?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+</script>
+
+</body>
+</html>
