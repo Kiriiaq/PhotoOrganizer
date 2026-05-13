@@ -364,57 +364,60 @@ class OrganizeFrame(ctk.CTkFrame):
         folders.grid(row=0, column=0, sticky="ew")
         folders.columnconfigure(1, weight=1)
 
-        # Titre + hint inline (compact)
-        hint = "💡 Plusieurs sources : ;"
-        if DND_AVAILABLE:
-            hint += "   •   Glisser-déposer un dossier supporté"
+        # Titre (refonte v5 — retours JSON 2026-05-13)
+        # Le hint « Plusieurs sources : ; » et la mention drag-and-drop ont
+        # été retirés (cf. W06 retour testeur : « supprime la fonctionnalité
+        # drag and drop inutile et la possibilité d'utiliser des séparateurs »).
         title_row = ctk.CTkFrame(folders, fg_color="transparent")
-        title_row.grid(row=0, column=0, columnspan=4, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
+        title_row.grid(row=0, column=0, columnspan=3, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
         ctk.CTkLabel(
             title_row, text="📁 Sélection des dossiers",
             font=font_section(),
         ).pack(side="left")
-        ctk.CTkLabel(
-            title_row, text=hint,
-            font=font_hint(), text_color=HINT_COLOR,
-        ).pack(side="right")
 
-        # Ligne Source(s) — accepte plusieurs chemins séparés par ';'
-        ctk.CTkLabel(folders, text="Source(s) :",
+        # Ligne Source — un seul dossier, plus de séparateur ;
+        ctk.CTkLabel(folders, text="Source :",
                      font=font_label(), width=90, anchor="w",
                      ).grid(row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
         self.source_entry = ctk.CTkEntry(
             folders,
             textvariable=self.source_var,
-            placeholder_text="Sélectionnez le(s) dossier(s) source — séparés par ;",
+            placeholder_text="Sélectionnez le dossier source à organiser…",
             height=BTN_H_STD,
         )
         self.source_entry.grid(row=1, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
         icon_button(folders, text="📂", command=self._browse_source).grid(
-            row=1, column=2, padx=PAD_S, pady=PAD_S,
+            row=1, column=2, padx=(PAD_S, PAD_M), pady=PAD_S,
         )
-        icon_button(folders, text="+", command=self._add_source_folder).grid(
-            row=1, column=3, padx=(0, PAD_M), pady=PAD_S,
-        )
+        # Le bouton « + Source » (multi-source) a été retiré — W08 retour
+        # testeur : « supprime le bouton car inutile ».
 
         # Ligne Destination
         ctk.CTkLabel(folders, text="Destination :",
                      font=font_label(), width=90, anchor="w",
                      ).grid(row=2, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
+
+        # Sous-frame pour entry + bouton ↗ "Ouvrir dest" qui restent
+        # accessibles. Le bouton 📂 Parcourir occupe la colonne 2.
+        dest_row = ctk.CTkFrame(folders, fg_color="transparent")
+        dest_row.grid(row=2, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
+        dest_row.columnconfigure(0, weight=1)
+
         self.dest_entry = ctk.CTkEntry(
-            folders,
+            dest_row,
             textvariable=self.dest_var,
             placeholder_text="Sélectionnez le dossier destination…",
             height=BTN_H_STD,
         )
-        self.dest_entry.grid(row=2, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
-        icon_button(folders, text="📂", command=self._browse_dest).grid(
-            row=2, column=2, padx=PAD_S, pady=PAD_S,
-        )
+        self.dest_entry.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
         icon_button(
-            folders, text="↗",
+            dest_row, text="↗",
             command=lambda: _open_folder(self.dest_var.get()),
-        ).grid(row=2, column=3, padx=(0, PAD_M), pady=PAD_S)
+        ).grid(row=0, column=1)
+
+        icon_button(folders, text="📂", command=self._browse_dest).grid(
+            row=2, column=2, padx=(PAD_S, PAD_M), pady=PAD_S,
+        )
 
         # Ligne Compteur fichiers (toujours visible — fix T-030..033)
         self.file_count_var = ctk.StringVar(value="Aucun dossier source sélectionné.")
@@ -426,12 +429,12 @@ class OrganizeFrame(ctk.CTkFrame):
             text_color=LABEL_MUTED,
         )
         self.file_count_label.grid(
-            row=3, column=0, columnspan=4,
+            row=3, column=0, columnspan=3,
             sticky="ew", padx=PAD_M, pady=(0, PAD_M),
         )
 
-        # Activer le drag-and-drop si la lib est disponible
-        self._setup_drag_drop()
+        # Drag-and-drop retiré (W06) — la méthode _setup_drag_drop reste
+        # définie mais n'est plus appelée pour ne pas créer de bindings.
 
     def _create_options_section(self):
         """Crée la section des options dans le scroll central (row=0)."""
@@ -475,13 +478,18 @@ class OrganizeFrame(ctk.CTkFrame):
         ).pack(anchor="w", padx=20, pady=3)
 
         # Organiser par localisation GPS
-        _make_checkbox(
+        # On garde une référence à la case pour positionner les sous-options
+        # GPS juste en dessous via pack(after=…) — cf. W17/W18 retour testeur.
+        self._gps_checkbox = _make_checkbox(
             left_frame,
             text="Par localisation GPS",
             variable=self.organize_by_location
-        ).pack(anchor="w", padx=20, pady=3)
+        )
+        self._gps_checkbox.pack(anchor="w", padx=20, pady=3)
 
-        # Sous-options GPS — cachées si organize_by_location est OFF
+        # Sous-options GPS — cachées si organize_by_location est OFF.
+        # Placées juste sous la case « Par localisation GPS » via
+        # pack(after=…) pour rester en contexte (W17/W18).
         self.gps_options_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         # Affichage initial déclenché plus bas via _refresh_gps_options_visibility
         gps_top = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
@@ -729,18 +737,29 @@ class OrganizeFrame(ctk.CTkFrame):
                      font=font_label(weight="bold"),
                      ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
-        for label, var, placeholder in [
-            ("Date min :",   self.filter_date_min,  "YYYY-MM-DD"),
-            ("Date max :",   self.filter_date_max,  "YYYY-MM-DD"),
-            ("Taille min :", self.filter_size_min,  "ex. 100KB"),
-            ("Taille max :", self.filter_size_max,  "ex. 50MB"),
+        # W30-W35 (retour testeur 2026-05-13) : placeholders enrichis avec
+        # un exemple concret et le format attendu, plus une ligne grise
+        # sous chaque champ qui rappelle le format en clair.
+        for label, var, placeholder, hint in [
+            ("Date min :",   self.filter_date_min,  "ex. 2024-06-01",
+             "Format YYYY-MM-DD  ·  ex. 2024-06-01"),
+            ("Date max :",   self.filter_date_max,  "ex. 2024-12-31",
+             "Format YYYY-MM-DD  ·  laisser vide = pas de limite"),
+            ("Taille min :", self.filter_size_min,  "ex. 100KB",
+             "Unités acceptées : B, KB, MB, GB  ·  ex. 100KB, 5MB"),
+            ("Taille max :", self.filter_size_max,  "ex. 50MB",
+             "Unités acceptées : B, KB, MB, GB  ·  vide = pas de limite"),
         ]:
             row = ctk.CTkFrame(filters, fg_color="transparent")
-            row.pack(fill="x", padx=PAD_S, pady=2)
+            row.pack(fill="x", padx=PAD_S, pady=(2, 0))
             ctk.CTkLabel(row, text=label, width=86, anchor="w",
                          font=font_label()).pack(side="left")
             ctk.CTkEntry(row, textvariable=var, placeholder_text=placeholder,
                          height=BTN_H_STD).pack(side="left", padx=PAD_S, fill="x", expand=True)
+            # Hint format en italique gris sous le champ
+            ctk.CTkLabel(filters, text=f"    {hint}",
+                         font=font_hint(), text_color=HINT_COLOR, anchor="w",
+                         ).pack(fill="x", padx=PAD_S, pady=(0, 2))
 
         # Note EXIF
         rating_row = ctk.CTkFrame(filters, fg_color="transparent")
@@ -755,14 +774,20 @@ class OrganizeFrame(ctk.CTkFrame):
         ctk.CTkLabel(rating_row, text="(0 = inactif)",
                      font=font_hint(), text_color=HINT_COLOR).pack(side="left")
 
-        # Mots-clés
+        # Mots-clés — W35 : placeholder + hint format
         kw_row = ctk.CTkFrame(filters, fg_color="transparent")
-        kw_row.pack(fill="x", padx=PAD_S, pady=(2, PAD_S))
+        kw_row.pack(fill="x", padx=PAD_S, pady=(2, 0))
         ctk.CTkLabel(kw_row, text="Mots-clés :", width=86, anchor="w",
                      font=font_label()).pack(side="left")
         ctk.CTkEntry(kw_row, textvariable=self.filter_keywords,
-                     placeholder_text="vacances, mariage, …", height=BTN_H_STD,
+                     placeholder_text="ex. vacances, mariage, été",
+                     height=BTN_H_STD,
                      ).pack(side="left", padx=PAD_S, fill="x", expand=True)
+        ctk.CTkLabel(
+            filters,
+            text="    Séparateur : virgule  ·  match si AU MOINS UN mot-clé EXIF correspond",
+            font=font_hint(), text_color=HINT_COLOR, anchor="w",
+        ).pack(fill="x", padx=PAD_S, pady=(0, PAD_S))
 
         # ===== Colonne droite : comportements + bursts + incremental + index =====
         behaviors = ctk.CTkFrame(self._adv_content, fg_color="transparent")
@@ -1208,11 +1233,17 @@ class OrganizeFrame(ctk.CTkFrame):
         self._on_max_distance_change(new_val)
 
     def _refresh_gps_options_visibility(self):
-        """Affiche/masque les sous-options GPS selon la case « Par localisation »."""
+        """Affiche/masque les sous-options GPS sous la case correspondante.
+
+        Refonte W17/W18 : pack(after=self._gps_checkbox) pour que les
+        sous-options apparaissent DIRECTEMENT sous « Par localisation GPS »
+        et non en bas du panneau (après Organisation avancée).
+        """
         if self.organize_by_location.get():
-            # Re-pack juste après la case correspondante (on l'insère dans
-            # l'ordre naturel — ici, avant la section Avancée).
-            self.gps_options_frame.pack(fill="x", padx=20, pady=(0, 4))
+            self.gps_options_frame.pack(
+                fill="x", padx=40, pady=(0, 4),
+                after=self._gps_checkbox,
+            )
         else:
             self.gps_options_frame.pack_forget()
 
@@ -1229,25 +1260,17 @@ class OrganizeFrame(ctk.CTkFrame):
             self.dest_var.set(folder)
 
     def _add_source_folder(self):
-        """Ajoute un dossier source supplémentaire (séparateur ;) — Lot R4."""
-        folder = filedialog.askdirectory(title="Ajouter un dossier source")
-        if not folder:
-            return
-        current = self.source_var.get().strip()
-        if current:
-            # Éviter les doublons
-            existing = {p.strip() for p in current.split(';') if p.strip()}
-            if folder not in existing:
-                self.source_var.set(f"{current};{folder}")
-        else:
+        """Conservé pour compatibilité (plus de bouton + dans l'IHM, cf. W08).
+        Si appelé via API, ouvre juste un askdirectory et remplace.
+        """
+        folder = filedialog.askdirectory(title="Sélectionner le dossier source")
+        if folder:
             self.source_var.set(folder)
 
     def _split_sources(self) -> List[str]:
-        """Découpe le source_var en liste de chemins (R4)."""
+        """Refonte v5 (W06) : multi-source retirée. Retourne [source] ou []."""
         raw = self.source_var.get().strip()
-        if not raw:
-            return []
-        return [p.strip() for p in raw.split(';') if p.strip()]
+        return [raw] if raw else []
 
     def _setup_drag_drop(self):
         """Active le drag-and-drop si tkinterdnd2 est installé (Lot Q1).
@@ -1557,37 +1580,22 @@ class OrganizeFrame(ctk.CTkFrame):
         )
 
     def _get_files(self) -> List[str]:
-        """Récupère la liste des fichiers à traiter sur **toutes les sources**.
+        """Récupère la liste des fichiers à traiter sur le **dossier source**.
 
-        R4 : prend en charge plusieurs sources séparées par ';' dans le champ.
-        Les chemins inexistants sont ignorés silencieusement (logs debug).
-        Les doublons inter-sources sont dédupliqués pour ne pas traiter
-        deux fois le même chemin physique.
+        Refonte v5 (W06) : multi-source avec séparateur ';' retirée.
+        ``_split_sources()`` reste exposé en interne pour compat tests mais
+        retourne désormais juste le contenu du champ.
         """
-        sources = self._split_sources()
-        if not sources:
+        src = self.source_var.get().strip()
+        if not src or not os.path.isdir(src):
             return []
-
-        all_files: List[str] = []
-        seen: set = set()
-        for src in sources:
-            if not os.path.isdir(src):
-                logger.debug(f"Source ignoree (inexistante) : {src}")
-                continue
-            files = self.file_manager.list_files(
-                src,
-                recursive=self.recursive.get(),
-                include_images=self.include_images.get(),
-                include_raw=self.include_raw.get(),
-                include_videos=self.include_videos.get(),
-            )
-            for f in files:
-                norm = os.path.normcase(os.path.abspath(f))
-                if norm in seen:
-                    continue
-                seen.add(norm)
-                all_files.append(f)
-        return all_files
+        return self.file_manager.list_files(
+            src,
+            recursive=self.recursive.get(),
+            include_images=self.include_images.get(),
+            include_raw=self.include_raw.get(),
+            include_videos=self.include_videos.get(),
+        )
 
     def _attach_tooltips(self):
         """Attache les info-bulles à tous les widgets clés du panneau.
@@ -1785,7 +1793,23 @@ class OrganizeFrame(ctk.CTkFrame):
         thread.start()
 
     def _organize_files(self):
-        """Lance l'organisation des fichiers."""
+        """Lance l'organisation des fichiers.
+
+        W60 (retour testeur 2026-05-13) : garde anti-double-clic + après une
+        annulation l'utilisateur doit pouvoir relancer immédiatement. On
+        reset explicitement les flags d'état au début de chaque lancement.
+        """
+        # Garde anti-double-clic / relance immédiate post-cancel
+        if getattr(self, "_operation_running", False):
+            logger.debug("Org déjà en cours, ignore clic redondant")
+            return
+
+        # Reset PROACTIF — si l'utilisateur avait annulé puis le bouton n'a
+        # pas été correctement remis (race condition), on garantit ici un
+        # état propre avant de relancer.
+        self._cancel_requested = False
+        self._current_organizer = None
+
         source = self.source_var.get()
         dest = self.dest_var.get()
 
@@ -1856,6 +1880,10 @@ class OrganizeFrame(ctk.CTkFrame):
         sorte de sa boucle d'organisation à la prochaine itération.
         Le flag local ``_cancel_requested`` reste utile pour la phase
         d'analyse et pour les conditions de boucle de scan.
+
+        W60 (retour testeur) : on réactive immédiatement le bouton
+        Organiser et on désactive Annuler — l'utilisateur ne doit pas
+        rester bloqué tant que le thread n'a pas pris le signal.
         """
         self._cancel_requested = True
         if self._current_organizer is not None:
@@ -1863,7 +1891,17 @@ class OrganizeFrame(ctk.CTkFrame):
                 self._current_organizer.cancel()
             except Exception as exc:
                 logger.debug(f"_cancel_operation: {exc}")
-        self._update_progress("Annulation en cours...", None)
+        self._update_progress("Annulation en cours…", None)
+        # Réactive le bouton Organiser dès la demande d'annulation, sans
+        # attendre la sortie du thread worker. Sécurité : l'option
+        # `_operation_running` reste True jusqu'à la fin du worker, ce qui
+        # empêche un double-lancement via la garde au début de _organize_files.
+        try:
+            self.organize_button.configure(state="normal")
+            self.analyze_button.configure(state="normal")
+            self.cancel_button.configure(state="disabled")
+        except Exception as exc:
+            logger.debug(f"_cancel_operation buttons reset: {exc}")
 
     def _set_buttons_state(self, enabled: bool):
         """Active/désactive les boutons."""
@@ -1910,7 +1948,19 @@ Distribution par appareil:
         """Affiche les résultats de l'organisation avec :
         - une notification système non-modale (Q5)
         - un dialog modal résumé + bouton « Ouvrir destination » (Q6).
+
+        W60 (retour testeur) : si l'utilisateur a annulé, on saute la
+        modale (qui bloquerait l'IHM avec grab_set) et on remet juste le
+        status bar à « Organisation annulée ». L'utilisateur peut relancer
+        immédiatement.
         """
+        if self._cancel_requested:
+            self._update_progress(
+                f"Organisation annulée — {result.processed} traités sur {result.total}",
+                0.0,
+            )
+            return
+
         summary = (
             f"Total : {result.total}  •  Traités : {result.processed}\n"
             f"Ignorés : {result.skipped}  •  Erreurs : {result.errors}"

@@ -76,14 +76,18 @@ class SettingsFrame(ctk.CTkFrame):
             attach_tooltip(self.schedule_switch, TIPS["schedule_enabled"])
 
     def _create_ui(self):
-        """Refonte UI v3 : sections scrollables + boutons sticky bottom.
+        """Refonte UI v5 (retours testeur 2026-05-13).
 
-        Layout :
-          ┌──────────────────────────────────────┐
-          │ ZONE SCROLL — toutes les sections     │ weight=1
-          ├──────────────────────────────────────┤
-          │ [🔄 Réinitialiser]   [💾 Sauvegarder] │ sticky bottom
-          └──────────────────────────────────────┘
+        Sections retirées suite aux retours :
+          - Apparence (W102) : redondant avec le bouton thème du header.
+          - Comportement par défaut (W103-W104) : déjà accessible dans Organize.
+          - Performance / Cache (W105-W107) : jugé inutile par le testeur.
+          - Auto-save planning Heure (W117) : inutile.
+
+        Sections conservées :
+          - Planification automatique (depuis Organize)
+          - API & Services (géocodage + clé)
+          - Logs & Données (niveau log + dossiers récents)
         """
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -92,12 +96,11 @@ class SettingsFrame(ctk.CTkFrame):
         scrollable = ctk.CTkScrollableFrame(self)
         scrollable.grid(row=0, column=0, sticky="nsew", padx=PAD_M, pady=(PAD_M, PAD_S))
 
-        self._create_appearance_section(scrollable)
-        self._create_defaults_section(scrollable)
-        self._create_schedule_section(scrollable)   # ← nouveau (déplacé d'Organize)
-        self._create_performance_section(scrollable)
-        self._create_api_section(scrollable)
-        self._create_data_section(scrollable)
+        # Sections W102 (Apparence), W103-W104 (Comportement défaut),
+        # W105-W107 (Performance/Cache) retirées suite aux retours testeur.
+        self._create_schedule_section(scrollable)   # Planification
+        self._create_api_section(scrollable)        # API & Services
+        self._create_data_section(scrollable)       # Logs & Données
 
         # ZONE 2 : boutons sticky bottom (toujours visibles)
         self._create_buttons_sticky()
