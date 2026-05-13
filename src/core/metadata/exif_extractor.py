@@ -94,6 +94,15 @@ class ExifExtractor:
         """
         Extrait les métadonnées d'un fichier.
 
+        T-114 (retour qualif 2026-05-13) : double couche de cache
+          1. ``self._cache`` mémoire (rapide, par-instance)
+          2. ``utils.cache.get_cache()`` (persistant SQLite/JSON, partagé)
+
+        Avant le fix, seul le cache mémoire local était utilisé : le cache
+        global affichait toujours 0 hit. Désormais sur un miss mémoire on
+        consulte le cache global ; un miss global déclenche l'extraction
+        et alimente les deux couches.
+
         Args:
             file_path: Chemin du fichier
             use_cache: Utiliser le cache si disponible
@@ -103,8 +112,22 @@ class ExifExtractor:
         """
         file_path = str(Path(file_path).resolve())
 
+        # Couche 1 : cache mémoire interne (le plus rapide)
         if use_cache and file_path in self._cache:
             return self._cache[file_path]
+
+        # Couche 2 : cache global persistant (hits comptabilisés)
+        if use_cache:
+            try:
+                # Import différé pour éviter une dépendance circulaire à
+                # l'import (utils.cache n'est pas critique au démarrage).
+                from utils.cache import get_cache
+                cached = get_cache().get(file_path)
+                if cached is not None:
+                    self._cache[file_path] = cached  # promote en mémoire
+                    return cached
+            except Exception as exc:
+                logger.debug(f"Cache global indisponible : {exc}")
 
         if not os.path.exists(file_path):
             logger.warning(f"Fichier inexistant: {file_path}")
@@ -128,7 +151,13 @@ class ExifExtractor:
         metadata.update(self._extract_basic(file_path))
 
         if use_cache:
+            # Alimenter les deux couches
             self._cache[file_path] = metadata
+            try:
+                from utils.cache import get_cache
+                get_cache().set(file_path, metadata)
+            except Exception as exc:
+                logger.debug(f"Cache global set échoué : {exc}")
 
         return metadata
 
