@@ -3,14 +3,14 @@ Module de cache pour les métadonnées.
 Améliore les performances en évitant les extractions répétées.
 """
 
-import os
-import json
 import hashlib
+import json
 import logging
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

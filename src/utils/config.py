@@ -3,12 +3,12 @@ Module de gestion de la configuration.
 Sauvegarde et chargement des préférences utilisateur.
 """
 
-import os
 import json
 import logging
+import os
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

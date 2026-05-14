@@ -16,7 +16,6 @@ la fixture ``app`` (téléchargée plusieurs fois → marqueur ``slow`` n'est
 PAS appliqué car les tests doivent tourner à chaque CI).
 """
 
-import customtkinter as ctk
 
 # La fixture `app` est définie dans tests/conftest.py (session-scoped)
 # pour partager une seule instance Tk entre tous les modules UI smoke.

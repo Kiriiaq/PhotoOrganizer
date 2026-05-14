@@ -1,6 +1,6 @@
 """Pytest configuration and fixtures for PhotoOrganizer."""
-import sys
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 

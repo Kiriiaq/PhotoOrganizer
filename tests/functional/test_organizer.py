@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from core.operations.organizer import SmartOrganizer, OrganizationOptions  # noqa: E402
 from core.operations.file_manager import FileManager  # noqa: E402
+from core.operations.organizer import OrganizationOptions, SmartOrganizer  # noqa: E402
 
 
 @pytest.fixture
@@ -111,8 +111,8 @@ def test_sanitize_dirname_cleans_forbidden_chars(organizer):
 
 def test_multilayer_respects_criteria_order(tmp_path):
     """En multicouche, la hiérarchie suit ``criteria_order``."""
+
     from PIL import Image
-    from datetime import datetime as dt
     src = tmp_path / "p.jpg"
     Image.new("RGB", (10, 10)).save(src)
 
@@ -225,8 +225,8 @@ def test_organize_by_location_falls_back_when_no_gps(tmp_path):
 
 def test_organize_by_location_raw_coords_when_geocoding_disabled(tmp_path):
     """Avec GPS et géocodage off, le dossier porte le nom Lat_x_Lon_y."""
-    from PIL import Image
     import piexif
+    from PIL import Image
 
     src = tmp_path / "with_gps.jpg"
     img = Image.new("RGB", (50, 50))
@@ -267,8 +267,8 @@ def test_organize_by_location_raw_coords_when_geocoding_disabled(tmp_path):
 def test_organize_by_location_offline_fallback(tmp_path, monkeypatch):
     """Si gps_processor.get_location_name lève (réseau down), on retombe
     silencieusement sur Lat_x_Lon_y au lieu de planter."""
-    from PIL import Image
     import piexif
+    from PIL import Image
 
     src = tmp_path / "p.jpg"
     img = Image.new("RGB", (40, 40))
@@ -303,9 +303,10 @@ def test_organize_by_location_offline_fallback(tmp_path, monkeypatch):
 
 def test_burst_detection_groups_close_photos(tmp_path):
     """Lot S1 : 3 photos prises < 3 s d'écart → sous-dossier Burst_01."""
-    from PIL import Image
-    import piexif
     from datetime import datetime as dt
+
+    import piexif
+    from PIL import Image
 
     def make_photo(name: str, when: dt):
         path = tmp_path / name
@@ -373,10 +374,11 @@ def test_incremental_mode_skips_known_files(tmp_path):
 
 def test_scheduler_configure_and_next_run():
     """Lot E5 : le scheduler calcule un prochain trigger cohérent."""
-    import sys, os
+    import sys
     sys.path.insert(0, os.path.abspath('src'))
+    from datetime import timedelta
+
     from core.scheduler import JobScheduler
-    from datetime import datetime, timedelta
 
     fired = []
     sched = JobScheduler(callback=lambda: fired.append(1), poll_seconds=5)
@@ -397,7 +399,7 @@ def test_scheduler_configure_and_next_run():
 
 def test_scheduler_rejects_invalid_time():
     """Heure mal formatée → désactivé silencieusement."""
-    import sys, os
+    import sys
     sys.path.insert(0, os.path.abspath('src'))
     from core.scheduler import JobScheduler
 

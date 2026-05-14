@@ -1,7 +1,5 @@
 """Tests fonctionnels du FileManager : copy/move/rollback."""
-import os
 import sys
-import shutil
 from pathlib import Path
 
 import pytest

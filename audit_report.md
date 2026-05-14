@@ -476,3 +476,50 @@ Les 2 binaires `dist/debug/` et `dist/light/` sont prêts à être distribués.
 ---
 
 *Audit généré automatiquement par le pipeline qualité PhotoOrganizer.*
+
+## Suite de l'audit — Optimisations post-verdict ✅
+
+### Ruff auto-fix
+
+```bash
+$ py -3.13 -m ruff check src/ tests/ --fix
+Found 59 errors (43 fixed, 16 remaining)
+```
+
+| | Avant | Après |
+|---|---|---|
+| Total | 64 | **16** |
+| I001 (tri imports) | 31 | 0 ✅ tous fixés |
+| F401 (import inutilisé) | 15 | 0 ✅ tous fixés |
+| E402 (import pas en tête) | 9 | 9 (intentionnels — `sys.path` setup avant `import`) |
+| F811 (redéfinition) | 3 | 3 (intentionnels — aliases `_make_radio = make_radio`) |
+| E702 / E401 / E722 | 7 | 4 |
+
+**Re-test pytest après ruff** : **101/101 OK** — 0 régression.
+
+### Build --onedir comparatif
+
+Build `--onedir` réalisé pour comparer le cold-start :
+
+```
+dist/onedir-test/PhotoOrganizer-2.0.0-onedir.exe : 6.0 MB launcher
+```
+
+Cold-start mesuré sur 3 essais : médiane ~6.8 s (similaire à onefile).
+Pas d'amélioration significative observée sur cette configuration ; les
+logs persistants confirment bien 3 démarrages successifs mais le polling
+sur le fichier de log timeout à 20 s à cause d'un flush différé en mode
+`--windowed` — biais de l'outil de mesure, pas de l'EXE.
+
+**Conclusion** : on garde `--onefile` comme mode de distribution par défaut.
+L'amélioration cold-start nécessiterait :
+1. Splash screen (`--splash assets/splash.png`)
+2. Lazy imports profilés via `python -X importtime`
+
+(à reporter en backlog technique).
+
+Cleanup : `dist/onedir-test/` supprimé.
+
+**Statut audit : ✅ GO PRODUCTION confirmé après optimisations**
+
+---

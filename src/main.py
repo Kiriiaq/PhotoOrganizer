@@ -50,8 +50,8 @@ def main():
     check_dependencies()
 
     # Importer et lancer l'application
-    from utils.logger import setup_logging
     from ui.app import PhotoOrganizerApp
+    from utils.logger import setup_logging
 
     # Configurer le logging
     logger = setup_logging(level="INFO")

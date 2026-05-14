@@ -8,10 +8,10 @@ and management operations, supporting CSV, JSON, and TXT formats.
 
 from .duplicate_reporter import (
     DuplicateReporter,
+    generate_all_reports,
     generate_csv_report,
     generate_json_report,
     generate_txt_report,
-    generate_all_reports,
 )
 
 __all__ = [

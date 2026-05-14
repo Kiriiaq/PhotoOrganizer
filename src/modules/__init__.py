@@ -3,8 +3,6 @@ Module des opérations sur les fichiers.
 Réexporte les composants depuis core.operations.
 """
 
-from ..core.operations.file_manager import FileManager, copy_file, move_file
-from ..core.operations.organizer import SmartOrganizer, organize_files, OrganizationOptions, OrganizationResult
 from ..core.operations.duplicate_finder import (
     DuplicateFinder,
     DuplicateGroup,
@@ -18,6 +16,8 @@ from ..core.operations.duplicate_manager import (
     get_manager,
     reset_manager,
 )
+from ..core.operations.file_manager import FileManager, copy_file, move_file
+from ..core.operations.organizer import OrganizationOptions, OrganizationResult, SmartOrganizer, organize_files
 
 __all__ = [
     'FileManager', 'copy_file', 'move_file',

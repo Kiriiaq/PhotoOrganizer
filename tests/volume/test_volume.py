@@ -1,5 +1,4 @@
 """Tests de volume : gros fichiers et grandes listes."""
-import os
 import sys
 import tracemalloc
 from pathlib import Path

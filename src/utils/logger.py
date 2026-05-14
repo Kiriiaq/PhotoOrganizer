@@ -3,11 +3,11 @@ Module de configuration du logging.
 Gestion centralisée des logs de l'application.
 """
 
+import logging
 import os
 import sys
-import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 

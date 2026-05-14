@@ -11,8 +11,8 @@ Couvre les exigences :
   - Sidebar Doublons élargie ≥ 500 px
 """
 
-import pytest
 import customtkinter as ctk
+import pytest
 
 # La fixture `app` est définie dans tests/conftest.py (session-scoped)
 # pour partager une seule instance Tk entre tous les modules UI smoke.
@@ -29,7 +29,7 @@ class TestTooltipModule:
         assert callable(attach_tooltip)
 
     def test_attach_tooltip_returns_instance(self, app):
-        from ui.tooltip import attach_tooltip, Tooltip, has_tooltip
+        from ui.tooltip import Tooltip, attach_tooltip, has_tooltip
         btn = ctk.CTkButton(app, text="Test")
         tip = attach_tooltip(btn, "Texte de test")
         assert isinstance(tip, Tooltip)
@@ -81,7 +81,7 @@ class TestTooltipsFr:
             assert key in SETTINGS
 
     def test_all_tooltips_are_strings(self):
-        from ui.tooltips_fr import ORGANIZE, DUPLICATES, HISTORY, SETTINGS, APP
+        from ui.tooltips_fr import APP, DUPLICATES, HISTORY, ORGANIZE, SETTINGS
         for d in (ORGANIZE, DUPLICATES, HISTORY, SETTINGS, APP):
             for k, v in d.items():
                 assert isinstance(v, str), f"Clé {k} : valeur non-str ({type(v)})"
@@ -108,7 +108,7 @@ class TestRenameTemplatesLibrary:
             assert tpl.preview, f"Preview vide pour {tpl.label}"
 
     def test_get_template_by_label(self):
-        from ui.prompt_examples import get_template_by_label, RENAME_TEMPLATES
+        from ui.prompt_examples import RENAME_TEMPLATES, get_template_by_label
         # Premier exemple connu
         first = RENAME_TEMPLATES[0]
         assert get_template_by_label(first.label) == first.template

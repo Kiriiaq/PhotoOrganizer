@@ -46,7 +46,7 @@ class TestSmartOrganizer:
         assert org.file_manager is not None
 
     def test_organize_empty_list(self, tmp_path):
-        from core.operations.organizer import SmartOrganizer, OrganizationOptions
+        from core.operations.organizer import OrganizationOptions, SmartOrganizer
         org = SmartOrganizer()
         result = org.organize([], str(tmp_path), OrganizationOptions())
         assert result.total == 0

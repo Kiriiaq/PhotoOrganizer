@@ -7,12 +7,12 @@ used by the duplicate manager, CLI, and reporters.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import yaml
+from typing import Any, Dict, List, Optional
 
+import yaml
 
 # =============================================================================
 # ENUMS

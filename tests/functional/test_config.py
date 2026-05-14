@@ -1,15 +1,12 @@
 """Tests fonctionnels du gestionnaire de config."""
-import json
 import sys
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from utils.config import ConfigManager, AppConfig  # noqa: E402
+from utils.config import AppConfig, ConfigManager  # noqa: E402
 
 
 def test_config_creates_dir(tmp_path):

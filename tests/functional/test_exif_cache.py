@@ -10,8 +10,8 @@ restait à 0 % même après des dizaines de re-scans (cf. retour qualif
 2026-05-13, T-114).
 """
 
+
 import pytest
-from pathlib import Path
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_global_cache_records_hits_after_repeated_reads(sample_photo):
 
 def test_global_cache_persists_between_extractor_instances(sample_photo, tmp_path):
     """Vérifie que le cache global persiste même si on recrée ExifExtractor."""
-    from core.metadata.exif_extractor import ExifExtractor, get_exif_data
+    from core.metadata.exif_extractor import ExifExtractor
     from utils.cache import get_cache, init_cache
 
     init_cache()

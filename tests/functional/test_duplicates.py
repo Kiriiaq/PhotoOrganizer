@@ -1,5 +1,4 @@
 """Tests fonctionnels du DuplicateManager : détection + exclusion corbeille."""
-import os
 import sys
 from pathlib import Path
 

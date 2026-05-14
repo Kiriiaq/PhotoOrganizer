@@ -26,9 +26,9 @@ Examples:
 """
 
 import argparse
-import sys
-import os
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -40,17 +40,17 @@ except ImportError:
     TQDM_AVAILABLE = False
 
 from src.config.duplicate_config import (
+    ConservationCriterion,
+    DuplicateGroupDecision,
     DuplicateManagerConfig,
     ExecutionMode,
-    ConservationCriterion,
-    HashAlgorithm,
     FileAction,
-    DuplicateGroupDecision,
+    HashAlgorithm,
     load_config_from_yaml,
     save_config_to_yaml,
 )
-from src.core.operations.duplicate_manager import DuplicateManager
 from src.core.operations.duplicate_finder import DuplicateFinder
+from src.core.operations.duplicate_manager import DuplicateManager
 from src.reports.duplicate_reporter import DuplicateReporter
 
 logger = logging.getLogger(__name__)

@@ -6,14 +6,14 @@ This module provides a specialized cache for file hashes, optimized for
 the duplicate detection workflow with support for quick hashes and full hashes.
 """
 
-import os
 import logging
+import os
 import sqlite3
 import threading
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple, List
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

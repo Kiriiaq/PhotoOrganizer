@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 from core.operations.file_manager import FileManager  # noqa: E402
-from core.operations.organizer import SmartOrganizer, OrganizationOptions  # noqa: E402
+from core.operations.organizer import OrganizationOptions, SmartOrganizer  # noqa: E402
 
 
 @pytest.mark.slow

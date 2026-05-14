@@ -7,28 +7,24 @@ and management system, including YAML-based configuration loading.
 """
 
 from .duplicate_config import (
+    ConservationCriterion,
+    ConservationPolicy,
+    DuplicateGroupDecision,
     # Main configuration
     DuplicateManagerConfig,
-
-    # Sub-configurations
-    FolderFilter,
-    ExtensionFilter,
-    ConservationPolicy,
-    HashingConfig,
-    PerformanceConfig,
-    LoggingConfig,
-
     # Enums
     ExecutionMode,
-    ConservationCriterion,
-    HashAlgorithm,
+    ExecutionResult,
+    ExtensionFilter,
     FileAction,
-
     # Results
     FileDecision,
-    DuplicateGroupDecision,
-    ExecutionResult,
-
+    # Sub-configurations
+    FolderFilter,
+    HashAlgorithm,
+    HashingConfig,
+    LoggingConfig,
+    PerformanceConfig,
     # Loaders
     load_config_from_yaml,
     save_config_to_yaml,

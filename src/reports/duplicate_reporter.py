@@ -9,14 +9,14 @@ for duplicate file analysis and management operations.
 import csv
 import json
 import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from src.config.duplicate_config import (
+    ExecutionMode,
     ExecutionResult,
     FileAction,
-    ExecutionMode,
 )
 
 logger = logging.getLogger(__name__)
