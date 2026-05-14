@@ -6,6 +6,7 @@ Interface moderne avec CustomTkinter.
 import logging
 import os
 import sys
+import tkinter as tk
 from tkinter import messagebox
 from typing import Optional
 
@@ -18,7 +19,6 @@ from core.metadata.gps_processor import get_processor as get_gps_processor
 from core.operations.file_manager import FileManager
 from utils.cache import init_cache
 from utils.config import get_config
-from utils.logger import setup_logging
 
 from .frames.duplicates_frame import DuplicatesFrame
 from .frames.history_frame import HistoryFrame
@@ -253,9 +253,15 @@ class PhotoOrganizerApp(ctk.CTk):
         )
         self.status_label.pack(side="left", padx=10, fill="x", expand=True)
 
-        # Progress bar (cachée par défaut)
-        self.progress_bar = ctk.CTkProgressBar(self.status_frame, width=200)
+        # Lot B (audit 2026-05-14, T-036) : progress bar TOUJOURS visible
+        # dans la status bar, dès l'init à 0 %. L'utilisateur sait où la
+        # trouver et n'est plus surpris par son apparition soudaine.
+        self.progress_bar = ctk.CTkProgressBar(
+            self.status_frame, width=200, height=16,
+            border_width=1, border_color=("gray60", "gray40"),
+        )
         self.progress_bar.set(0)
+        self.progress_bar.pack(side="right", padx=10)
 
     def _update_status(self, message: str, progress: Optional[float] = None):
         """
@@ -263,17 +269,11 @@ class PhotoOrganizerApp(ctk.CTk):
 
         Args:
             message: Message à afficher
-            progress: Progression (0-1) ou None pour cacher la barre
+            progress: Progression (0-1) ou None pour remettre la barre à 0
         """
         self.status_label.configure(text=message)
-
-        if progress is not None:
-            if not self.progress_bar.winfo_ismapped():
-                self.progress_bar.pack(side="right", padx=10)
-            self.progress_bar.set(progress)
-        else:
-            if self.progress_bar.winfo_ismapped():
-                self.progress_bar.pack_forget()
+        # Progress bar toujours visible. None → reset à 0 (idle visible).
+        self.progress_bar.set(progress if progress is not None else 0)
 
         self.update_idletasks()
 
@@ -321,7 +321,9 @@ Licence MIT
         try:
             if self.tabview.get() == "📜 Historique":
                 self.history_frame.refresh()
-        except Exception as exc:
+        except (tk.TclError, AttributeError) as exc:
+            # D-04 (audit 2026-05-14) : TclError si widget détruit, AttributeError
+            # si history_frame pas encore monté (timing init).
             logger.debug(f"_on_tab_changed: {exc}")
 
     # ------------------------------------------------------------------
@@ -335,27 +337,77 @@ Licence MIT
     )
 
     def _install_shortcuts(self):
-        """Installe les raccourcis clavier globaux.
+        """Installe les raccourcis clavier globaux (Lot A audit 2026-05-14).
 
-        Ctrl+1..Ctrl+4 sélectionnent les onglets dans l'ordre. ``bind_all``
-        assure que les raccourcis fonctionnent quel que soit le widget qui a
-        le focus (sauf champ de saisie qui peut consommer la touche, mais
-        Tk/Tkinter remonte les Control-Key même depuis les Entry).
+        Stratégie de robustesse :
+        - ``bind_all("<Control-Key-N>")`` pour la navigation entre onglets,
+          MAIS certains widgets (CTkEntry/Textbox) peuvent consommer la
+          touche avant qu'elle ne remonte au niveau ``all`` ;
+        - on **double les bindings** avec ``<Alt-Key-N>`` qui n'est jamais
+          consommé par les Entry — fallback garanti même focus dans un champ ;
+        - ``<Control-Key-5>`` (T-020) : pas de 5e onglet → câblé sur
+          « focus champ Source de l'onglet courant » (action utile sinon perdue) ;
+        - ``<Escape>`` (T-023) : annulation contextuelle de l'opération en
+          cours sur l'onglet actif. No-op si aucune op en cours.
+        - ``F1`` = aide.
         """
         for i, name in enumerate(self.TAB_NAMES, start=1):
             self.bind_all(
                 f"<Control-Key-{i}>",
                 lambda _e, n=name: self._select_tab(n),
             )
-        # F1 = aide
+            # Doublon Alt+N pour résilience face aux widgets qui consomment Ctrl+N
+            self.bind_all(
+                f"<Alt-Key-{i}>",
+                lambda _e, n=name: self._select_tab(n),
+            )
+
+        # Ctrl+5 : focus champ source du panneau Organisation
+        self.bind_all("<Control-Key-5>", lambda _e: self._focus_source_entry())
+        # Escape : annulation contextuelle (cf. _cancel_active_op)
+        self.bind_all("<Escape>", lambda _e: self._cancel_active_op())
+        # F1 : aide
         self.bind_all("<F1>", lambda _e: self._show_about())
+
+    def _focus_source_entry(self):
+        """Met le focus sur le champ Source du panneau Organisation."""
+        try:
+            self.tabview.set("📁 Organisation")
+            self.organize_frame.source_entry.focus_set()
+        except (tk.TclError, AttributeError) as exc:
+            # D-04 (audit 2026-05-14) : si l'onglet/widget est détruit ou pas
+            # encore prêt, on log et on continue.
+            logger.debug(f"_focus_source_entry: {exc}")
+
+    def _cancel_active_op(self):
+        """Annule l'opération en cours sur l'onglet actif (Escape — T-023).
+
+        Aiguillage simple :
+        - 📁 Organisation → ``organize_frame._cancel_operation()``
+        - 🔍 Doublons     → ``duplicates_frame._cancel_operation()``
+        Autres onglets : no-op silencieux.
+        Si aucune op n'est en cours, ``_cancel_operation`` est idempotent
+        (positionne juste le flag et désactive le bouton).
+        """
+        try:
+            active = self.tabview.get()
+            if active == "📁 Organisation":
+                if getattr(self.organize_frame, "_operation_running", False):
+                    self.organize_frame._cancel_operation()
+            elif active == "🔍 Doublons":
+                if getattr(self.duplicates_frame, "_operation_running", False):
+                    self.duplicates_frame._cancel_operation()
+        except (tk.TclError, AttributeError) as exc:
+            # D-04 (audit 2026-05-14) : tabview détruit ou frame absent.
+            logger.debug(f"_cancel_active_op: {exc}")
 
     def _select_tab(self, tab_name: str):
         """Sélectionne un onglet par son nom."""
         try:
             self.tabview.set(tab_name)
             self._on_tab_changed()
-        except Exception as exc:
+        except (tk.TclError, AttributeError) as exc:
+            # D-04 (audit 2026-05-14) : nom inconnu ou widget détruit.
             logger.warning(f"Impossible de selectionner l'onglet {tab_name}: {exc}")
 
     # ------------------------------------------------------------------
@@ -446,7 +498,9 @@ Licence MIT
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                     f"PhotoOrganizer.App.{self.APP_VERSION}"
                 )
-            except Exception as exc:
+            except (OSError, AttributeError) as exc:
+                # D-04 (audit 2026-05-14) : OSError si Win32 API rejette,
+                # AttributeError si ctypes.windll indisponible (Wine, sandbox).
                 logger.debug(f"AppUserModelID non applique: {exc}")
 
         applied = False
@@ -458,7 +512,9 @@ Licence MIT
                 self.iconbitmap(ico_path)
                 logger.info(f"Icone chargee: {ico_path}")
                 applied = True
-            except Exception as exc:
+            except (tk.TclError, OSError) as exc:
+                # D-04 (audit 2026-05-14) : TclError = format invalide,
+                # OSError = fichier illisible/manquant à l'instant T.
                 logger.warning(f"iconbitmap a echoue ({ico_path}): {exc}")
 
         # iconphoto en complément du .ico : améliore le rendu sur certains
@@ -471,7 +527,8 @@ Licence MIT
                 if not applied:
                     logger.info(f"Icone PNG chargee: {png_path}")
                 applied = True
-            except Exception as exc:
+            except (tk.TclError, OSError) as exc:
+                # D-04 (audit 2026-05-14) : idem ci-dessus pour le PNG.
                 logger.warning(f"iconphoto a echoue ({png_path}): {exc}")
 
         if not applied:
@@ -497,18 +554,10 @@ Licence MIT
         self.destroy()
 
 
-def main():
-    """Point d'entrée principal."""
-    # Configuration du logging
-    setup_logging(level="INFO")
-    logger.info("Démarrage de PhotoOrganizer")
-
-    # Lancer l'application
-    app = PhotoOrganizerApp()
-    app.mainloop()
-
-    logger.info("Fermeture de PhotoOrganizer")
-
-
+# D-03 (audit 2026-05-14) : la fonction main() locale a été supprimée car
+# dupliquée avec src/main.py. Le point d'entrée officiel est `main.py` à la
+# racine du projet, qui délègue à `src.main.main`. Si on lance directement
+# `python src/ui/app.py` (cas de debug rare), on délègue au vrai entry point.
 if __name__ == "__main__":
-    main()
+    from main import main as _entry  # noqa: E402  (root main.py)
+    _entry()

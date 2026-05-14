@@ -186,8 +186,9 @@ ORGANIZE = {
         "critères choisis. Peut prendre plusieurs minutes (1000 fichiers ≈ 30 s)."
     ),
     "btn_cancel": (
-        "Annule l'opération en cours dès la prochaine itération. "
-        "Les fichiers déjà traités ne sont pas restaurés (utiliser Historique)."
+        "Annule l'opération coopérativement : le worker s'arrête entre 2 fichiers "
+        "(latence ≤ 1 s en général). Les fichiers déjà traités ne sont pas "
+        "restaurés (utiliser Historique). Patientez quelques secondes avant de relancer."
     ),
 
     # ---- Toggle Avancé ----
@@ -310,7 +311,10 @@ DUPLICATES = {
         "Exécute les actions planifiées (selon le Mode choisi). "
         "Toujours simulation d'abord pour vérifier."
     ),
-    "btn_cancel":  "Annule le scan ou l'exécution en cours.",
+    "btn_cancel":  (
+        "Annule le scan ou l'exécution coopérativement : le worker s'arrête "
+        "entre 2 fichiers (latence ≤ 1 s en général). Patientez avant de relancer."
+    ),
 }
 
 

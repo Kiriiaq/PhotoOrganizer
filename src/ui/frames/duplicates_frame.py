@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import threading
+import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import Callable, List, Optional
 
@@ -87,6 +88,8 @@ class DuplicatesFrame(ctk.CTkFrame):
 
         self._cancel_requested = False
         self._operation_running = False
+        # D-06 (audit 2026-05-14) : sentinel anti-RuntimeError post-destroy
+        self._destroyed = False
         self._duplicate_result: Optional[DuplicateResult] = None
         self._analysis_result: Optional[ExecutionResult] = None
         self._manager: Optional[DuplicateManager] = None
@@ -183,14 +186,15 @@ class DuplicatesFrame(ctk.CTkFrame):
         config_frame = ctk.CTkFrame(title_frame, fg_color="transparent")
         config_frame.pack(side="right")
 
-        ctk.CTkButton(
-            config_frame, text="Charger config", width=110,
-            command=self._load_config_file
+        # Lot C audit 2026-05-14 : design system pour boutons sidebar.
+        neutral_button(
+            config_frame, text="Charger config",
+            command=self._load_config_file, width=110,
         ).pack(side="left", padx=2)
 
-        ctk.CTkButton(
-            config_frame, text="Sauver config", width=110,
-            command=self._save_config_file
+        neutral_button(
+            config_frame, text="Sauver config",
+            command=self._save_config_file, width=110,
         ).pack(side="left", padx=2)
 
         # Dossier source
@@ -203,9 +207,9 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.source_var,
             placeholder_text="Selectionnez un dossier a analyser..."
         ).pack(side="left", fill="x", expand=True, padx=5)
-        ctk.CTkButton(
-            folder_frame, text="Parcourir", width=80,
-            command=self._browse_source
+        neutral_button(
+            folder_frame, text="Parcourir",
+            command=self._browse_source, width=80,
         ).pack(side="left")
 
         # Mode d'exécution + destination move
@@ -235,9 +239,9 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.move_destination,
             placeholder_text="Dossier de destination pour les doublons..."
         ).pack(side="left", fill="x", expand=True, padx=5)
-        ctk.CTkButton(
-            self.dest_frame, text="Parcourir", width=80,
-            command=self._browse_destination
+        neutral_button(
+            self.dest_frame, text="Parcourir",
+            command=self._browse_destination, width=80,
         ).pack(side="left")
 
     # =========================================================================
@@ -445,9 +449,9 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.priority_dirs_str,
             placeholder_text="Chemins separes par ;"
         ).pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ctk.CTkButton(
-            prio_input_frame, text="+", width=30,
-            command=self._add_priority_dir
+        neutral_button(
+            prio_input_frame, text="+",
+            command=self._add_priority_dir, width=30,
         ).pack(side="left")
 
     def _create_performance_options(self, parent):
@@ -507,9 +511,9 @@ class DuplicatesFrame(ctk.CTkFrame):
             row2, textvariable=self.report_output_dir,
             placeholder_text="(meme dossier que source)", width=200
         ).pack(side="left", padx=5, fill="x", expand=True)
-        ctk.CTkButton(
-            row2, text="...", width=30,
-            command=self._browse_report_dir
+        neutral_button(
+            row2, text="...",
+            command=self._browse_report_dir, width=30,
         ).pack(side="left")
 
     # =========================================================================
@@ -570,10 +574,23 @@ class DuplicatesFrame(ctk.CTkFrame):
                            padx=PAD_M, pady=(0, PAD_M))
         actions_frame.columnconfigure(0, weight=1)
 
-        # Barre de progression visible dès l'init
-        self.progress_bar = ctk.CTkProgressBar(actions_frame, height=14)
-        self.progress_bar.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
+        # Lot B (audit 2026-05-14, T-036) : progress bar plus visible
+        progress_row = ctk.CTkFrame(actions_frame, fg_color="transparent")
+        progress_row.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
+        progress_row.columnconfigure(0, weight=1)
+
+        self.progress_bar = ctk.CTkProgressBar(
+            progress_row, height=20,
+            border_width=1, border_color=("gray60", "gray40"),
+        )
+        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
         self.progress_bar.set(0)
+
+        self.progress_pct_var = ctk.StringVar(value="0 %")
+        ctk.CTkLabel(
+            progress_row, textvariable=self.progress_pct_var,
+            font=font_label(weight="bold"), width=44, anchor="e",
+        ).grid(row=0, column=1, sticky="e")
 
         # Label progression compact
         self.progress_label = ctk.CTkLabel(
@@ -882,7 +899,23 @@ class DuplicatesFrame(ctk.CTkFrame):
     # =========================================================================
 
     def _start_scan(self):
-        """Lance le scan et l'analyse des doublons."""
+        """Lance le scan et l'analyse des doublons.
+
+        D-01 (audit 2026-05-14) : message clair si annulation en cours plutôt
+        qu'un no-op silencieux.
+        """
+        # Garde D-01 : annulation en cours / opération déjà active
+        if getattr(self, "_operation_running", False):
+            if getattr(self, "_cancel_requested", False):
+                messagebox.showinfo(
+                    "Annulation en cours",
+                    "Le scan est en cours d'annulation.\n"
+                    "Patientez quelques secondes avant de relancer.",
+                )
+            else:
+                logger.debug("Scan déjà en cours, ignore clic redondant")
+            return
+
         source = self.source_var.get().strip()
         if not source:
             messagebox.showerror("Erreur", "Veuillez selectionner un dossier source.")
@@ -901,6 +934,9 @@ class DuplicatesFrame(ctk.CTkFrame):
         if errors:
             messagebox.showerror("Erreur de configuration", "\n".join(errors))
             return
+
+        # Reset cancel flag avant de lancer une nouvelle opération
+        self._cancel_requested = False
 
         # Réinitialiser l'UI
         self._reset_results()
@@ -922,7 +958,7 @@ class DuplicatesFrame(ctk.CTkFrame):
                 self._duplicate_result = dup_result
 
                 if not dup_result.duplicate_groups:
-                    self.after(0, lambda: self._show_no_duplicates(dup_result))
+                    self._safe_after(0, lambda: self._show_no_duplicates(dup_result))
                     self._set_running(False)
                     return
 
@@ -932,7 +968,7 @@ class DuplicatesFrame(ctk.CTkFrame):
                 self._analysis_result = analysis
 
                 # Afficher les résultats
-                self.after(0, lambda: self._display_analysis(dup_result, analysis))
+                self._safe_after(0, lambda: self._display_analysis(dup_result, analysis))
 
                 self._update_progress(
                     f"Termine: {analysis.duplicate_groups} groupes, "
@@ -946,7 +982,7 @@ class DuplicatesFrame(ctk.CTkFrame):
                 # explicite la lambda passée à `self.after` lèverait NameError.
                 err_msg = str(exc)
                 logger.exception("Erreur durant le scan des doublons")
-                self.after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
+                self._safe_after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
                 self._update_progress(f"Erreur: {err_msg}", 0)
 
             finally:
@@ -956,7 +992,22 @@ class DuplicatesFrame(ctk.CTkFrame):
         thread.start()
 
     def _execute_actions(self):
-        """Exécute les actions planifiées (suppression/déplacement/corbeille)."""
+        """Exécute les actions planifiées (suppression/déplacement/corbeille).
+
+        D-01 (audit 2026-05-14) : message clair si annulation en cours.
+        """
+        # Garde D-01 : annulation en cours / opération déjà active
+        if getattr(self, "_operation_running", False):
+            if getattr(self, "_cancel_requested", False):
+                messagebox.showinfo(
+                    "Annulation en cours",
+                    "L'opération est en cours d'annulation.\n"
+                    "Patientez quelques secondes avant de relancer.",
+                )
+            else:
+                logger.debug("Exécution déjà en cours, ignore clic redondant")
+            return
+
         if not self._analysis_result or not self._manager:
             return
 
@@ -1006,13 +1057,13 @@ class DuplicatesFrame(ctk.CTkFrame):
                 self._generate_reports()
 
                 # Afficher le résultat
-                self.after(0, lambda: self._show_execution_result(result))
+                self._safe_after(0, lambda: self._show_execution_result(result))
                 self._update_progress("Execution terminee.", 1.0)
 
             except Exception as exc:
                 err_msg = str(exc)
                 logger.exception("Erreur durant l'execution des actions doublons")
-                self.after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
+                self._safe_after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
 
             finally:
                 self._set_running(False)
@@ -1056,7 +1107,7 @@ class DuplicatesFrame(ctk.CTkFrame):
         except Exception as exc:
             err_msg = str(exc)
             logger.exception("Erreur generation rapports doublons")
-            self.after(0, lambda m=err_msg: messagebox.showwarning(
+            self._safe_after(0, lambda m=err_msg: messagebox.showwarning(
                 "Rapports", f"Erreur lors de la generation des rapports:\n{m}"
             ))
 
@@ -1246,15 +1297,40 @@ class DuplicatesFrame(ctk.CTkFrame):
 
         self._update_progress(f"{message} ({current}/{total})", progress)
 
+    # ------------------------------------------------------------------
+    # D-06 (audit 2026-05-14) : sentinel anti-RuntimeError post-destroy
+    # ------------------------------------------------------------------
+    def destroy(self):
+        """Marque le frame comme détruit avant de libérer les ressources Tk."""
+        self._destroyed = True
+        super().destroy()
+
+    def _safe_after(self, delay_ms: int, fn):
+        """Variante de ``self.after`` no-op si le frame a été détruit."""
+        if getattr(self, "_destroyed", False):
+            return None
+        try:
+            return self.after(delay_ms, fn)
+        except (tk.TclError, RuntimeError) as exc:
+            logger.debug(f"_safe_after: {exc}")
+            return None
+
     def _update_progress(self, message: str, progress: Optional[float]):
-        """Met à jour la barre de progression de manière thread-safe."""
+        """Met à jour la barre de progression et le label %."""
         def update():
             self.progress_label.configure(text=message)
             if progress is not None:
-                self.progress_bar.set(max(0, min(1, progress)))
+                clamped = max(0, min(1, progress))
+                self.progress_bar.set(clamped)
+                # Lot B audit 2026-05-14 : label numérique
+                try:
+                    self.progress_pct_var.set(f"{int(round(clamped * 100))} %")
+                except tk.TclError:
+                    # Widget detruit pendant l'update — no-op silencieux.
+                    pass
             self.status_callback(message, progress)
 
-        self.after(0, update)
+        self._safe_after(0, update)
 
     def _set_running(self, running: bool):
         """Bascule l'état des boutons selon l'opération en cours."""
@@ -1270,14 +1346,28 @@ class DuplicatesFrame(ctk.CTkFrame):
                 self.cancel_button.configure(state="disabled")
                 # execute_button sera activé par _display_analysis si résultats
 
-        self.after(0, update)
+        self._safe_after(0, update)
 
     def _cancel_operation(self):
-        """Annule l'opération en cours."""
+        """Annule l'opération en cours.
+
+        D-01 (audit 2026-05-14) : on désactive Annuler et on remet Rechercher
+        en état "normal" dès la demande, sans attendre la sortie effective du
+        worker. Le worker continue jusqu'à la prochaine itération coopérative
+        puis sortira proprement.
+        """
         self._cancel_requested = True
         if self._manager:
-            self._manager.cancel()
+            try:
+                self._manager.cancel()
+            except Exception as exc:
+                logger.debug(f"_cancel_operation manager: {exc}")
         self._update_progress("Annulation en cours...", None)
+        try:
+            self.search_button.configure(state="normal")
+            self.cancel_button.configure(state="disabled")
+        except Exception as exc:
+            logger.debug(f"_cancel_operation buttons reset: {exc}")
 
     @staticmethod
     def _format_size(size_bytes: int) -> str:

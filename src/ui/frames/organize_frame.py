@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import threading
+import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox
 from typing import Callable, List, Optional
@@ -204,6 +205,11 @@ class OrganizeFrame(ctk.CTkFrame):
         # Variables d'état
         self._cancel_requested = False
         self._operation_running = False
+        # D-06 (audit 2026-05-14) : sentinel pour éviter
+        # `RuntimeError: main thread is not in main loop` quand un worker
+        # essaie de marshaller un callback `after(0, ...)` alors que le frame
+        # vient d'être détruit (fermeture app, swap d'onglet, hot-reload…).
+        self._destroyed = False
         # Référence à l'organizer en cours (pour propager cancel())
         self._current_organizer: Optional[SmartOrganizer] = None
 
@@ -431,6 +437,17 @@ class OrganizeFrame(ctk.CTkFrame):
         self.file_count_label.grid(
             row=3, column=0, columnspan=3,
             sticky="ew", padx=PAD_M, pady=(0, PAD_M),
+        )
+
+        # Lot B audit 2026-05-14 (T-030..T-033) : bouton « 📋 » qui ouvre une
+        # modale listant les fichiers détectés. Réponse au retour testeur
+        # "je ne vois pas le titre/chemin des fichiers sélectionnés".
+        self.show_files_btn = icon_button(
+            folders, text="📋",
+            command=self._show_files_list,
+        )
+        self.show_files_btn.grid(
+            row=3, column=3, padx=(0, PAD_M), pady=(0, PAD_M),
         )
 
         # Drag-and-drop retiré (W06) — la méthode _setup_drag_drop reste
@@ -1060,11 +1077,28 @@ class OrganizeFrame(ctk.CTkFrame):
         ici — l'utilisateur le voit avant même de regarder les boutons.
         """
         parent = self._bottom_zone
+        parent.columnconfigure(0, weight=1)
 
-        # Barre de progression visible dès l'init
-        self.progress_bar = ctk.CTkProgressBar(parent, height=14)
-        self.progress_bar.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
+        # Lot B (audit 2026-05-14, T-036) : progress bar plus visible.
+        # height 14 → 20 ; ajout d'une bordure matérialisant la track à 0 % ;
+        # label numérique « 0 % » toujours présent à droite pour qu'on
+        # repère immédiatement où est l'indicateur.
+        progress_row = ctk.CTkFrame(parent, fg_color="transparent")
+        progress_row.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
+        progress_row.columnconfigure(0, weight=1)
+
+        self.progress_bar = ctk.CTkProgressBar(
+            progress_row, height=20,
+            border_width=1, border_color=("gray60", "gray40"),
+        )
+        self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
         self.progress_bar.set(0)
+
+        self.progress_pct_var = ctk.StringVar(value="0 %")
+        ctk.CTkLabel(
+            progress_row, textvariable=self.progress_pct_var,
+            font=font_label(weight="bold"), width=44, anchor="e",
+        ).grid(row=0, column=1, sticky="e")
 
         # Label de progression
         self.progress_label = ctk.CTkLabel(
@@ -1521,8 +1555,8 @@ class OrganizeFrame(ctk.CTkFrame):
         # On déclenche l'organisation avec les paramètres courants.
         # Si pas de source/dest configurés, on log juste et on saute.
         try:
-            self.after(0, self._organize_files)
-        except Exception as exc:
+            self._safe_after(0, self._organize_files)
+        except (tk.TclError, RuntimeError) as exc:
             logger.warning(f"Scheduled run dispatch failed: {exc}")
 
     def _get_options(self) -> OrganizationOptions:
@@ -1681,6 +1715,45 @@ class OrganizeFrame(ctk.CTkFrame):
             yield child
             yield from OrganizeFrame._iter_descendants(child)
 
+    def _show_files_list(self):
+        """Modal listant les fichiers détectés dans la source (T-030..T-033).
+
+        Affiche jusqu'à 500 chemins triés. Permet à l'utilisateur de vérifier
+        VISUELLEMENT quels fichiers seront traités. Si > 500, affiche un
+        message « ... et N de plus » pour rester réactif.
+        """
+        files = self._get_files()
+        win = ctk.CTkToplevel(self)
+        win.title("Fichiers détectés")
+        win.geometry("700x500")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+
+        ctk.CTkLabel(
+            win,
+            text=f"📋 {len(files)} fichier(s) détecté(s) avec les filtres actuels",
+            font=font_section(),
+        ).pack(anchor="w", padx=PAD_L, pady=(PAD_L, PAD_S))
+
+        if not files:
+            ctk.CTkLabel(
+                win, text="Aucun fichier trouvé.",
+                text_color=LABEL_MUTED,
+            ).pack(padx=PAD_L, pady=PAD_M)
+        else:
+            box = ctk.CTkTextbox(win, font=font_hint())
+            box.pack(fill="both", expand=True, padx=PAD_L, pady=PAD_S)
+            for i, f in enumerate(files[:500], 1):
+                box.insert("end", f"{i:>4}.  {f}\n")
+            if len(files) > 500:
+                box.insert("end", f"\n… et {len(files) - 500} fichier(s) supplémentaire(s)")
+            box.configure(state="disabled")
+
+        ctk.CTkButton(
+            win, text="Fermer", command=win.destroy,
+            height=BTN_H_STD,
+        ).pack(pady=PAD_M)
+
     def _refresh_file_count(self):
         """Met à jour le compteur de fichiers détectés sous les boutons.
 
@@ -1702,19 +1775,30 @@ class OrganizeFrame(ctk.CTkFrame):
         self.file_count_var.set(f"Comptage des fichiers dans {os.path.basename(source)}…")
 
         def count_thread():
+            # D-06 (audit 2026-05-14) : sortir immédiatement si le frame a
+            # été détruit pendant que le thread démarrait — évite le
+            # `RuntimeError: main thread is not in main loop` lors de
+            # l'accès aux StringVar via `_get_files()`.
+            if getattr(self, "_destroyed", False):
+                return
             try:
                 files = self._get_files()
+                if getattr(self, "_destroyed", False):
+                    return
                 count = len(files)
                 shown = source if len(source) <= 70 else "…" + source[-67:]
                 if count == 0:
                     msg = f"📂 {shown} — aucun fichier détecté avec les filtres actuels."
                 else:
                     msg = f"📂 {shown} — {count} fichier(s) prêt(s) à être organisé(s)."
-                self.after(0, lambda m=msg: self.file_count_var.set(m))
-            except Exception as exc:
+                self._safe_after(0, lambda m=msg: self.file_count_var.set(m))
+            except RuntimeError:
+                # Tk mainloop disparue (frame détruit pendant un get).
+                return
+            except (OSError, ValueError) as exc:
                 err = str(exc)
                 logger.warning(f"Comptage echoue: {err}")
-                self.after(
+                self._safe_after(
                     0, lambda m=err: self.file_count_var.set(f"Erreur de comptage : {m}")
                 )
 
@@ -1722,6 +1806,19 @@ class OrganizeFrame(ctk.CTkFrame):
 
     def _analyze_files(self):
         """Analyse les fichiers du dossier source."""
+        # D-01 (audit 2026-05-14) : pas de double-lancement pendant qu'une
+        # opération tourne, et message clair si annulation en cours.
+        if getattr(self, "_operation_running", False):
+            if getattr(self, "_cancel_requested", False):
+                messagebox.showinfo(
+                    "Annulation en cours",
+                    "L'opération est en cours d'annulation.\n"
+                    "Patientez quelques secondes avant de relancer.",
+                )
+            else:
+                logger.debug("Analyse déjà en cours, ignore clic redondant")
+            return
+
         source = self.source_var.get()
         if not source:
             messagebox.showerror("Erreur", "Veuillez sélectionner un dossier source.")
@@ -1730,6 +1827,9 @@ class OrganizeFrame(ctk.CTkFrame):
         if not os.path.isdir(source):
             messagebox.showerror("Erreur", "Le dossier source n'existe pas.")
             return
+
+        # Reset cancel flag avant de lancer une nouvelle opération
+        self._cancel_requested = False
 
         def analyze():
             self._operation_running = True
@@ -1798,10 +1898,22 @@ class OrganizeFrame(ctk.CTkFrame):
         W60 (retour testeur 2026-05-13) : garde anti-double-clic + après une
         annulation l'utilisateur doit pouvoir relancer immédiatement. On
         reset explicitement les flags d'état au début de chaque lancement.
+
+        D-01 (audit 2026-05-14) : si une annulation est en cours, le worker
+        n'a pas encore fini de sortir proprement. On informe l'utilisateur
+        avec un message clair plutôt qu'un no-op silencieux.
         """
         # Garde anti-double-clic / relance immédiate post-cancel
         if getattr(self, "_operation_running", False):
-            logger.debug("Org déjà en cours, ignore clic redondant")
+            if getattr(self, "_cancel_requested", False):
+                # Annulation en cours mais worker pas encore sorti.
+                messagebox.showinfo(
+                    "Annulation en cours",
+                    "L'opération est en cours d'annulation.\n"
+                    "Patientez quelques secondes avant de relancer.",
+                )
+            else:
+                logger.debug("Org déjà en cours, ignore clic redondant")
             return
 
         # Reset PROACTIF — si l'utilisateur avait annulé puis le bouton n'a
@@ -1868,7 +1980,7 @@ class OrganizeFrame(ctk.CTkFrame):
                 self._set_buttons_state(True)
 
             # Afficher les résultats
-            self.after(0, lambda: self._show_organization_results(result))
+            self._safe_after(0, lambda: self._show_organization_results(result))
 
         thread = threading.Thread(target=organize, daemon=True)
         thread.start()
@@ -1903,24 +2015,55 @@ class OrganizeFrame(ctk.CTkFrame):
         except Exception as exc:
             logger.debug(f"_cancel_operation buttons reset: {exc}")
 
+    # ------------------------------------------------------------------
+    # D-06 (audit 2026-05-14) : sentinel anti-RuntimeError post-destroy
+    # ------------------------------------------------------------------
+    def destroy(self):
+        """Marque le frame comme détruit avant de libérer les ressources Tk.
+
+        Les workers en arrière-plan utilisent ``self.after(0, ...)`` pour
+        marshaller leurs callbacks sur la boucle Tk principale. Sans ce
+        sentinel, un worker qui se réveille après ``destroy()`` ferait
+        crasher l'app avec ``RuntimeError: main thread is not in main loop``.
+        """
+        self._destroyed = True
+        super().destroy()
+
+    def _safe_after(self, delay_ms: int, fn):
+        """Variante de ``self.after`` no-op si le frame a été détruit."""
+        if getattr(self, "_destroyed", False):
+            return None
+        try:
+            return self.after(delay_ms, fn)
+        except (tk.TclError, RuntimeError) as exc:
+            # TclError : widget invalide. RuntimeError : main loop terminée.
+            logger.debug(f"_safe_after: {exc}")
+            return None
+
     def _set_buttons_state(self, enabled: bool):
         """Active/désactive les boutons."""
         state = "normal" if enabled else "disabled"
         cancel_state = "disabled" if enabled else "normal"
 
-        self.after(0, lambda: self.analyze_button.configure(state=state))
-        self.after(0, lambda: self.organize_button.configure(state=state))
-        self.after(0, lambda: self.cancel_button.configure(state=cancel_state))
+        self._safe_after(0, lambda: self.analyze_button.configure(state=state))
+        self._safe_after(0, lambda: self.organize_button.configure(state=state))
+        self._safe_after(0, lambda: self.cancel_button.configure(state=cancel_state))
 
     def _update_progress(self, message: str, progress: Optional[float]):
-        """Met à jour la barre de progression."""
+        """Met à jour la barre de progression et le label %."""
         def update():
             self.progress_label.configure(text=message)
             if progress is not None:
                 self.progress_bar.set(progress)
+                # Lot B audit 2026-05-14 : label numérique synchro
+                try:
+                    self.progress_pct_var.set(f"{int(round(progress * 100))} %")
+                except tk.TclError:
+                    # Widget detruit pendant l'update — no-op silencieux.
+                    pass
             self.status_callback(message, progress)
 
-        self.after(0, update)
+        self._safe_after(0, update)
 
     def _show_analysis_results(self, stats: dict):
         """Affiche les résultats de l'analyse."""
@@ -1942,7 +2085,7 @@ Distribution par appareil:
             messagebox.showinfo("Analyse terminée", message)
             self._update_progress("Analyse terminée", 1)
 
-        self.after(0, show)
+        self._safe_after(0, show)
 
     def _show_organization_results(self, result):
         """Affiche les résultats de l'organisation avec :
