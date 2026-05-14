@@ -73,16 +73,20 @@ class PhotoOrganizerApp(ctk.CTk):
 
         # Configuration de la fenêtre
         self.title(f"{self.APP_NAME} v{self.APP_VERSION}")
-        self.geometry(f"{config.window_width}x{config.window_height}")
         # Refonte UI v3 : minsize relevé à 800×550 pour garantir le
         # layout 3-zones de l'onglet Organisation (top fixe / centre /
         # bottom fixe). En dessous, l'IHM devient inutilisable car les
         # 3 zones se chevauchent.
         self.minsize(800, 550)
 
-        # Position de la fenêtre
-        if config.window_x is not None and config.window_y is not None:
-            self.geometry(f"+{config.window_x}+{config.window_y}")
+        # Géométrie restaurée + validée contre l'écran courant (bugfix
+        # 2026-05-14 : sur un dual-screen retiré, les coords sauvegardées
+        # plaçaient la fenêtre hors champ visible → "lancement lent, aucune
+        # fenêtre" alors que l'app tournait bien).
+        self._apply_validated_geometry(
+            config.window_width, config.window_height,
+            config.window_x, config.window_y,
+        )
 
         # Icône (si disponible) — cherche resources/icons puis fallback assets/
         self._install_icon()
@@ -451,6 +455,53 @@ Licence MIT
         except Exception as exc:
             logger.warning(f"DnD non active : {exc}")
 
+    def _apply_validated_geometry(self, w, h, x, y):
+        """Applique width/height/x/y en validant contre l'écran courant.
+
+        Bugfix (audit 2026-05-14) : les anciennes coords sauvegardées
+        pouvaient pointer vers un 2e écran déconnecté ; la fenêtre
+        s'ouvrait alors hors champ visible (symptôme rapporté : « le
+        lancement est lent et aucune fenêtre ne s'affiche »).
+
+        Règles :
+        - largeur/hauteur clampées entre [800×550] (minsize) et la taille
+          de l'écran courant.
+        - x/y vérifiés : si la fenêtre dépasse l'écran de plus de 100 px
+          dans une direction, on recentre.
+        """
+        try:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+        except tk.TclError:
+            screen_w, screen_h = 1920, 1080  # fallback raisonnable
+
+        # Clamp taille
+        w = max(800, min(int(w or 1200), screen_w))
+        h = max(550, min(int(h or 825), screen_h))
+
+        # Valide la position : marge de tolérance 100 px (pour barres système).
+        x_valid = (
+            x is not None
+            and -100 <= int(x) <= screen_w - 100
+        )
+        y_valid = (
+            y is not None
+            and -100 <= int(y) <= screen_h - 100
+        )
+
+        if x_valid and y_valid:
+            self.geometry(f"{w}x{h}+{int(x)}+{int(y)}")
+            logger.debug(f"Geometry restored : {w}x{h}+{x}+{y}")
+        else:
+            # Hors écran → recentre
+            cx = max(0, (screen_w - w) // 2)
+            cy = max(0, (screen_h - h) // 2)
+            self.geometry(f"{w}x{h}+{cx}+{cy}")
+            logger.info(
+                f"Geometry sauvegardée hors écran (x={x},y={y}, écran={screen_w}x{screen_h}) — "
+                f"fenêtre recentrée à ({cx},{cy})"
+            )
+
     def _install_icon(self):
         """Charge l'icône de l'application (titre, barre des tâches Windows).
 
@@ -539,11 +590,27 @@ Licence MIT
 
     def _on_closing(self):
         """Gère la fermeture de l'application."""
-        # Sauvegarder la position et la taille de la fenêtre
-        self.config_manager.set('window_width', self.winfo_width())
-        self.config_manager.set('window_height', self.winfo_height())
-        self.config_manager.set('window_x', self.winfo_x())
-        self.config_manager.set('window_y', self.winfo_y())
+        # Sauvegarder la position et la taille — uniquement si la fenêtre
+        # est toujours dans l'écran courant. Évite de pérenniser des coords
+        # devenues invalides (cf. bugfix _apply_validated_geometry).
+        try:
+            w = self.winfo_width()
+            h = self.winfo_height()
+            x = self.winfo_x()
+            y = self.winfo_y()
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+            if -100 <= x <= screen_w - 100 and -100 <= y <= screen_h - 100:
+                self.config_manager.set('window_width', w)
+                self.config_manager.set('window_height', h)
+                self.config_manager.set('window_x', x)
+                self.config_manager.set('window_y', y)
+            else:
+                logger.info(
+                    f"Coords fenêtre hors écran ({x},{y}) — non sauvegardées"
+                )
+        except tk.TclError as exc:
+            logger.debug(f"Sauvegarde geometry : {exc}")
 
         # Sauvegarder les dossiers récents
         if self.source_folder.get():
