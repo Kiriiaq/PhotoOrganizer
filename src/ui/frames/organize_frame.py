@@ -1959,27 +1959,35 @@ class OrganizeFrame(ctk.CTkFrame):
         Affiche jusqu'à 500 chemins triés. Permet à l'utilisateur de vérifier
         VISUELLEMENT quels fichiers seront traités. Si > 500, affiche un
         message « ... et N de plus » pour rester réactif.
+
+        Logo PhotoOrganizer en haut-gauche (audit 2026-05-15).
         """
+        from ui.theme import add_logo_to_modal
+
         files = self._get_files()
         win = ctk.CTkToplevel(self)
         win.title("Fichiers détectés")
-        win.geometry("700x500")
+        win.geometry("700x540")
         win.transient(self.winfo_toplevel())
         win.grab_set()
 
-        ctk.CTkLabel(
-            win,
+        # Logo haut-gauche
+        add_logo_to_modal(
+            win, size=40,
             text=f"📋 {len(files)} fichier(s) détecté(s) avec les filtres actuels",
-            font=font_section(),
-        ).pack(anchor="w", padx=PAD_L, pady=(PAD_L, PAD_S))
+        )
+
+        # Container pour le reste
+        body = ctk.CTkFrame(win, fg_color="transparent")
+        body.pack(fill="both", expand=True)
 
         if not files:
             ctk.CTkLabel(
-                win, text="Aucun fichier trouvé.",
+                body, text="Aucun fichier trouvé.",
                 text_color=LABEL_MUTED,
             ).pack(padx=PAD_L, pady=PAD_M)
         else:
-            box = ctk.CTkTextbox(win, font=font_hint())
+            box = ctk.CTkTextbox(body, font=font_hint())
             box.pack(fill="both", expand=True, padx=PAD_L, pady=PAD_S)
             for i, f in enumerate(files[:500], 1):
                 box.insert("end", f"{i:>4}.  {f}\n")
@@ -1988,7 +1996,7 @@ class OrganizeFrame(ctk.CTkFrame):
             box.configure(state="disabled")
 
         ctk.CTkButton(
-            win, text="Fermer", command=win.destroy,
+            body, text="Fermer", command=win.destroy,
             height=BTN_H_STD,
         ).pack(pady=PAD_M)
 
@@ -2383,24 +2391,30 @@ Distribution par appareil:
     def _show_results_modal(self, message: str, dest: str):
         """Modal résumé custom (au lieu de messagebox basique) avec un
         bouton « 📂 Ouvrir destination » qui ouvre l'explorateur natif.
+
+        Logo PhotoOrganizer en haut-gauche (audit 2026-05-15).
         """
+        from ui.theme import add_logo_to_modal
+
         win = ctk.CTkToplevel(self)
         win.title("Organisation terminée")
-        win.geometry("520x320")
+        win.geometry("520x360")
         win.transient(self.winfo_toplevel())
         win.grab_set()
 
-        ctk.CTkLabel(
-            win, text="✅ Organisation terminée",
-            font=ctk.CTkFont(size=16, weight="bold"),
-        ).pack(padx=12, pady=(12, 6), anchor="w")
+        # Logo haut-gauche (audit 2026-05-15)
+        add_logo_to_modal(win, size=40, text="✅ Organisation terminée")
 
-        textbox = ctk.CTkTextbox(win, height=180)
+        # Container pour le reste (sous le logo)
+        body = ctk.CTkFrame(win, fg_color="transparent")
+        body.pack(fill="both", expand=True)
+
+        textbox = ctk.CTkTextbox(body, height=180)
         textbox.pack(fill="both", expand=True, padx=12, pady=4)
         textbox.insert("end", message)
         textbox.configure(state="disabled")
 
-        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row = ctk.CTkFrame(body, fg_color="transparent")
         btn_row.pack(fill="x", padx=12, pady=(4, 12))
 
         if dest:
@@ -2502,12 +2516,19 @@ Distribution par appareil:
 
             tree.setdefault(path, []).append(fname)
 
-        # Modale d'affichage
+        # Modale d'affichage — logo haut-gauche (audit 2026-05-15)
+        from ui.theme import add_logo_to_modal
+
         win = ctk.CTkToplevel(self)
         win.title("Aperçu dry-run (sans modification disque)")
-        win.geometry("760x540")
+        win.geometry("760x580")
         win.transient(self.winfo_toplevel())
         win.grab_set()
+
+        add_logo_to_modal(win, size=40, text="Aperçu (dry-run)")
+
+        body = ctk.CTkFrame(win, fg_color="transparent")
+        body.pack(fill="both", expand=True)
 
         header_text = (
             f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
@@ -2517,11 +2538,11 @@ Distribution par appareil:
         header_text += f"\n📁 Destination : {dest}"
         if len(eligible) > 100:
             header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
-        ctk.CTkLabel(win, text=header_text, justify="left", anchor="w").pack(
+        ctk.CTkLabel(body, text=header_text, justify="left", anchor="w").pack(
             fill="x", padx=12, pady=(12, 4)
         )
 
-        textbox = ctk.CTkTextbox(win, font=ctk.CTkFont(family="Consolas", size=11))
+        textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
         textbox.pack(fill="both", expand=True, padx=12, pady=4)
         for folder in sorted(tree.keys()):
             rel = os.path.relpath(folder, dest) if dest in folder else folder
@@ -2532,6 +2553,6 @@ Distribution par appareil:
                 textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
         textbox.configure(state="disabled")
 
-        ctk.CTkButton(win, text="Fermer", command=win.destroy).pack(
+        ctk.CTkButton(body, text="Fermer", command=win.destroy).pack(
             padx=12, pady=(4, 12)
         )
