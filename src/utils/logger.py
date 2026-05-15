@@ -23,6 +23,30 @@ def get_log_dir() -> Path:
     return log_dir
 
 
+def set_log_level(level: str) -> bool:
+    """Change le niveau de log à chaud (audit 2026-05-15).
+
+    Évite à l'utilisateur de redémarrer l'app après avoir changé le niveau
+    dans Paramètres. Met à jour le logger racine ``PhotoOrganizer`` ET
+    tous ses handlers (console + fichier).
+
+    Args:
+        level: "DEBUG" | "INFO" | "WARNING" | "ERROR" (case-insensitive)
+
+    Returns:
+        ``True`` si le niveau a été appliqué, ``False`` si invalide.
+    """
+    log_level = getattr(logging, level.upper(), None)
+    if log_level is None:
+        return False
+    root_logger = logging.getLogger('PhotoOrganizer')
+    root_logger.setLevel(log_level)
+    for handler in root_logger.handlers:
+        handler.setLevel(log_level)
+    root_logger.info(f"Niveau de log changé : {level.upper()}")
+    return True
+
+
 def setup_logging(
     level: str = "INFO",
     log_to_file: bool = True,

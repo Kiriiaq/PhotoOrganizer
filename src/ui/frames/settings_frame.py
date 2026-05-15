@@ -21,11 +21,13 @@ from ui.theme import (
     font_section,
     make_checkbox,
     make_radio,
+    neutral_button,
     primary_button,
     warning_button,
 )
 from utils.cache import get_cache
 from utils.config import ConfigManager
+from utils.logger import get_log_dir, set_log_level
 
 # Aliases retro-compat avec l'ancien nommage local
 _make_checkbox = make_checkbox
@@ -332,16 +334,28 @@ class SettingsFrame(ctk.CTkFrame):
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
-        # Niveau de log
+        # Niveau de log — audit 2026-05-15 : appliqué à chaud (plus besoin
+        # de relancer l'app pour voir l'effet), accolé à un bouton « Voir
+        # les logs » qui ouvre le dossier de logs dans l'explorateur.
         log_frame = ctk.CTkFrame(section, fg_color="transparent")
         log_frame.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(log_frame, text="Niveau de log:").pack(side="left", padx=5)
+        ctk.CTkLabel(log_frame, text="Niveau de log :").pack(side="left", padx=5)
         ctk.CTkOptionMenu(
             log_frame,
             variable=self.log_level_var,
-            values=["DEBUG", "INFO", "WARNING", "ERROR"]
+            values=["DEBUG", "INFO", "WARNING", "ERROR"],
+            command=lambda v: set_log_level(v),
         ).pack(side="left", padx=5)
+        ctk.CTkLabel(
+            log_frame, text="(appliqué immédiatement)",
+            font=font_hint(), text_color=HINT_COLOR,
+        ).pack(side="left", padx=PAD_S)
+
+        neutral_button(
+            log_frame, text="📂 Voir les logs",
+            command=self._open_log_dir, width=140,
+        ).pack(side="right", padx=PAD_S)
 
         # Dossiers récents
         recent_frame = ctk.CTkFrame(section, fg_color="transparent")
@@ -428,6 +442,32 @@ class SettingsFrame(ctk.CTkFrame):
         cache.clear()
 
         messagebox.showinfo("Succès", "Le cache a été vidé.")
+
+    def _open_log_dir(self):
+        """Ouvre le dossier des logs dans l'explorateur (audit 2026-05-15).
+
+        Plateforme :
+        - Windows : ``os.startfile``
+        - macOS   : ``open <path>`` via subprocess
+        - Linux   : ``xdg-open <path>`` via subprocess
+        """
+        import os
+        import subprocess
+        import sys
+
+        log_dir = get_log_dir()
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(log_dir))  # noqa: S606
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(log_dir)])  # noqa: S603
+            else:
+                subprocess.Popen(["xdg-open", str(log_dir)])  # noqa: S603
+        except OSError as exc:
+            messagebox.showerror(
+                "Logs",
+                f"Impossible d'ouvrir le dossier de logs :\n{log_dir}\n\n{exc}",
+            )
 
     def _clear_recent(self):
         """Efface les dossiers récents."""

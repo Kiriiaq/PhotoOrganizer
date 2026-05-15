@@ -6,7 +6,7 @@ Configuration, cache, progression et autres outils.
 from .cache import MetadataCache, get_cache
 from .config import ConfigManager, get_config
 from .hash_cache import HashCache, HashCacheEntry, get_hash_cache, reset_hash_cache
-from .logger import get_logger, setup_logging
+from .logger import get_log_dir, get_logger, set_log_level, setup_logging
 
 __all__ = [
     # Configuration
@@ -19,5 +19,5 @@ __all__ = [
     'HashCache', 'HashCacheEntry', 'get_hash_cache', 'reset_hash_cache',
 
     # Logging
-    'setup_logging', 'get_logger',
+    'setup_logging', 'get_logger', 'set_log_level', 'get_log_dir',
 ]
