@@ -117,9 +117,12 @@ class SmartOrganizer:
     }
 
     # Extensions RAW utilisées pour la détection des paires (Lot R3).
+    # Lot F (audit 2026-05-15) : élargi avec .k25/.kdc/.mrw/.erf/.nrw —
+    # synchro avec FileManager.EXTENSIONS pour cohérence des paires RAW+JPEG.
     RAW_EXTENSIONS = frozenset({
         '.raw', '.arw', '.cr2', '.cr3', '.nef', '.orf', '.rw2', '.dng',
-        '.3fr', '.raf', '.pef', '.srw', '.sr2', '.x3f', '.mef', '.iiq', '.rwl',
+        '.3fr', '.raf', '.pef', '.srw', '.sr2', '.x3f', '.mef', '.iiq',
+        '.rwl', '.k25', '.kdc', '.mrw', '.erf', '.nrw',
     })
     # Compagnons JPEG des paires RAW.
     JPEG_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.jfif'})

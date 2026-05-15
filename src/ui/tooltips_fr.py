@@ -95,9 +95,18 @@ ORGANIZE = {
         "Inclut les sous-dossiers de la source. Décoché : seulement le dossier "
         "racine est scanné."
     ),
-    "include_images": "Inclut JPG, PNG, HEIC, GIF, BMP, TIFF, WebP, AVIF, etc.",
-    "include_raw": "Inclut les RAW : ARW, CR2, CR3, NEF, DNG, ORF, RW2, PEF, etc.",
-    "include_videos": "Inclut MP4, MOV, AVI, MKV, WMV, M4V, etc. Décoché par défaut.",
+    "include_images": (
+        "Inclut JPG/JPEG, PNG, GIF, BMP, TIFF/TIF, WebP, JFIF, JP2, "
+        "AVIF, HEIC/HEIF."
+    ),
+    "include_raw": (
+        "Inclut tous les RAW grand public : ARW, CR2, CR3, NEF, DNG, ORF, "
+        "RW2, RAF, PEF, SRW, SR2, X3F, MEF, IIQ, RWL, K25, KDC, MRW, ERF, NRW."
+    ),
+    "include_videos": (
+        "Inclut MP4, MOV, AVI, MKV, WMV, M4V, MPG/MPEG, 3GP, FLV, WebM, "
+        "MTS/TS, VOB. Décoché par défaut."
+    ),
 
     # ---- Filtres avancés (R1) ----
     "filter_date_min": (
@@ -249,9 +258,15 @@ DUPLICATES = {
     ),
 
     # Filtres
-    "include_images": "Inclut JPG, PNG, HEIC, GIF, BMP, TIFF, WebP, AVIF.",
-    "include_raw":    "Inclut les fichiers RAW (ARW, CR2, NEF, DNG…).",
-    "include_videos": "Inclut MP4, MOV, AVI, MKV, etc.",
+    "include_images": (
+        "Inclut JPG/JPEG, PNG, GIF, BMP, TIFF/TIF, WebP, JFIF, JP2, "
+        "AVIF, HEIC/HEIF."
+    ),
+    "include_raw": (
+        "Inclut tous les RAW grand public : ARW, CR2, CR3, NEF, DNG, ORF, "
+        "RW2, RAF, PEF, SRW, K25, KDC, MRW, ERF, NRW, etc."
+    ),
+    "include_videos": "Inclut MP4, MOV, AVI, MKV, WMV, M4V, MPG, etc.",
     "recursive":      "Inclut les sous-dossiers de la source.",
     "min_size": (
         "Taille min des fichiers analysés. Ex. : '100KB' évite de doubler "
