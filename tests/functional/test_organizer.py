@@ -790,3 +790,248 @@ def test_multilayer_inverted_order(tmp_path):
     top_a = {p.name for p in dest_a.iterdir()}
     top_b = {p.name for p in dest_b.iterdir()}
     assert top_a != top_b, f"a={top_a} b={top_b}"
+
+
+# ============================================================================
+# Tests additionnels — audit 2026-05-15 (étoffage couverture)
+# ----------------------------------------------------------------------------
+# 3 tests bursts complémentaires + 5 tests sur les filtres WIP préexistants
+# (extensions, dim_min/max, orientation, gps_required, camera_makes_filter).
+# ============================================================================
+
+
+def _make_photo_with_exif(path, when=None, make=None, model=None, width=50, height=50):
+    """Helper : crée une JPEG factice avec EXIF DateTimeOriginal / Make / Model."""
+    import piexif
+    from PIL import Image
+
+    img = Image.new("RGB", (width, height))
+    exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+    if when is not None:
+        exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = when.strftime("%Y:%m:%d %H:%M:%S").encode()
+    if make is not None:
+        exif_dict["0th"][piexif.ImageIFD.Make] = make.encode()
+    if model is not None:
+        exif_dict["0th"][piexif.ImageIFD.Model] = model.encode()
+    try:
+        img.save(path, exif=piexif.dump(exif_dict))
+    except Exception:
+        img.save(path)
+    return path
+
+
+# ---- Bursts : compléments ---------------------------------------------------
+
+
+def test_organization_options_from_dict_roundtrips_burst_bounds():
+    """``from_dict`` doit reconstruire correctement les bornes auto exposées
+    en commit 29d4921 — sécurité contre une régression de sérialisation."""
+    data = {
+        "detect_bursts": True,
+        "burst_mode": "auto",
+        "burst_threshold_seconds": 5,
+        "burst_min_count": 4,
+        "burst_auto_min_seconds": 10,
+        "burst_auto_max_seconds": 3600,
+    }
+    o = OrganizationOptions.from_dict(data)
+    assert o.detect_bursts is True
+    assert o.burst_mode == "auto"
+    assert o.burst_threshold_seconds == 5
+    assert o.burst_min_count == 4
+    assert o.burst_auto_min_seconds == 10
+    assert o.burst_auto_max_seconds == 3600
+
+
+def test_burst_detection_two_bursts_same_folder_are_numbered_incrementally(tmp_path):
+    """Deux rafales DANS LE MÊME dossier-destination doivent recevoir des
+    numéros incrémentés : Burst_01 puis Burst_02.
+
+    Contraste avec test_burst_detection_numbers_independently_per_destination
+    qui vérifie que la numérotation REPART à 01 dans CHAQUE dossier.
+    """
+    from datetime import datetime as dt
+
+    base = dt(2026, 5, 7, 10, 0, 0)
+    p1 = _make_photo_with_exif(tmp_path / "a1.jpg", when=base)
+    p2 = _make_photo_with_exif(tmp_path / "a2.jpg", when=base.replace(second=1))
+    p3 = _make_photo_with_exif(tmp_path / "a3.jpg", when=base.replace(second=2))
+    # gap > seuil → nouveau groupe
+    p4 = _make_photo_with_exif(tmp_path / "b1.jpg", when=base.replace(minute=30))
+    p5 = _make_photo_with_exif(tmp_path / "b2.jpg", when=base.replace(minute=30, second=1))
+    p6 = _make_photo_with_exif(tmp_path / "b3.jpg", when=base.replace(minute=30, second=2))
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=True,
+        date_format="year",  # tout va dans 2026/
+        detect_bursts=True,
+        burst_mode="manual",
+        burst_threshold_seconds=3,
+        burst_min_count=3,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(p) for p in (p1, p2, p3, p4, p5, p6)], str(dest), opts)
+    assert res.processed == 6
+    assert (dest / "2026" / "Burst_01").is_dir()
+    assert (dest / "2026" / "Burst_02").is_dir()
+    # Une rafale = 3 photos chacune
+    assert len(list((dest / "2026" / "Burst_01").glob("*.jpg"))) == 3
+    assert len(list((dest / "2026" / "Burst_02").glob("*.jpg"))) == 3
+
+
+def test_burst_detection_auto_falls_back_to_manual_with_few_photos(tmp_path):
+    """Mode auto + < 3 photos datées → fallback au seuil manuel
+    (``burst_threshold_seconds``). Documenté dans la docstring.
+
+    Cas : 2 photos espacées d'1 s, seuil manuel = 3 s, mode auto demandé.
+    Comme < 3 photos datées, on retombe sur le manual et les 2 photos
+    devraient être groupées (mais min_count=2 sinon pas de burst créé).
+    """
+    from datetime import datetime as dt
+
+    base = dt(2026, 5, 7, 11, 0, 0)
+    p1 = _make_photo_with_exif(tmp_path / "f1.jpg", when=base)
+    p2 = _make_photo_with_exif(tmp_path / "f2.jpg", when=base.replace(second=1))
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=True,
+        date_format="year",
+        detect_bursts=True,
+        burst_mode="auto",
+        burst_threshold_seconds=3,
+        burst_min_count=2,  # important : sinon le burst de 2 ne se forme pas
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(p1), str(p2)], str(dest), opts)
+    assert res.processed == 2
+    # Avec fallback manual et min_count=2, les 2 photos forment 1 burst.
+    assert (dest / "2026" / "Burst_01").is_dir(), f"Burst attendu via fallback manual — got: {list(dest.rglob('*'))}"
+
+
+# ---- Filtres WIP préexistants (extensions / dim / orientation / gps / camera)
+
+
+def test_extensions_filter_keeps_only_allowed(tmp_path):
+    """``extensions_filter`` ne garde que les extensions listées."""
+    from PIL import Image
+
+    jpg = tmp_path / "a.jpg"
+    png = tmp_path / "b.png"
+    Image.new("RGB", (40, 40)).save(jpg, format="JPEG")
+    Image.new("RGB", (40, 40)).save(png, format="PNG")
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False,
+        organize_by_camera=False,
+        extensions_filter=["jpg"],  # rejette .png
+        validate_disk_space=False,
+    )
+    res = org.organize([str(jpg), str(png)], str(tmp_path / "out"), opts)
+    assert res.processed == 1, f"got {res.processed} (skipped={res.skipped})"
+    assert res.skipped == 1
+
+
+def test_dim_min_max_filters_reject_out_of_range(tmp_path):
+    """``dim_min`` / ``dim_max`` filtrent par taille en pixels."""
+    from PIL import Image
+
+    small = tmp_path / "small.jpg"
+    medium = tmp_path / "medium.jpg"
+    huge = tmp_path / "huge.jpg"
+    Image.new("RGB", (100, 100)).save(small)
+    Image.new("RGB", (800, 600)).save(medium)
+    Image.new("RGB", (5000, 4000)).save(huge)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False,
+        organize_by_camera=False,
+        dim_min=(500, 400),
+        dim_max=(2000, 2000),
+        validate_disk_space=False,
+    )
+    res = org.organize([str(small), str(medium), str(huge)], str(tmp_path / "out"), opts)
+    # Seul medium (800x600) passe les bornes [500x400 ; 2000x2000].
+    assert res.processed == 1
+    assert res.skipped == 2
+
+
+def test_orientation_filter_landscape_portrait_square(tmp_path):
+    """``orientation_filter`` distingue landscape / portrait / square."""
+    from PIL import Image
+
+    land = tmp_path / "L.jpg"
+    port = tmp_path / "P.jpg"
+    sq = tmp_path / "S.jpg"
+    Image.new("RGB", (200, 100)).save(land)
+    Image.new("RGB", (100, 200)).save(port)
+    Image.new("RGB", (150, 150)).save(sq)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False,
+        organize_by_camera=False,
+        orientation_filter="landscape",
+        validate_disk_space=False,
+    )
+    res = org.organize([str(land), str(port), str(sq)], str(tmp_path / "out"), opts)
+    # Seul L (200x100) est landscape strict (w > h).
+    assert res.processed == 1
+    assert res.skipped == 2
+
+
+def test_gps_required_with_filters_files_without_gps(tmp_path):
+    """``gps_required="with"`` rejette les photos sans coordonnées EXIF."""
+    import piexif
+    from PIL import Image
+
+    with_gps = tmp_path / "with_gps.jpg"
+    without_gps = tmp_path / "no_gps.jpg"
+
+    # Photo avec GPS embarqué
+    img = Image.new("RGB", (50, 50))
+    gps_ifd = {
+        piexif.GPSIFD.GPSLatitudeRef: b"N",
+        piexif.GPSIFD.GPSLatitude: ((48, 1), (51, 1), (24, 1)),
+        piexif.GPSIFD.GPSLongitudeRef: b"E",
+        piexif.GPSIFD.GPSLongitude: ((2, 1), (21, 1), (3, 1)),
+    }
+    img.save(with_gps, exif=piexif.dump({"GPS": gps_ifd}))
+    # Photo sans GPS
+    Image.new("RGB", (50, 50)).save(without_gps)
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False,
+        organize_by_camera=False,
+        gps_required="with",
+        validate_disk_space=False,
+    )
+    res = org.organize([str(with_gps), str(without_gps)], str(tmp_path / "out"), opts)
+    assert res.processed == 1
+    assert res.skipped == 1
+
+
+def test_camera_makes_filter_matches_case_insensitive(tmp_path):
+    """``camera_makes_filter`` matche la marque EXIF (case-insensitive,
+    sous-chaîne acceptée)."""
+    sony = _make_photo_with_exif(tmp_path / "sony.jpg", make="SONY", model="ILCE-7M3")
+    canon = _make_photo_with_exif(tmp_path / "canon.jpg", make="Canon", model="EOS R5")
+    nikon = _make_photo_with_exif(tmp_path / "nikon.jpg", make="NIKON CORPORATION", model="Z 7")
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=False,
+        organize_by_camera=False,
+        camera_makes_filter=["sony", "nikon"],  # match insensible à la casse
+        validate_disk_space=False,
+    )
+    res = org.organize([str(sony), str(canon), str(nikon)], str(tmp_path / "out"), opts)
+    # Sony + Nikon passent, Canon est rejeté.
+    assert res.processed == 2, f"got {res.processed} (skipped={res.skipped})"
+    assert res.skipped == 1
