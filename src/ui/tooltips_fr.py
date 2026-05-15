@@ -230,6 +230,10 @@ DUPLICATES = {
 
     "load_config": "Charge une configuration depuis un fichier YAML.",
     "save_config": "Sauvegarde la configuration courante dans un fichier YAML.",
+    "browse_dest": (
+        "Parcourir et sélectionner le dossier de destination "
+        "(mode Déplacer uniquement)."
+    ),
 
     # Modes
     "mode_dry_run": (
@@ -399,7 +403,12 @@ SETTINGS = {
 
     "log_level": (
         "Niveau de verbosité des logs. INFO par défaut. "
-        "DEBUG = tout (gros fichiers). ERROR = uniquement les pannes."
+        "DEBUG = tout (gros fichiers). ERROR = uniquement les pannes. "
+        "Effet immédiat — pas besoin de redémarrer."
+    ),
+    "btn_view_logs": (
+        "Ouvre le dossier des logs dans l'explorateur. "
+        "Chemin : %LOCALAPPDATA%\\PhotoOrganizer\\logs (Windows)."
     ),
     "btn_clear_recent": "Vide la liste des dossiers source/destination récents.",
 

@@ -159,6 +159,8 @@ class PhotoOrganizerApp(ctk.CTk):
             PAD_S,
             font_title,
         )
+        from ui.tooltip import attach_tooltip
+        from ui.tooltips_fr import APP as APP_TIPS
 
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
@@ -179,6 +181,7 @@ class PhotoOrganizerApp(ctk.CTk):
             command=self._toggle_theme,
         )
         self.theme_button.pack(side="right", padx=PAD_S)
+        attach_tooltip(self.theme_button, APP_TIPS["btn_theme"])
 
         help_button = ctk.CTkButton(
             header_frame,
@@ -187,6 +190,7 @@ class PhotoOrganizerApp(ctk.CTk):
             command=self._show_about,
         )
         help_button.pack(side="right", padx=PAD_S)
+        attach_tooltip(help_button, APP_TIPS["btn_help"])
 
     def _create_navigation(self):
         """Crée la navigation par onglets."""

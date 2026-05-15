@@ -394,9 +394,10 @@ class OrganizeFrame(ctk.CTkFrame):
             height=BTN_H_STD,
         )
         self.source_entry.grid(row=1, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
-        icon_button(folders, text="📂", command=self._browse_source).grid(
-            row=1, column=2, padx=(PAD_S, PAD_M), pady=PAD_S,
+        self.browse_source_btn = icon_button(
+            folders, text="📂", command=self._browse_source,
         )
+        self.browse_source_btn.grid(row=1, column=2, padx=(PAD_S, PAD_M), pady=PAD_S)
         # Le bouton « + Source » (multi-source) a été retiré — W08 retour
         # testeur : « supprime le bouton car inutile ».
 
@@ -418,14 +419,16 @@ class OrganizeFrame(ctk.CTkFrame):
             height=BTN_H_STD,
         )
         self.dest_entry.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
-        icon_button(
+        self.open_dest_btn = icon_button(
             dest_row, text="↗",
             command=lambda: _open_folder(self.dest_var.get()),
-        ).grid(row=0, column=1)
-
-        icon_button(folders, text="📂", command=self._browse_dest).grid(
-            row=2, column=2, padx=(PAD_S, PAD_M), pady=PAD_S,
         )
+        self.open_dest_btn.grid(row=0, column=1)
+
+        self.browse_dest_btn = icon_button(
+            folders, text="📂", command=self._browse_dest,
+        )
+        self.browse_dest_btn.grid(row=2, column=2, padx=(PAD_S, PAD_M), pady=PAD_S)
 
         # Ligne Compteur fichiers (toujours visible — fix T-030..033)
         self.file_count_var = ctk.StringVar(value="Aucun dossier source sélectionné.")
@@ -1862,6 +1865,20 @@ class OrganizeFrame(ctk.CTkFrame):
         attach_tooltip(self.source_entry, TIPS["source_entry"])
         attach_tooltip(self.dest_entry, TIPS["dest_entry"])
         attach_tooltip(self.file_count_label, TIPS["file_count"])
+
+        # Boutons icône-only Source/Destination (audit 2026-05-15)
+        if hasattr(self, "browse_source_btn"):
+            attach_tooltip(self.browse_source_btn, TIPS["browse_source"])
+        if hasattr(self, "browse_dest_btn"):
+            attach_tooltip(self.browse_dest_btn, TIPS["browse_dest"])
+        if hasattr(self, "open_dest_btn"):
+            attach_tooltip(self.open_dest_btn, TIPS["open_dest"])
+        if hasattr(self, "show_files_btn"):
+            attach_tooltip(
+                self.show_files_btn,
+                "Affiche la liste détaillée des fichiers détectés "
+                "(jusqu'à 500) avec les filtres actuels.",
+            )
 
         # Cases / radios des critères et types
         # On cherche par nom de variable plutôt que par référence directe
