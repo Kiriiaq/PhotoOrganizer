@@ -29,12 +29,13 @@ class OrganizationOptions:
         - Renommage par template
         - Index export (CSV / JSON)
     """
+
     # ---- Critères ----
     organize_by_date: bool = True
     organize_by_camera: bool = False
     organize_by_location: bool = False
     multilayer: bool = False
-    criteria_order: List[str] = field(default_factory=lambda: ['date', 'camera', 'location'])
+    criteria_order: List[str] = field(default_factory=lambda: ["date", "camera", "location"])
     date_format: str = "year/month/day"
     max_distance_km: float = 1.0
     use_geocoding: bool = True
@@ -50,14 +51,14 @@ class OrganizationOptions:
     date_max: Optional[datetime] = None
     size_min_bytes: int = 0
     size_max_bytes: Optional[int] = None
-    rating_min: int = 0                     # 0..5, 0 = pas de filtre
+    rating_min: int = 0  # 0..5, 0 = pas de filtre
     keywords_filter: List[str] = field(default_factory=list)  # OR : un seul match suffit
 
     # ---- Comportements avancés ----
-    skip_if_identical: bool = False         # R2 : si dest existe ET hash identique → skip
-    keep_raw_jpeg_pairs: bool = False       # R3 : co-localiser les paires *.RAW + *.JPG
-    cleanup_empty_source: bool = False      # R5 : supprimer dossiers vides du source post-MOVE
-    validate_disk_space: bool = True        # R6 : check espace dispo avant exécution
+    skip_if_identical: bool = False  # R2 : si dest existe ET hash identique → skip
+    keep_raw_jpeg_pairs: bool = False  # R3 : co-localiser les paires *.RAW + *.JPG
+    cleanup_empty_source: bool = False  # R5 : supprimer dossiers vides du source post-MOVE
+    validate_disk_space: bool = True  # R6 : check espace dispo avant exécution
 
     # ---- Renommage (Q4) ----
     # Template de nom de fichier final. Si None → nom d'origine conservé.
@@ -90,7 +91,7 @@ class OrganizationOptions:
     incremental_mode: bool = False
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'OrganizationOptions':
+    def from_dict(cls, data: Dict[str, Any]) -> "OrganizationOptions":
         """Crée une instance depuis un dictionnaire (utilisé par les presets)."""
         return cls(**{k: data[k] for k in data if k in cls.__dataclass_fields__})
 
@@ -98,6 +99,7 @@ class OrganizationOptions:
 @dataclass
 class OrganizationResult:
     """Résultat d'une organisation."""
+
     total: int = 0
     processed: int = 0
     skipped: int = 0
@@ -107,31 +109,52 @@ class OrganizationResult:
     # ---- Statistiques GPS pour la modale résultat ----
     files_with_gps: int = 0
     files_without_gps: int = 0
-    files_geocoded: int = 0       # nom de lieu résolu (Nominatim/PositionStack)
-    files_raw_coords: int = 0     # fallback Lat_x_Lon_y
+    files_geocoded: int = 0  # nom de lieu résolu (Nominatim/PositionStack)
+    files_raw_coords: int = 0  # fallback Lat_x_Lon_y
 
 
 class SmartOrganizer:
     """Organiseur intelligent de fichiers média."""
 
     DATE_FORMATS = {
-        'year/month/day': '{year}/{month}/{year}_{month}_{day}',
-        'year/month': '{year}/{year}_{month}',
-        'year': '{year}',
-        'year_month_day': '{year}_{month}_{day}',
-        'year_month': '{year}_{month}',
+        "year/month/day": "{year}/{month}/{year}_{month}_{day}",
+        "year/month": "{year}/{year}_{month}",
+        "year": "{year}",
+        "year_month_day": "{year}_{month}_{day}",
+        "year_month": "{year}_{month}",
     }
 
     # Extensions RAW utilisées pour la détection des paires (Lot R3).
     # Lot F (audit 2026-05-15) : élargi avec .k25/.kdc/.mrw/.erf/.nrw —
     # synchro avec FileManager.EXTENSIONS pour cohérence des paires RAW+JPEG.
-    RAW_EXTENSIONS = frozenset({
-        '.raw', '.arw', '.cr2', '.cr3', '.nef', '.orf', '.rw2', '.dng',
-        '.3fr', '.raf', '.pef', '.srw', '.sr2', '.x3f', '.mef', '.iiq',
-        '.rwl', '.k25', '.kdc', '.mrw', '.erf', '.nrw',
-    })
+    RAW_EXTENSIONS = frozenset(
+        {
+            ".raw",
+            ".arw",
+            ".cr2",
+            ".cr3",
+            ".nef",
+            ".orf",
+            ".rw2",
+            ".dng",
+            ".3fr",
+            ".raf",
+            ".pef",
+            ".srw",
+            ".sr2",
+            ".x3f",
+            ".mef",
+            ".iiq",
+            ".rwl",
+            ".k25",
+            ".kdc",
+            ".mrw",
+            ".erf",
+            ".nrw",
+        }
+    )
     # Compagnons JPEG des paires RAW.
-    JPEG_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.jfif'})
+    JPEG_EXTENSIONS = frozenset({".jpg", ".jpeg", ".jfif"})
 
     def __init__(self, file_manager: Optional[FileManager] = None):
         """
@@ -152,6 +175,11 @@ class SmartOrganizer:
         # S1 : map file_path -> burst_id (str ou None si solo). Calculé
         # une fois par appel à organize() pour éviter de relire les EXIF.
         self._burst_membership: Dict[str, Optional[str]] = {}
+        # S1 bis (audit 2026-05-15) : map file_path -> dossier-destination
+        # pré-calculé. Sert à grouper les bursts PAR dossier-destination
+        # final (au lieu du batch global) tout en évitant la double
+        # résolution dans _process_file (qui réutilise le cache).
+        self._destination_cache: Dict[str, str] = {}
         # S5 : set des hash deja organises (loade depuis l'index a
         # destination). Sert au pre-filtrage avant copy/move.
         self._known_hashes: set = set()
@@ -161,7 +189,7 @@ class SmartOrganizer:
         file_paths: List[str],
         target_dir: str,
         options: OrganizationOptions,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> OrganizationResult:
         """
         Organise les fichiers selon les options spécifiées.
@@ -215,14 +243,36 @@ class SmartOrganizer:
             self._raw_jpeg_pairs = self._detect_raw_jpeg_pairs(eligible_files)
 
         # 2 bis) Détection des bursts / rafales (Lot S1)
+        #
+        # Audit 2026-05-15 : on regroupe les fichiers par dossier-
+        # destination FINAL avant d'appeler ``_detect_bursts``. Avant ce
+        # changement, le mean/stddev du mode auto était calculé sur tout
+        # le batch — ce qui n'a pas de sens quand le batch couvre
+        # plusieurs voyages / années (Δ inter-dossiers >> Δ intra-burst).
+        # En groupant par dossier final, le calcul mean/stddev colle à
+        # la demande utilisateur : « delta moyen entre photos du dossier ».
+        # Bonus : la numérotation ``Burst_NN`` repart à 01 dans chaque
+        # dossier puisqu'on rappelle ``_detect_bursts`` par groupe.
         self._burst_membership.clear()
+        self._destination_cache.clear()
         if options.detect_bursts:
-            self._burst_membership = self._detect_bursts(
-                eligible_files,
-                threshold_seconds=options.burst_threshold_seconds,
-                min_count=options.burst_min_count,
-                mode=getattr(options, 'burst_mode', 'manual'),
-            )
+            by_folder: Dict[str, List[str]] = {}
+            for fp in eligible_files:
+                try:
+                    folder = self._resolve_destination_folder(fp, target_dir, options, result=result)
+                except Exception as exc:
+                    logger.debug(f"Pre-calcul destination echoue pour {fp}: {exc}")
+                    folder = target_dir
+                self._destination_cache[fp] = folder
+                by_folder.setdefault(folder, []).append(fp)
+            for folder, paths_in_folder in by_folder.items():
+                sub = self._detect_bursts(
+                    paths_in_folder,
+                    threshold_seconds=options.burst_threshold_seconds,
+                    min_count=options.burst_min_count,
+                    mode=getattr(options, "burst_mode", "manual"),
+                )
+                self._burst_membership.update(sub)
 
         # 2 ter) Mode incrémental (Lot S5) : on charge l'index existant
         # à destination et on filtre les fichiers déjà organisés.
@@ -231,15 +281,10 @@ class SmartOrganizer:
             self._known_hashes = self._load_incremental_index(target_dir)
             if self._known_hashes:
                 before = len(eligible_files)
-                eligible_files = [
-                    fp for fp in eligible_files
-                    if not self._is_already_indexed(fp)
-                ]
+                eligible_files = [fp for fp in eligible_files if not self._is_already_indexed(fp)]
                 already = before - len(eligible_files)
                 if already:
-                    logger.info(
-                        f"Mode incremental : {already} fichier(s) deja indexes, ignores"
-                    )
+                    logger.info(f"Mode incremental : {already} fichier(s) deja indexes, ignores")
                     result.skipped += already
 
         # 3) Validation espace disque (Lot R6)
@@ -300,61 +345,95 @@ class SmartOrganizer:
 
         return result
 
+    def _resolve_destination_folder(
+        self,
+        file_path: str,
+        target_dir: str,
+        options: OrganizationOptions,
+        result: Optional["OrganizationResult"] = None,
+    ) -> str:
+        """Calcule le dossier-destination final (sans sous-dossier Burst_NN/).
+
+        Méthode partagée par :
+          * ``_process_file`` — calcul + comptage des stats GPS pour
+            chaque fichier réellement traité.
+          * ``organize()`` étape 2bis — pré-calcul pour grouper les
+            fichiers par dossier final avant détection de bursts.
+
+        Le résultat des deux appels est identique grâce au cache LRU
+        de ``gps_processor`` (~aucun coût HTTP redondant).
+
+        Quand ``result`` est ``None``, les compteurs GPS ne sont pas
+        incrémentés — utile si l'appelant souhaite ne pas
+        double-compter (par exemple lors d'un pré-calcul).
+        """
+        # Lire les métadonnées (EXIF + GPS) — ne lève pas si absent
+        exif_data = get_exif_data(file_path)
+        date_taken, _ = extract_date(file_path, exif_data, return_origin=True)
+        make, model = get_camera_info(exif_data, file_path)
+        gps_coords = get_gps_coordinates(file_path)
+
+        # Déterminer l'ordre des critères (mode mono vs multilayer)
+        if options.multilayer:
+            criteria = options.criteria_order
+        else:
+            if options.organize_by_date:
+                criteria = ["date"]
+            elif options.organize_by_camera:
+                criteria = ["camera"]
+            elif options.organize_by_location:
+                criteria = ["location"]
+            else:
+                criteria = []
+
+        current_path = target_dir
+        for criterion in criteria:
+            if criterion == "date" and options.organize_by_date:
+                current_path = self._apply_date_organization(current_path, date_taken, options.date_format)
+            elif criterion == "camera" and options.organize_by_camera:
+                current_path = self._apply_camera_organization(current_path, make, model)
+            elif criterion == "location" and options.organize_by_location:
+                current_path = self._apply_location_organization(
+                    current_path,
+                    gps_coords,
+                    options.use_geocoding,
+                    result=result,
+                )
+        return current_path
+
     def _process_file(
         self,
         file_path: str,
         target_dir: str,
         options: OrganizationOptions,
-        result: Optional['OrganizationResult'] = None,
+        result: Optional["OrganizationResult"] = None,
     ) -> bool:
         """Traite un seul fichier.
 
         ``result`` (optionnel) reçoit les compteurs de stats GPS via
-        ``_apply_location_organization``.
+        ``_apply_location_organization`` — sauf si le dossier de
+        destination a déjà été pré-calculé pour la détection de bursts
+        (auquel cas les compteurs ont déjà été incrémentés et on
+        réutilise le cache pour éviter le double comptage).
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Fichier inexistant: {file_path}")
 
-        # Extraire les métadonnées
+        # Métadonnées EXIF — nécessaires pour le renommage template et
+        # les paires RAW/JPEG, donc relues même quand le dossier a été
+        # pré-calculé. Coût négligeable (< 1 ms par fichier).
         exif_data = get_exif_data(file_path)
         date_taken, date_origin = extract_date(file_path, exif_data, return_origin=True)
         make, model = get_camera_info(exif_data, file_path)
-        gps_coords = get_gps_coordinates(file_path)
 
-        # Construire le chemin de destination
-        current_path = target_dir
-
-        # Déterminer l'ordre des critères
-        if options.multilayer:
-            criteria = options.criteria_order
+        # Dossier-destination : réutilise le cache si il a été rempli
+        # par l'étape 2bis (mode bursts). Sinon résolution standard avec
+        # comptage des stats GPS.
+        cached_dest = self._destination_cache.get(file_path)
+        if cached_dest is not None:
+            current_path = cached_dest
         else:
-            # Mode non-multicouche: un seul critère actif
-            if options.organize_by_date:
-                criteria = ['date']
-            elif options.organize_by_camera:
-                criteria = ['camera']
-            elif options.organize_by_location:
-                criteria = ['location']
-            else:
-                criteria = []
-
-        # Appliquer chaque critère
-        for criterion in criteria:
-            if criterion == 'date' and options.organize_by_date:
-                current_path = self._apply_date_organization(
-                    current_path, date_taken, options.date_format
-                )
-
-            elif criterion == 'camera' and options.organize_by_camera:
-                current_path = self._apply_camera_organization(
-                    current_path, make, model
-                )
-
-            elif criterion == 'location' and options.organize_by_location:
-                current_path = self._apply_location_organization(
-                    current_path, gps_coords, options.use_geocoding,
-                    result=result,
-                )
+            current_path = self._resolve_destination_folder(file_path, target_dir, options, result=result)
 
         # S1 — Sous-dossier Burst_NN/ si le fichier appartient à une rafale.
         # On ne crée le sous-dossier QUE pour les vrais bursts (≥ min_count).
@@ -370,13 +449,15 @@ class SmartOrganizer:
         if options.rename_template:
             try:
                 final_name = self._apply_rename_template(
-                    original_name, options.rename_template,
-                    date_taken, make, model, self._counter,
+                    original_name,
+                    options.rename_template,
+                    date_taken,
+                    make,
+                    model,
+                    self._counter,
                 )
             except Exception as exc:
-                logger.warning(
-                    f"Template de renommage echoue pour {original_name}: {exc}"
-                )
+                logger.warning(f"Template de renommage echoue pour {original_name}: {exc}")
                 final_name = original_name
         else:
             final_name = original_name
@@ -400,13 +481,9 @@ class SmartOrganizer:
 
         # Copier ou déplacer
         if options.copy_not_move:
-            operation = self.file_manager.copy_file(
-                file_path, dest_path, auto_rename=options.auto_rename
-            )
+            operation = self.file_manager.copy_file(file_path, dest_path, auto_rename=options.auto_rename)
         else:
-            operation = self.file_manager.move_file(
-                file_path, dest_path, auto_rename=options.auto_rename
-            )
+            operation = self.file_manager.move_file(file_path, dest_path, auto_rename=options.auto_rename)
 
         # Enregistrer dans l'index de session pour export ultérieur (R7)
         # ainsi que pour le mode incrémental (S5) qui réutilise l'index.
@@ -418,22 +495,24 @@ class SmartOrganizer:
             # Hash partiel (head+tail) pour le mode incrémental S5 — calculé
             # uniquement si demandé pour ne pas pénaliser les organisations
             # standard. C'est aussi la clé du cache .photoorganizer_index.json.
-            h = ''
+            h = ""
             if options.incremental_mode or options.export_index_csv or options.export_index_json:
                 try:
                     h = _quick_hash(operation.destination)
                 except OSError:
-                    h = ''
-            self._index_records.append({
-                'source':       file_path,
-                'destination':  operation.destination,
-                'date':         date_taken.isoformat() if date_taken else '',
-                'camera':       f"{make} {model}".strip(),
-                'size_bytes':   size,
-                'hash':         h,
-                'action':       operation.operation_type,
-                'burst_id':     burst_id or '',
-            })
+                    h = ""
+            self._index_records.append(
+                {
+                    "source": file_path,
+                    "destination": operation.destination,
+                    "date": date_taken.isoformat() if date_taken else "",
+                    "camera": f"{make} {model}".strip(),
+                    "size_bytes": size,
+                    "hash": h,
+                    "action": operation.operation_type,
+                    "burst_id": burst_id or "",
+                }
+            )
 
         # Companion RAW+JPEG (Lot R3) : si le fichier traité fait partie d'une
         # paire, on transfère aussi son partenaire dans le même dossier de
@@ -451,36 +530,28 @@ class SmartOrganizer:
     ):
         """Transfère le compagnon RAW/JPEG dans le même dossier que le primaire."""
         from pathlib import Path
+
         stem = Path(primary_path).stem.lower()
         partners = self._raw_jpeg_pairs.get(stem, [])
         for partner in partners:
             if partner == primary_path:
                 continue
             # Ne pas re-traiter si déjà fait
-            if any(rec['source'] == partner for rec in self._index_records):
+            if any(rec["source"] == partner for rec in self._index_records):
                 continue
             partner_dest = os.path.join(target_dir, os.path.basename(partner))
             if os.path.exists(partner_dest) and options.skip_existing:
                 continue
             try:
                 if options.copy_not_move:
-                    self.file_manager.copy_file(
-                        partner, partner_dest, auto_rename=options.auto_rename
-                    )
+                    self.file_manager.copy_file(partner, partner_dest, auto_rename=options.auto_rename)
                 else:
-                    self.file_manager.move_file(
-                        partner, partner_dest, auto_rename=options.auto_rename
-                    )
+                    self.file_manager.move_file(partner, partner_dest, auto_rename=options.auto_rename)
                 logger.debug(f"Companion RAW/JPEG copie : {partner}")
             except Exception as exc:
                 logger.warning(f"Echec compagnon {partner}: {exc}")
 
-    def _apply_date_organization(
-        self,
-        base_path: str,
-        date_taken: Optional[datetime],
-        date_format: str
-    ) -> str:
+    def _apply_date_organization(self, base_path: str, date_taken: Optional[datetime], date_format: str) -> str:
         """Applique l'organisation par date."""
         if not date_taken:
             return os.path.join(base_path, "Sans date")
@@ -507,14 +578,9 @@ class SmartOrganizer:
         os.makedirs(path, exist_ok=True)
         return path
 
-    def _apply_camera_organization(
-        self,
-        base_path: str,
-        make: str,
-        model: str
-    ) -> str:
+    def _apply_camera_organization(self, base_path: str, make: str, model: str) -> str:
         """Applique l'organisation par appareil photo."""
-        if make == 'Unknown' and model == 'Unknown':
+        if make == "Unknown" and model == "Unknown":
             camera_name = "Appareil inconnu"
         else:
             camera_name = f"{make} {model}".strip()
@@ -531,7 +597,7 @@ class SmartOrganizer:
         base_path: str,
         gps_coords: Tuple[Optional[float], Optional[float]],
         use_geocoding: bool,
-        result: Optional['OrganizationResult'] = None,
+        result: Optional["OrganizationResult"] = None,
     ) -> str:
         """Applique l'organisation par localisation.
 
@@ -561,16 +627,15 @@ class SmartOrganizer:
                     # `get_location_name` peut renvoyer None ou une chaîne
                     # vide selon les implementations / pannes silencieuses.
                     if not location_name or location_name.strip() in {
-                        "", "Inconnu", "Unknown",
+                        "",
+                        "Inconnu",
+                        "Unknown",
                     }:
                         raise ValueError("nom de lieu vide")
                     if result is not None:
                         result.files_geocoded += 1
                 except Exception as exc:
-                    logger.debug(
-                        f"Geocodage indisponible pour ({lat:.4f}, {lon:.4f}) — "
-                        f"fallback Lat_x_Lon_y : {exc}"
-                    )
+                    logger.debug(f"Geocodage indisponible pour ({lat:.4f}, {lon:.4f}) — fallback Lat_x_Lon_y : {exc}")
                     location_name = f"Lat_{lat:.4f}_Lon_{lon:.4f}"
                     if result is not None:
                         result.files_raw_coords += 1
@@ -591,7 +656,7 @@ class SmartOrganizer:
         # Caractères interdits sous Windows
         forbidden = '<>:"/\\|?*'
         for char in forbidden:
-            name = name.replace(char, '_')
+            name = name.replace(char, "_")
 
         # Limiter la longueur
         if len(name) > 80:
@@ -633,8 +698,10 @@ class SmartOrganizer:
 
         # Filtres EXIF : on lit l'EXIF UNE seule fois si nécessaire
         needs_exif = (
-            options.date_min is not None or options.date_max is not None
-            or options.rating_min > 0 or options.keywords_filter
+            options.date_min is not None
+            or options.date_max is not None
+            or options.rating_min > 0
+            or options.keywords_filter
         )
         if not needs_exif:
             return True
@@ -676,7 +743,7 @@ class SmartOrganizer:
     @staticmethod
     def _extract_rating(exif: Dict[str, Any]) -> int:
         """Lit le rating EXIF/XMP (0..5). Retourne 0 si absent."""
-        for key in ('Rating', 'XMP:Rating', 'EXIF:Rating'):
+        for key in ("Rating", "XMP:Rating", "EXIF:Rating"):
             v = exif.get(key)
             if v is None:
                 continue
@@ -691,7 +758,7 @@ class SmartOrganizer:
     def _extract_keywords(exif: Dict[str, Any]) -> set:
         """Lit les mots-clés EXIF/XMP/IPTC. Retourne un set en lowercase."""
         candidates: List[str] = []
-        for key in ('Keywords', 'XMP:Subject', 'IPTC:Keywords'):
+        for key in ("Keywords", "XMP:Subject", "IPTC:Keywords"):
             v = exif.get(key)
             if not v:
                 continue
@@ -699,7 +766,7 @@ class SmartOrganizer:
                 candidates.extend(str(x) for x in v)
             else:
                 # Souvent une chaine séparée par ;
-                candidates.extend(s.strip() for s in str(v).split(';'))
+                candidates.extend(s.strip() for s in str(v).split(";"))
         return {k.lower() for k in candidates if k}
 
     def _detect_raw_jpeg_pairs(self, file_paths: List[str]) -> Dict[str, List[str]]:
@@ -710,6 +777,7 @@ class SmartOrganizer:
         """
         from collections import defaultdict
         from pathlib import Path
+
         groups: Dict[str, List[str]] = defaultdict(list)
         for fp in file_paths:
             stem = Path(fp).stem.lower()
@@ -768,18 +836,20 @@ class SmartOrganizer:
         par 'unknown'.
         """
         from pathlib import Path
+
         p = Path(original_name)
         stem = p.stem
         ext = p.suffix
-        camera = ' '.join(filter(None, [make, model])).strip() or 'unknown'
+        camera = " ".join(filter(None, [make, model])).strip() or "unknown"
 
         # Petite classe wrapper pour gérer date None gracieusement
         class _SafeDate:
             def __init__(self, d):
                 self._d = d
+
             def __format__(self, fmt):
                 if self._d is None:
-                    return 'unknown'
+                    return "unknown"
                 if not fmt:
                     return self._d.isoformat()
                 return self._d.strftime(fmt)
@@ -793,11 +863,11 @@ class SmartOrganizer:
         )
         # Si le template ne contient pas {ext}, on l'ajoute pour éviter
         # de produire un fichier sans extension.
-        if not rendered.endswith(ext) and '.' not in os.path.basename(rendered):
+        if not rendered.endswith(ext) and "." not in os.path.basename(rendered):
             rendered = f"{rendered}{ext}"
         # Sanitization basique des caractères interdits Windows
         for ch in '<>:"/\\|?*':
-            rendered = rendered.replace(ch, '_')
+            rendered = rendered.replace(ch, "_")
         return rendered
 
     def _validate_disk_space(
@@ -807,16 +877,14 @@ class SmartOrganizer:
     ) -> Tuple[bool, str]:
         """Vérifie qu'il y a assez d'espace libre sur le disque cible (R6)."""
         import shutil
+
         try:
-            total_required = sum(
-                os.path.getsize(fp) for fp in file_paths if os.path.exists(fp)
-            )
+            total_required = sum(os.path.getsize(fp) for fp in file_paths if os.path.exists(fp))
             os.makedirs(target_dir, exist_ok=True)
             free = shutil.disk_usage(target_dir).free
             if total_required > free:
                 msg = (
-                    f"Espace disque insuffisant : {total_required / 1e9:.2f} Go "
-                    f"requis, {free / 1e9:.2f} Go disponibles"
+                    f"Espace disque insuffisant : {total_required / 1e9:.2f} Go requis, {free / 1e9:.2f} Go disponibles"
                 )
                 return False, msg
             return True, ""
@@ -900,15 +968,13 @@ class SmartOrganizer:
                     deltas.append(delta)
             if deltas:
                 import statistics
+
                 mean = statistics.mean(deltas)
                 stddev = statistics.pstdev(deltas) if len(deltas) > 1 else 0.0
                 # Seuil = mean - stddev, clampé à [1 s ; 600 s]
                 auto_thr = max(1.0, min(mean - stddev, 600.0))
                 effective_threshold = int(round(auto_thr))
-                logger.info(
-                    f"Bursts mode auto : mean={mean:.1f}s, "
-                    f"stddev={stddev:.1f}s → seuil={effective_threshold}s"
-                )
+                logger.info(f"Bursts mode auto : mean={mean:.1f}s, stddev={stddev:.1f}s → seuil={effective_threshold}s")
 
         membership: Dict[str, Optional[str]] = {fp: None for fp in file_paths}
         groups: List[List[str]] = []
@@ -943,7 +1009,7 @@ class SmartOrganizer:
     @staticmethod
     def _incremental_index_path(target_dir: str) -> str:
         """Emplacement canonique du cache incrémental (Lot S5)."""
-        return os.path.join(target_dir, '.photoorganizer_index.json')
+        return os.path.join(target_dir, ".photoorganizer_index.json")
 
     def _load_incremental_index(self, target_dir: str) -> set:
         """Charge l'index incrémental précédent et retourne le set des hash."""
@@ -952,12 +1018,11 @@ class SmartOrganizer:
             return set()
         try:
             import json
-            with open(path, 'r', encoding='utf-8') as f:
+
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            hashes = {rec.get('hash') for rec in data if rec.get('hash')}
-            logger.info(
-                f"Index incremental charge : {len(hashes)} entree(s) connue(s)"
-            )
+            hashes = {rec.get("hash") for rec in data if rec.get("hash")}
+            logger.info(f"Index incremental charge : {len(hashes)} entree(s) connue(s)")
             return hashes
         except (OSError, ValueError) as exc:
             logger.warning(f"Index incremental illisible ({exc}) — ignore")
@@ -972,24 +1037,23 @@ class SmartOrganizer:
         path = self._incremental_index_path(target_dir)
         try:
             import json
+
             existing: List[Dict[str, Any]] = []
             if os.path.exists(path):
                 try:
-                    with open(path, 'r', encoding='utf-8') as f:
+                    with open(path, "r", encoding="utf-8") as f:
                         existing = json.load(f)
                 except (OSError, ValueError):
                     existing = []
-            seen = {(rec.get('hash'), rec.get('destination')) for rec in existing}
+            seen = {(rec.get("hash"), rec.get("destination")) for rec in existing}
             for rec in self._index_records:
-                key = (rec.get('hash'), rec.get('destination'))
-                if rec.get('hash') and key not in seen:
+                key = (rec.get("hash"), rec.get("destination"))
+                if rec.get("hash") and key not in seen:
                     existing.append(rec)
                     seen.add(key)
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(existing, f, ensure_ascii=False, indent=2)
-            logger.info(
-                f"Index incremental sauvegarde : {len(existing)} entree(s) au total"
-            )
+            logger.info(f"Index incremental sauvegarde : {len(existing)} entree(s) au total")
         except OSError as exc:
             logger.warning(f"Echec sauvegarde index incremental : {exc}")
 
@@ -1006,16 +1070,15 @@ class SmartOrganizer:
         """Écrit un fichier d'index CSV et/ou JSON dans target_dir (R7)."""
         if not self._index_records:
             return
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if options.export_index_csv:
             import csv
+
             csv_path = os.path.join(target_dir, f"_photoorganizer_index_{timestamp}.csv")
             try:
-                with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-                    writer = csv.DictWriter(
-                        f, fieldnames=list(self._index_records[0].keys())
-                    )
+                with open(csv_path, "w", encoding="utf-8", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=list(self._index_records[0].keys()))
                     writer.writeheader()
                     writer.writerows(self._index_records)
                 logger.info(f"Index CSV ecrit : {csv_path}")
@@ -1024,9 +1087,10 @@ class SmartOrganizer:
 
         if options.export_index_json:
             import json
+
             json_path = os.path.join(target_dir, f"_photoorganizer_index_{timestamp}.json")
             try:
-                with open(json_path, 'w', encoding='utf-8') as f:
+                with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(self._index_records, f, indent=2, ensure_ascii=False)
                 logger.info(f"Index JSON ecrit : {json_path}")
             except OSError as exc:
@@ -1036,9 +1100,10 @@ class SmartOrganizer:
 def _quick_hash(path: str, head_bytes: int = 64 * 1024) -> str:
     """Hash partiel (head + tail) d'un fichier pour comparaison rapide."""
     import hashlib
+
     h = hashlib.blake2b(digest_size=16)
     size = os.path.getsize(path)
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         h.update(f.read(head_bytes))
         if size > head_bytes * 2:
             f.seek(-head_bytes, os.SEEK_END)
@@ -1060,10 +1125,7 @@ def get_organizer() -> SmartOrganizer:
 
 
 def organize_files(
-    file_paths: List[str],
-    target_dir: str,
-    options: Dict[str, Any],
-    progress_callback: Optional[Callable] = None
+    file_paths: List[str], target_dir: str, options: Dict[str, Any], progress_callback: Optional[Callable] = None
 ) -> Dict[str, Any]:
     """
     Fonction utilitaire pour organiser des fichiers.
@@ -1082,9 +1144,9 @@ def organize_files(
     result = organizer.organize(file_paths, target_dir, opts, progress_callback)
 
     return {
-        'total': result.total,
-        'processed': result.processed,
-        'skipped': result.skipped,
-        'errors': result.errors,
-        'error_messages': result.error_messages
+        "total": result.total,
+        "processed": result.processed,
+        "skipped": result.skipped,
+        "errors": result.errors,
+        "error_messages": result.error_messages,
     }
