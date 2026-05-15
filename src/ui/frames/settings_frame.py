@@ -21,11 +21,13 @@ from ui.theme import (
     font_section,
     make_checkbox,
     make_radio,
+    neutral_button,
     primary_button,
     warning_button,
 )
 from utils.cache import get_cache
 from utils.config import ConfigManager
+from utils.logger import get_log_dir, set_log_level
 
 # Aliases retro-compat avec l'ancien nommage local
 _make_checkbox = make_checkbox
@@ -276,12 +278,14 @@ class SettingsFrame(ctk.CTkFrame):
         stats_label.pack(anchor="w", padx=40, pady=5)
 
         # Bouton vider le cache
-        ctk.CTkButton(
+        clear_cache_btn = ctk.CTkButton(
             section,
             text="🗑️ Vider le cache",
             command=self._clear_cache,
             width=150
-        ).pack(anchor="w", padx=40, pady=5)
+        )
+        clear_cache_btn.pack(anchor="w", padx=40, pady=5)
+        attach_tooltip(clear_cache_btn, TIPS["btn_clear_cache"])
 
     def _create_api_section(self, parent):
         """Crée la section API."""
@@ -332,16 +336,32 @@ class SettingsFrame(ctk.CTkFrame):
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
-        # Niveau de log
+        # Niveau de log — audit 2026-05-15 : appliqué à chaud (plus besoin
+        # de relancer l'app pour voir l'effet), accolé à un bouton « Voir
+        # les logs » qui ouvre le dossier de logs dans l'explorateur.
         log_frame = ctk.CTkFrame(section, fg_color="transparent")
         log_frame.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(log_frame, text="Niveau de log:").pack(side="left", padx=5)
-        ctk.CTkOptionMenu(
+        ctk.CTkLabel(log_frame, text="Niveau de log :").pack(side="left", padx=5)
+        log_menu = ctk.CTkOptionMenu(
             log_frame,
             variable=self.log_level_var,
-            values=["DEBUG", "INFO", "WARNING", "ERROR"]
-        ).pack(side="left", padx=5)
+            values=["DEBUG", "INFO", "WARNING", "ERROR"],
+            command=lambda v: set_log_level(v),
+        )
+        log_menu.pack(side="left", padx=5)
+        attach_tooltip(log_menu, TIPS["log_level"])
+        ctk.CTkLabel(
+            log_frame, text="(appliqué immédiatement)",
+            font=font_hint(), text_color=HINT_COLOR,
+        ).pack(side="left", padx=PAD_S)
+
+        view_logs_btn = neutral_button(
+            log_frame, text="📂 Voir les logs",
+            command=self._open_log_dir, width=140,
+        )
+        view_logs_btn.pack(side="right", padx=PAD_S)
+        attach_tooltip(view_logs_btn, TIPS["btn_view_logs"])
 
         # Dossiers récents
         recent_frame = ctk.CTkFrame(section, fg_color="transparent")
@@ -353,12 +373,14 @@ class SettingsFrame(ctk.CTkFrame):
                  f"{len(self.config.recent_destinations)} destinations"
         ).pack(side="left", padx=5)
 
-        ctk.CTkButton(
+        clear_recent_btn = ctk.CTkButton(
             recent_frame,
             text="Effacer",
             command=self._clear_recent,
             width=80
-        ).pack(side="left", padx=10)
+        )
+        clear_recent_btn.pack(side="left", padx=10)
+        attach_tooltip(clear_recent_btn, TIPS["btn_clear_recent"])
 
     def _create_buttons_sticky(self):
         """Boutons sauvegarde / réinitialiser sticky bottom (toujours visibles)."""
@@ -367,16 +389,20 @@ class SettingsFrame(ctk.CTkFrame):
         buttons_frame.columnconfigure(1, weight=1)  # spacer
 
         # Réinitialiser à gauche (warning, secondaire)
-        warning_button(
+        reset_btn = warning_button(
             buttons_frame, text="🔄 Réinitialiser",
             command=self._reset_settings,
-        ).grid(row=0, column=0, sticky="w")
+        )
+        reset_btn.grid(row=0, column=0, sticky="w")
+        attach_tooltip(reset_btn, TIPS["btn_reset"])
 
         # Sauvegarder à droite (primary, action principale)
-        primary_button(
+        save_btn = primary_button(
             buttons_frame, text="💾 Sauvegarder",
             command=self._save_settings,
-        ).grid(row=0, column=2, sticky="e")
+        )
+        save_btn.grid(row=0, column=2, sticky="e")
+        attach_tooltip(save_btn, TIPS["btn_save"])
 
     def _on_theme_change(self):
         """Gère le changement de thème."""
@@ -428,6 +454,32 @@ class SettingsFrame(ctk.CTkFrame):
         cache.clear()
 
         messagebox.showinfo("Succès", "Le cache a été vidé.")
+
+    def _open_log_dir(self):
+        """Ouvre le dossier des logs dans l'explorateur (audit 2026-05-15).
+
+        Plateforme :
+        - Windows : ``os.startfile``
+        - macOS   : ``open <path>`` via subprocess
+        - Linux   : ``xdg-open <path>`` via subprocess
+        """
+        import os
+        import subprocess
+        import sys
+
+        log_dir = get_log_dir()
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(log_dir))  # noqa: S606
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(log_dir)])  # noqa: S603
+            else:
+                subprocess.Popen(["xdg-open", str(log_dir)])  # noqa: S603
+        except OSError as exc:
+            messagebox.showerror(
+                "Logs",
+                f"Impossible d'ouvrir le dossier de logs :\n{log_dir}\n\n{exc}",
+            )
 
     def _clear_recent(self):
         """Efface les dossiers récents."""

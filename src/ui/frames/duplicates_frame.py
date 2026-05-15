@@ -187,15 +187,19 @@ class DuplicatesFrame(ctk.CTkFrame):
         config_frame.pack(side="right")
 
         # Lot C audit 2026-05-14 : design system pour boutons sidebar.
-        neutral_button(
+        load_cfg_btn = neutral_button(
             config_frame, text="Charger config",
             command=self._load_config_file, width=110,
-        ).pack(side="left", padx=2)
+        )
+        load_cfg_btn.pack(side="left", padx=2)
+        attach_tooltip(load_cfg_btn, TIPS["load_config"])
 
-        neutral_button(
+        save_cfg_btn = neutral_button(
             config_frame, text="Sauver config",
             command=self._save_config_file, width=110,
-        ).pack(side="left", padx=2)
+        )
+        save_cfg_btn.pack(side="left", padx=2)
+        attach_tooltip(save_cfg_btn, TIPS["save_config"])
 
         # Dossier source
         folder_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
@@ -207,10 +211,12 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.source_var,
             placeholder_text="Selectionnez un dossier a analyser..."
         ).pack(side="left", fill="x", expand=True, padx=5)
-        neutral_button(
+        browse_src_btn = neutral_button(
             folder_frame, text="Parcourir",
             command=self._browse_source, width=80,
-        ).pack(side="left")
+        )
+        browse_src_btn.pack(side="left")
+        attach_tooltip(browse_src_btn, TIPS["browse_source"])
 
         # Mode d'exécution + destination move
         mode_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
@@ -239,10 +245,12 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.move_destination,
             placeholder_text="Dossier de destination pour les doublons..."
         ).pack(side="left", fill="x", expand=True, padx=5)
-        neutral_button(
+        browse_dest_btn = neutral_button(
             self.dest_frame, text="Parcourir",
             command=self._browse_destination, width=80,
-        ).pack(side="left")
+        )
+        browse_dest_btn.pack(side="left")
+        attach_tooltip(browse_dest_btn, TIPS["browse_dest"])
 
     # =========================================================================
     # MAIN SECTION (Tabs: Options + Résultats)
@@ -449,10 +457,12 @@ class DuplicatesFrame(ctk.CTkFrame):
             textvariable=self.priority_dirs_str,
             placeholder_text="Chemins separes par ;"
         ).pack(side="left", fill="x", expand=True, padx=(0, 5))
-        neutral_button(
+        add_prio_btn = neutral_button(
             prio_input_frame, text="+",
             command=self._add_priority_dir, width=30,
-        ).pack(side="left")
+        )
+        add_prio_btn.pack(side="left")
+        attach_tooltip(add_prio_btn, TIPS["add_priority_dir"])
 
     def _create_performance_options(self, parent):
         """Options de performance et sécurité."""
@@ -511,10 +521,12 @@ class DuplicatesFrame(ctk.CTkFrame):
             row2, textvariable=self.report_output_dir,
             placeholder_text="(meme dossier que source)", width=200
         ).pack(side="left", padx=5, fill="x", expand=True)
-        neutral_button(
+        browse_report_btn = neutral_button(
             row2, text="...",
             command=self._browse_report_dir, width=30,
-        ).pack(side="left")
+        )
+        browse_report_btn.pack(side="left")
+        attach_tooltip(browse_report_btn, TIPS["browse_report_dir"])
 
     # =========================================================================
     # RESULTS TAB

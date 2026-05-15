@@ -95,9 +95,18 @@ ORGANIZE = {
         "Inclut les sous-dossiers de la source. Décoché : seulement le dossier "
         "racine est scanné."
     ),
-    "include_images": "Inclut JPG, PNG, HEIC, GIF, BMP, TIFF, WebP, AVIF, etc.",
-    "include_raw": "Inclut les RAW : ARW, CR2, CR3, NEF, DNG, ORF, RW2, PEF, etc.",
-    "include_videos": "Inclut MP4, MOV, AVI, MKV, WMV, M4V, etc. Décoché par défaut.",
+    "include_images": (
+        "Inclut JPG/JPEG, PNG, GIF, BMP, TIFF/TIF, WebP, JFIF, JP2, "
+        "AVIF, HEIC/HEIF."
+    ),
+    "include_raw": (
+        "Inclut tous les RAW grand public : ARW, CR2, CR3, NEF, DNG, ORF, "
+        "RW2, RAF, PEF, SRW, SR2, X3F, MEF, IIQ, RWL, K25, KDC, MRW, ERF, NRW."
+    ),
+    "include_videos": (
+        "Inclut MP4, MOV, AVI, MKV, WMV, M4V, MPG/MPEG, 3GP, FLV, WebM, "
+        "MTS/TS, VOB. Décoché par défaut."
+    ),
 
     # ---- Filtres avancés (R1) ----
     "filter_date_min": (
@@ -153,6 +162,15 @@ ORGANIZE = {
     "detect_bursts": (
         "Détecte les rafales (photos prises à < N secondes d'écart) et les "
         "regroupe dans un sous-dossier Burst_NN/ pour chaque série."
+    ),
+    "burst_mode_manual": (
+        "Seuil fixe défini par l'utilisateur (Écart max en secondes). "
+        "Recommandé quand tu connais le rythme de prise (3-5 s typique)."
+    ),
+    "burst_mode_auto": (
+        "Seuil calculé automatiquement à partir des écarts du dossier : "
+        "moyenne(Δ) − écart-type. Plus précis sur dossiers hétérogènes. "
+        "Fallback manuel si moins de 3 photos datées."
     ),
     "burst_threshold": "Écart maximum entre 2 photos pour les considérer dans la même rafale.",
     "burst_min_count": "Nombre minimum de photos pour qu'une série soit considérée comme rafale.",
@@ -212,6 +230,10 @@ DUPLICATES = {
 
     "load_config": "Charge une configuration depuis un fichier YAML.",
     "save_config": "Sauvegarde la configuration courante dans un fichier YAML.",
+    "browse_dest": (
+        "Parcourir et sélectionner le dossier de destination "
+        "(mode Déplacer uniquement)."
+    ),
 
     # Modes
     "mode_dry_run": (
@@ -249,9 +271,15 @@ DUPLICATES = {
     ),
 
     # Filtres
-    "include_images": "Inclut JPG, PNG, HEIC, GIF, BMP, TIFF, WebP, AVIF.",
-    "include_raw":    "Inclut les fichiers RAW (ARW, CR2, NEF, DNG…).",
-    "include_videos": "Inclut MP4, MOV, AVI, MKV, etc.",
+    "include_images": (
+        "Inclut JPG/JPEG, PNG, GIF, BMP, TIFF/TIF, WebP, JFIF, JP2, "
+        "AVIF, HEIC/HEIF."
+    ),
+    "include_raw": (
+        "Inclut tous les RAW grand public : ARW, CR2, CR3, NEF, DNG, ORF, "
+        "RW2, RAF, PEF, SRW, K25, KDC, MRW, ERF, NRW, etc."
+    ),
+    "include_videos": "Inclut MP4, MOV, AVI, MKV, WMV, M4V, MPG, etc.",
     "recursive":      "Inclut les sous-dossiers de la source.",
     "min_size": (
         "Taille min des fichiers analysés. Ex. : '100KB' évite de doubler "
@@ -375,7 +403,12 @@ SETTINGS = {
 
     "log_level": (
         "Niveau de verbosité des logs. INFO par défaut. "
-        "DEBUG = tout (gros fichiers). ERROR = uniquement les pannes."
+        "DEBUG = tout (gros fichiers). ERROR = uniquement les pannes. "
+        "Effet immédiat — pas besoin de redémarrer."
+    ),
+    "btn_view_logs": (
+        "Ouvre le dossier des logs dans l'explorateur. "
+        "Chemin : %LOCALAPPDATA%\\PhotoOrganizer\\logs (Windows)."
     ),
     "btn_clear_recent": "Vide la liste des dossiers source/destination récents.",
 

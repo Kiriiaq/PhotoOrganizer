@@ -228,3 +228,102 @@ def make_radio(parent, **kw) -> ctk.CTkRadioButton:
 def section_separator(parent) -> ctk.CTkFrame:
     """Trait fin gris pour séparer 2 sections logiques d'un panneau."""
     return ctk.CTkFrame(parent, height=2, fg_color=SEPARATOR_COLOR)
+
+
+# =============================================================================
+# Logo de marque pour les modales (audit 2026-05-15)
+# =============================================================================
+#
+# Demande testeur : « Afficher le logo PhotoOrganizer en haut à gauche sur
+# toutes les fenêtres (popup clipboard/fichiers détectés, fenêtres
+# secondaires, etc.) ».
+#
+# Ce helper centralise le chargement de l'icône .png (resize 40×40) et la
+# pose dans une modale. No-op silencieux si l'image n'est pas trouvée ou
+# si Pillow n'est pas dispo — la modale reste fonctionnelle.
+
+import logging as _logging
+import os as _os
+import sys as _sys
+from typing import Optional
+
+_logo_logger = _logging.getLogger(__name__)
+_LOGO_CACHE: dict = {}  # taille -> CTkImage (évite de relire/resize 10× par session)
+
+
+def _find_logo_path() -> Optional[str]:
+    """Cherche le PNG du logo dans les emplacements connus (dev + PyInstaller)."""
+    here = _os.path.dirname(_os.path.abspath(__file__))
+    project_root = _os.path.abspath(_os.path.join(here, '..', '..'))
+    bases = [project_root, here]
+    meipass = getattr(_sys, '_MEIPASS', None)
+    if meipass:
+        bases.insert(0, meipass)
+    candidates_rel = [
+        _os.path.join('assets', 'icons', 'icon.png'),
+        _os.path.join('resources', 'icons', 'icon.png'),
+        _os.path.join('assets', 'icon.png'),
+    ]
+    for base in bases:
+        for rel in candidates_rel:
+            p = _os.path.join(base, rel)
+            if _os.path.exists(p):
+                return p
+    return None
+
+
+def add_logo_to_modal(
+    modal,
+    size: int = 40,
+    text: Optional[str] = None,
+) -> Optional[ctk.CTkLabel]:
+    """Ajoute le logo PhotoOrganizer en haut-gauche d'une modale.
+
+    Args:
+        modal: ``ctk.CTkToplevel`` cible. Le helper utilise grid(row=0,
+            column=0, sticky="nw", padx=PAD_M, pady=PAD_M) — pense à
+            décaler tes widgets existants en column>=1 ou à les wrapper.
+            Si tu as besoin d'un pack(), passe un sous-frame ici.
+        size: Taille en pixels (40 par défaut, recommandé pour modales).
+        text: Texte optionnel à coller à droite du logo (titre court).
+
+    Returns:
+        Le ``CTkLabel`` créé, ou ``None`` si le logo est introuvable ou
+        si l'opération échoue (l'appelant peut continuer sans souci).
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        _logo_logger.debug("Pillow absent — logo modale skip")
+        return None
+
+    cache_key = size
+    if cache_key in _LOGO_CACHE:
+        ctk_image = _LOGO_CACHE[cache_key]
+    else:
+        path = _find_logo_path()
+        if not path:
+            _logo_logger.debug("Logo PNG introuvable — modales sans logo")
+            return None
+        try:
+            pil_img = Image.open(path).resize((size, size), Image.LANCZOS)
+            ctk_image = ctk.CTkImage(
+                light_image=pil_img, dark_image=pil_img, size=(size, size),
+            )
+            _LOGO_CACHE[cache_key] = ctk_image
+        except (OSError, ValueError) as exc:
+            _logo_logger.warning(f"Logo load failed ({path}): {exc}")
+            return None
+
+    try:
+        label = ctk.CTkLabel(
+            modal, image=ctk_image,
+            text=f" {text}" if text else "",
+            compound="left", anchor="w",
+            font=font_label(weight="bold"),
+        )
+        label.grid(row=0, column=0, sticky="nw", padx=PAD_M, pady=PAD_M)
+        return label
+    except Exception as exc:
+        _logo_logger.debug(f"Logo placement failed : {exc}")
+        return None

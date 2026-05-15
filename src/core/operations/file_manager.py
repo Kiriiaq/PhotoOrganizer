@@ -37,12 +37,17 @@ class FileOperation:
 class FileManager:
     """Gestionnaire d'opérations sur les fichiers."""
 
-    # Extensions supportées par catégorie
+    # Extensions supportées par catégorie (Lot F audit 2026-05-15 :
+    # élargissement RAW pour couvrir tous les boîtiers grand public — ajout
+    # de .k25/.kdc (Kodak), .mrw (Minolta), .erf (Epson), .nrw (Nikon).
+    # Les formats ICO/WMF/EMF restent volontairement EXCLUS : ce sont des
+    # formats vectoriels/icônes Windows sans métadonnées photo.
     EXTENSIONS = {
         'image': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
                   '.webp', '.jfif', '.jp2', '.avif', '.heic', '.heif'],
         'raw': ['.raw', '.arw', '.cr2', '.cr3', '.nef', '.orf', '.rw2', '.dng',
-                '.3fr', '.raf', '.pef', '.srw', '.sr2', '.x3f', '.mef', '.iiq', '.rwl'],
+                '.3fr', '.raf', '.pef', '.srw', '.sr2', '.x3f', '.mef', '.iiq',
+                '.rwl', '.k25', '.kdc', '.mrw', '.erf', '.nrw'],
         'video': ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm',
                   '.3gp', '.m4v', '.mpg', '.mpeg', '.mts', '.ts', '.vob']
     }
