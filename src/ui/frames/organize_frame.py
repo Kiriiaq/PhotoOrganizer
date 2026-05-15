@@ -258,6 +258,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # ---- Bursts S1 + Incremental S5 ----
         self.detect_bursts = ctk.BooleanVar(value=False)
+        self.burst_mode = ctk.StringVar(value="manual")  # "manual" | "auto"
         self.burst_threshold = ctk.IntVar(value=3)             # secondes
         self.burst_min_count = ctk.IntVar(value=3)
         self.incremental_mode = ctk.BooleanVar(value=False)
@@ -865,23 +866,59 @@ class OrganizeFrame(ctk.CTkFrame):
                     anchor="w", justify="left",
                 ).pack(fill="x", padx=(PAD_L, PAD_S), pady=(0, PAD_S))
 
-        # Sous-options bursts inline (visibles tout le temps quand le panneau l'est)
+        # Sous-options bursts inline — mode manuel / auto (audit 2026-05-15).
+        # En mode manuel : seuil temporel choisi par l'utilisateur.
+        # En mode auto : seuil = mean - stddev des deltas du dossier final.
         burst_sub = ctk.CTkFrame(behaviors, fg_color="transparent")
         burst_sub.pack(fill="x", padx=(28, PAD_S), pady=(0, PAD_S))
-        ctk.CTkLabel(burst_sub, text="Écart max :", width=80, anchor="w",
+
+        # Ligne 1 : choix du mode (radios)
+        mode_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        mode_row.pack(fill="x", pady=(0, 2))
+        ctk.CTkLabel(mode_row, text="Mode :", width=80, anchor="w",
+                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        _make_radio(
+            mode_row, text="Manuel (seuil fixe)",
+            variable=self.burst_mode, value="manual",
+            command=lambda: self._refresh_burst_mode_ui(),
+        ).pack(side="left", padx=(0, PAD_M))
+        _make_radio(
+            mode_row, text="Auto (Δ moyen − σ)",
+            variable=self.burst_mode, value="auto",
+            command=lambda: self._refresh_burst_mode_ui(),
+        ).pack(side="left")
+
+        # Ligne 2 : Écart max (visible seulement en mode manuel)
+        self._burst_manual_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        self._burst_manual_row.pack(fill="x", pady=(0, 2))
+        ctk.CTkLabel(self._burst_manual_row, text="Écart max :", width=80, anchor="w",
                      font=font_hint(), text_color=HINT_COLOR).pack(side="left")
         ctk.CTkOptionMenu(
-            burst_sub, variable=self.burst_threshold,
-            values=["1", "2", "3", "5", "10"], width=60, height=BTN_H_STD,
+            self._burst_manual_row, variable=self.burst_threshold,
+            values=["1", "2", "3", "5", "10", "30", "60"],
+            width=70, height=BTN_H_STD,
             command=lambda v: self.burst_threshold.set(int(v)),
         ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(burst_sub, text="s · Min :",
+        ctk.CTkLabel(self._burst_manual_row, text="s",
+                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+
+        # Ligne 3 : Min photos par burst (visible dans les 2 modes)
+        min_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        min_row.pack(fill="x")
+        ctk.CTkLabel(min_row, text="Min photos :", width=80, anchor="w",
                      font=font_hint(), text_color=HINT_COLOR).pack(side="left")
         ctk.CTkOptionMenu(
-            burst_sub, variable=self.burst_min_count,
+            min_row, variable=self.burst_min_count,
             values=["2", "3", "4", "5", "8"], width=60, height=BTN_H_STD,
             command=lambda v: self.burst_min_count.set(int(v)),
         ).pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(
+            min_row, text="par groupe",
+            font=font_hint(), text_color=HINT_COLOR,
+        ).pack(side="left")
+
+        # État initial (manuel par défaut)
+        self._refresh_burst_mode_ui()
 
         # Index export — séparateur + 2 cases compactes en bas
         ctk.CTkFrame(behaviors, height=1, fg_color=SEPARATOR_COLOR).pack(
@@ -1096,6 +1133,23 @@ class OrganizeFrame(ctk.CTkFrame):
     def _rename_toggle_label(self) -> str:
         return "▶  🏷️ Renommage & Presets" if self._rename_collapsed \
                else "▼  🏷️ Renommage & Presets"
+
+    def _refresh_burst_mode_ui(self):
+        """Affiche/cache la ligne Écart max selon le mode burst.
+
+        Mode manuel → ligne visible (l'utilisateur règle le seuil)
+        Mode auto   → ligne cachée (le seuil est calculé à l'exécution)
+        """
+        try:
+            if self.burst_mode.get() == "manual":
+                self._burst_manual_row.pack(fill="x", pady=(0, 2))
+                # Réordonner avant la ligne min — repack après le pack_forget
+                # du min n'est pas nécessaire ici car min_row n'est pas masquée.
+            else:
+                self._burst_manual_row.pack_forget()
+        except AttributeError:
+            # Pas encore créé (appel pendant l'init)
+            pass
 
     def _toggle_rename_section(self):
         """Bascule le panneau Renommage et persiste l'état."""
@@ -1774,6 +1828,7 @@ class OrganizeFrame(ctk.CTkFrame):
             export_index_json=self.export_index_json.get(),
             # Bursts S1 + Incremental S5
             detect_bursts=self.detect_bursts.get(),
+            burst_mode=self.burst_mode.get(),
             burst_threshold_seconds=self.burst_threshold.get(),
             burst_min_count=self.burst_min_count.get(),
             incremental_mode=self.incremental_mode.get(),

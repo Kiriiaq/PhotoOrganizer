@@ -73,7 +73,13 @@ class OrganizationOptions:
     # d'écart sont regroupées dans un sous-dossier ``Burst_NN/`` à
     # l'intérieur de leur dossier de destination habituel. Seuils par
     # défaut : 3 photos minimum, dans une fenêtre de 3 secondes.
+    #
+    # Mode (audit 2026-05-15) :
+    #   "manual" : seuil fixe = ``burst_threshold_seconds`` (défaut)
+    #   "auto"   : seuil calculé = max(1, mean(deltas) - stddev(deltas))
+    #              sur les écarts entre photos consécutives du dossier.
     detect_bursts: bool = False
+    burst_mode: str = "manual"  # "manual" | "auto"
     burst_threshold_seconds: int = 3
     burst_min_count: int = 3
 
@@ -215,6 +221,7 @@ class SmartOrganizer:
                 eligible_files,
                 threshold_seconds=options.burst_threshold_seconds,
                 min_count=options.burst_min_count,
+                mode=getattr(options, 'burst_mode', 'manual'),
             )
 
         # 2 ter) Mode incrémental (Lot S5) : on charge l'index existant
@@ -842,6 +849,7 @@ class SmartOrganizer:
         file_paths: List[str],
         threshold_seconds: int = 3,
         min_count: int = 3,
+        mode: str = "manual",
     ) -> Dict[str, Optional[str]]:
         """Détecte les rafales (Lot S1) en groupant par DateTimeOriginal.
 
@@ -850,6 +858,16 @@ class SmartOrganizer:
         avec la photo précédente dépasse `threshold_seconds`, on clôt le
         groupe courant. Les groupes de moins de `min_count` photos sont
         considérés comme des prises uniques (membership = None).
+
+        Mode (audit 2026-05-15) :
+            - ``manual`` (défaut) : seuil = ``threshold_seconds`` (fixe)
+            - ``auto``            : seuil = max(1, mean(Δ) − stddev(Δ))
+              calculé sur les écarts entre photos consécutives du dossier.
+              Heuristique : les Δ « courts » (en dessous de la moyenne)
+              sont caractéristiques d'une rafale, alors que les Δ
+              « longs » correspondent aux pauses entre prises de vue
+              distinctes. Soustraire l'écart-type rend le seuil plus
+              strict (ne capture que les Δ vraiment courts).
 
         Retourne : ``{file_path: burst_id_or_None}``. Les burst_id ont la
         forme ``Burst_01``, ``Burst_02``, … (numérotation chronologique).
@@ -871,13 +889,34 @@ class SmartOrganizer:
         # Trier chronologiquement
         dated.sort(key=lambda t: t[1])
 
+        # Mode auto : recalculer threshold à partir des deltas réels.
+        # Si moins de 3 photos datées, on retombe sur le manuel.
+        effective_threshold = threshold_seconds
+        if mode == "auto" and len(dated) >= 3:
+            deltas = []
+            for i in range(1, len(dated)):
+                delta = (dated[i][1] - dated[i - 1][1]).total_seconds()
+                if delta >= 0:
+                    deltas.append(delta)
+            if deltas:
+                import statistics
+                mean = statistics.mean(deltas)
+                stddev = statistics.pstdev(deltas) if len(deltas) > 1 else 0.0
+                # Seuil = mean - stddev, clampé à [1 s ; 600 s]
+                auto_thr = max(1.0, min(mean - stddev, 600.0))
+                effective_threshold = int(round(auto_thr))
+                logger.info(
+                    f"Bursts mode auto : mean={mean:.1f}s, "
+                    f"stddev={stddev:.1f}s → seuil={effective_threshold}s"
+                )
+
         membership: Dict[str, Optional[str]] = {fp: None for fp in file_paths}
         groups: List[List[str]] = []
         current: List[str] = [dated[0][0]]
         prev_date = dated[0][1]
         for fp, d in dated[1:]:
             delta = (d - prev_date).total_seconds()
-            if delta <= threshold_seconds:
+            if delta <= effective_threshold:
                 current.append(fp)
             else:
                 groups.append(current)
@@ -897,7 +936,7 @@ class SmartOrganizer:
         if burst_index:
             logger.info(
                 f"Detection bursts : {burst_index} rafale(s) detectee(s) "
-                f"(seuil {threshold_seconds}s, min {min_count} photos)"
+                f"(mode={mode}, seuil {effective_threshold}s, min {min_count} photos)"
             )
         return membership
 

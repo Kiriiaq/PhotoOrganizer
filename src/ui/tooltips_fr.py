@@ -163,6 +163,15 @@ ORGANIZE = {
         "Détecte les rafales (photos prises à < N secondes d'écart) et les "
         "regroupe dans un sous-dossier Burst_NN/ pour chaque série."
     ),
+    "burst_mode_manual": (
+        "Seuil fixe défini par l'utilisateur (Écart max en secondes). "
+        "Recommandé quand tu connais le rythme de prise (3-5 s typique)."
+    ),
+    "burst_mode_auto": (
+        "Seuil calculé automatiquement à partir des écarts du dossier : "
+        "moyenne(Δ) − écart-type. Plus précis sur dossiers hétérogènes. "
+        "Fallback manuel si moins de 3 photos datées."
+    ),
     "burst_threshold": "Écart maximum entre 2 photos pour les considérer dans la même rafale.",
     "burst_min_count": "Nombre minimum de photos pour qu'une série soit considérée comme rafale.",
     "export_index_csv":  "Génère un fichier CSV listant toutes les opérations effectuées.",
