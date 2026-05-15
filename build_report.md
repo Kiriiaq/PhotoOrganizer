@@ -4,10 +4,10 @@
 
 | Champ | Valeur |
 |---|---|
-| **Date / heure** | 2026-05-15 12:52 (rebuild après élargissement bursts auto) |
+| **Date / heure** | 2026-05-15 13:08 (rebuild après ajout de 8 tests + élargissement bursts) |
 | **Branche** | `main` |
-| **Commit HEAD** | `29d4921 feat(bursts): expose les bornes auto_min/auto_max + WIP filtres` |
-| **Commit précédent** | `579a30e fix(bursts): mean/stddev calculé par dossier-destination (2026-05-15)` |
+| **Commit HEAD** | `6d7f114 test: 8 tests additionnels — couverture bursts + filtres WIP` |
+| **Commit précédent** | `29d4921 feat(bursts): expose auto_min/auto_max + WIP filtres` |
 | **Python** | 3.11.9 |
 | **PyInstaller** | 6.20.0 |
 | **Plateforme** | Windows 10/11 64-bit |
@@ -17,11 +17,11 @@
 | Étape | Statut | Détail |
 |---|---|---|
 | 1. Pré-vérifs | ✅ | Working tree clean après commit, branche `main` |
-| 2. Tests pytest | ✅ | **112/112** verts (25 functional dont 3 nouveaux burst tests) en 18.95 s |
+| 2. Tests pytest | ✅ | **120/120** verts (33 functional dont 8 nouveaux : 3 bursts + 5 filtres WIP) en 17.85 s |
 | 3. Ruff check + format | ✅ | `All checks passed!` + format conforme |
-| 4. Build debug | ✅ | `PhotoOrganizer-2.0.0-debug.exe` 36.0 MB |
-| 5. Build release light | ✅ | `PhotoOrganizer-2.0.0-light.exe` 34.5 MB |
-| 6. Smoke tests post-build | ✅ | debug ALIVE 6.15 s · light ALIVE 6.17 s (`audit/smoke_exe.py`) |
+| 4. Build debug | ✅ | `PhotoOrganizer-2.0.0-debug.exe` 36.0 MB (cleanup `rm -rf build/ *.spec` avant) |
+| 5. Build release light | ✅ | `PhotoOrganizer-2.0.0-light.exe` 34.5 MB (cleanup idem) |
+| 6. Smoke tests post-build | ✅ | debug ALIVE 6.18 s · light ALIVE 6.50 s (`audit/smoke_exe.py`) |
 | 7. Rapport | ✅ | ce document |
 
 > **Note 2026-05-15** : le 1ᵉʳ run du build debug a échoué sur un
@@ -36,8 +36,16 @@
 
 | Fichier | Taille | SHA-256 |
 |---|---:|---|
-| `dist/PhotoOrganizer-2.0.0-debug.exe` | 37 781 329 B (36.0 MB) | `8dd94291ff308612fed8eed2834cfe973fc580739dc16168a3cc26eabd6d62bf` |
-| `dist/PhotoOrganizer-2.0.0-light.exe` | 36 126 144 B (34.5 MB) | `3c177e1263f3a15b2e6ea04fd81a90d1497900985e977ead6c9bab545b3c0a29` |
+| `dist/PhotoOrganizer-2.0.0-debug.exe` | 37 781 329 B (36.0 MB) | `1c6f437e8d999a88e33d95250d2ffe57d4ac6b14b7005363727caca5bd067395` |
+| `dist/PhotoOrganizer-2.0.0-light.exe` | 36 125 761 B (34.5 MB) | `5728e71d988cc83bfa4c610e87d32b8caf47ab6b54e599f322730346187b6330` |
+
+### Hashes du build précédent (12:52, commit `29d4921`)
+| Fichier | SHA-256 |
+|---|---|
+| `PhotoOrganizer-2.0.0-debug.exe` | `8dd94291ff308612fed8eed2834cfe973fc580739dc16168a3cc26eabd6d62bf` |
+| `PhotoOrganizer-2.0.0-light.exe` | `3c177e1263f3a15b2e6ea04fd81a90d1497900985e977ead6c9bab545b3c0a29` |
+
+Les hashes diffèrent même quand le code est identique : PyInstaller embarque un timestamp dans le PE header.
 
 **Builds précédents (2026-05-15 08:07/08:09)** conservés dans
 `dist/debug/` et `dist/light/` pour comparaison/rollback :
@@ -87,13 +95,33 @@ hold_time : 6.17 s
 | Suite | Tests | Statut |
 |---|---:|---|
 | `tests/smoke/` | 32 | ✅ |
-| `tests/functional/test_organizer.py` | **25** | ✅ (3 nouveaux burst tests) |
+| `tests/functional/test_organizer.py` | **33** | ✅ (3 bursts + 5 filtres WIP nouveaux dans ce build) |
 | `tests/functional/test_file_manager.py` | 7 | ✅ |
 | `tests/functional/test_duplicates.py` | 6 | ✅ |
 | `tests/functional/test_config.py` | 4 | ✅ |
 | `tests/functional/` (autres) | 36 | ✅ |
 | `tests/perf/test_perf.py` | 2 (benchmark) | ✅ |
-| **Total** | **112 / 112** | ✅ |
+| **Total** | **120 / 120** | ✅ |
+
+### 8 tests ajoutés au commit `6d7f114`
+
+**Bursts (3)** :
+
+| Test | Couvre |
+|---|---|
+| `test_organization_options_from_dict_roundtrips_burst_bounds` | Sérialisation `auto_min_seconds` / `auto_max_seconds` via `OrganizationOptions.from_dict` |
+| `test_burst_detection_two_bursts_same_folder_are_numbered_incrementally` | 2 rafales dans le même dossier-destination → `Burst_01` puis `Burst_02` (numérotation incrémentale par dossier) |
+| `test_burst_detection_auto_falls_back_to_manual_with_few_photos` | Mode auto + < 3 photos datées → fallback documenté sur le seuil manuel |
+
+**Filtres WIP préexistants (5)** :
+
+| Test | Couvre |
+|---|---|
+| `test_extensions_filter_keeps_only_allowed` | `.jpg` gardé, `.png` rejeté |
+| `test_dim_min_max_filters_reject_out_of_range` | 100×100 + 800×600 + 5000×4000 → seul 800×600 passe `[500×400 ; 2000×2000]` |
+| `test_orientation_filter_landscape_portrait_square` | 3 photos (L/P/S) avec `orientation_filter="landscape"` → garde uniquement L |
+| `test_gps_required_with_filters_files_without_gps` | EXIF GPS embarqué vs pas, `gps_required="with"` garde 1/2 |
+| `test_camera_makes_filter_matches_case_insensitive` | `SONY` + `Canon` + `NIKON CORPORATION`, filter=`[sony, nikon]` → garde 2/3 |
 
 ## Élargissement bursts intégré à ce build
 
@@ -178,14 +206,15 @@ python audit/smoke_exe.py
 make clean
 ```
 
-## Log git (5 derniers commits sur `main`)
+## Log git (6 derniers commits sur `main`)
 
 ```
+6d7f114 test: 8 tests additionnels — couverture bursts + filtres WIP (audit 2026-05-15)
+f06a6bf build: rebuild debug + light EXEs après élargissement bursts (2026-05-15 12:52)
 29d4921 feat(bursts): expose les bornes auto_min/auto_max comme option avancée + WIP filtres
 579a30e fix(bursts): mean/stddev calculé par dossier-destination (audit 2026-05-15)
 f31a274 Merge branch 'feat/v2.1-refonte-ux'
 a54b928 feat(ux): logo PhotoOrganizer en haut-gauche dans toutes les modales
-ad27798 feat(ux): tooltips exhaustifs sur tous les boutons d'action
 ```
 
 ## Verdict global
