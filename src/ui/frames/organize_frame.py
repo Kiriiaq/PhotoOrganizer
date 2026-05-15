@@ -24,6 +24,7 @@ from ui.theme import (
     BTN_H_STD,
     HINT_COLOR,
     LABEL_MUTED,
+    PAD_L,
     PAD_M,
     PAD_S,
     SEPARATOR_COLOR,
@@ -814,18 +815,55 @@ class OrganizeFrame(ctk.CTkFrame):
                      font=font_label(weight="bold"),
                      ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
-        # Liste compacte de toggles (tous regroupés visuellement)
-        for text, var in [
-            ("Skip si fichier identique déjà présent",          self.skip_if_identical),
-            ("Garder les paires RAW + JPEG ensemble",           self.keep_raw_jpeg_pairs),
-            ("Nettoyer les dossiers source vides (Déplacer)",   self.cleanup_empty_source),
-            ("Vérifier l'espace disque avant exécution",        self.validate_disk_space),
-            ("Notification système à la fin",                   self.notify_on_finish),
-            ("Mode incrémental (skip déjà organisés)",          self.incremental_mode),
-            ("Détection de rafales → sous-dossier Burst_NN/",   self.detect_bursts),
-        ]:
-            _make_checkbox(behaviors, text=text, variable=var
-                           ).pack(anchor="w", padx=PAD_M, pady=PAD_S)
+        # Comportements regroupés par catégorie (audit 2026-05-15) — au lieu
+        # d'une longue liste à plat, on présente 4 sous-groupes lisibles.
+        # Chaque sous-groupe a un sous-titre gris et 1-3 toggles indentés.
+        behavior_groups = [
+            ("📦 Conservation des doublons", [
+                ("Skip si fichier identique déjà présent",
+                 self.skip_if_identical,
+                 "ex : 2 photos identiques (hash égal) → seule la 1ère est traitée"),
+                ("Garder les paires RAW + JPEG ensemble",
+                 self.keep_raw_jpeg_pairs,
+                 "ex : IMG_001.CR2 + IMG_001.JPG → même dossier final"),
+            ]),
+            ("🧹 Nettoyage / sécurité", [
+                ("Nettoyer les dossiers source vides (Déplacer)",
+                 self.cleanup_empty_source,
+                 "ex : après MOVE, supprime D:/Vacances/Jour1/ s'il devient vide"),
+                ("Vérifier l'espace disque avant exécution",
+                 self.validate_disk_space,
+                 "ex : refuse de copier 80 Go vers un disque qui en a 50"),
+            ]),
+            ("🔍 Détection / mode", [
+                ("Détection de rafales → sous-dossier Burst_NN/",
+                 self.detect_bursts,
+                 "ex : 5 photos prises en 2 s → Burst_01/"),
+                ("Mode incrémental (skip déjà organisés)",
+                 self.incremental_mode,
+                 "ex : 2e exécution du même dossier → ne retraite que les nouveaux"),
+            ]),
+            ("🔔 Notification", [
+                ("Notification système à la fin",
+                 self.notify_on_finish,
+                 "ex : toast Windows « 1245 fichiers traités » à la fin"),
+            ]),
+        ]
+        for group_title, toggles in behavior_groups:
+            ctk.CTkLabel(
+                behaviors, text=group_title,
+                font=font_hint(), text_color=HINT_COLOR,
+                anchor="w",
+            ).pack(fill="x", padx=PAD_S, pady=(PAD_S, 0))
+            for text, var, hint in toggles:
+                _make_checkbox(behaviors, text=text, variable=var
+                               ).pack(anchor="w", padx=(PAD_L, PAD_S), pady=(2, 0))
+                # Note inline avec un "ex : …" sous chaque toggle.
+                ctk.CTkLabel(
+                    behaviors, text=f"    {hint}",
+                    font=font_hint(), text_color=HINT_COLOR,
+                    anchor="w", justify="left",
+                ).pack(fill="x", padx=(PAD_L, PAD_S), pady=(0, PAD_S))
 
         # Sous-options bursts inline (visibles tout le temps quand le panneau l'est)
         burst_sub = ctk.CTkFrame(behaviors, fg_color="transparent")
@@ -1004,26 +1042,40 @@ class OrganizeFrame(ctk.CTkFrame):
             "write", lambda *_: self._refresh_rename_preview()
         )
 
-        # Tokens disponibles
+        # Tokens disponibles + exemples concrets (audit 2026-05-15)
         ctk.CTkLabel(
             edit_box,
             text="Tokens : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
             font=font_hint(), text_color=HINT_COLOR, anchor="w",
         ).grid(row=2, column=0, columnspan=2, sticky="ew",
-               padx=PAD_M, pady=(PAD_S, PAD_M))
+               padx=PAD_M, pady=(PAD_S, 0))
+        ctk.CTkLabel(
+            edit_box,
+            text=(
+                "    ex : {date:%Y%m%d}_{counter:04d}{ext}    →    "
+                "20260507_0001.jpg\n"
+                "    ex : {date:%Y-%m-%d}_{camera}_{original}    →    "
+                "2026-05-07_Sony-A7M3_IMG_0001.jpg\n"
+                "    ex : {date:%Y-%m}_VAC_{counter:03d}{ext}   →    "
+                "2026-05_VAC_001.jpg"
+            ),
+            font=font_hint(), text_color=HINT_COLOR,
+            anchor="w", justify="left",
+        ).grid(row=3, column=0, columnspan=2, sticky="ew",
+               padx=PAD_M, pady=(0, PAD_M))
 
         # Séparateur entre Renommage et Presets
         ctk.CTkFrame(edit_box, height=1, fg_color=SEPARATOR_COLOR).grid(
-            row=3, column=0, columnspan=2, sticky="ew",
+            row=4, column=0, columnspan=2, sticky="ew",
             padx=PAD_M, pady=(0, PAD_S),
         )
 
         # Ligne Presets
         ctk.CTkLabel(edit_box, text="Preset :",
-                     font=font_label()).grid(row=4, column=0, sticky="w",
+                     font=font_label()).grid(row=5, column=0, sticky="w",
                                              padx=PAD_M, pady=(0, PAD_M))
         preset_row = ctk.CTkFrame(edit_box, fg_color="transparent")
-        preset_row.grid(row=4, column=1, sticky="ew",
+        preset_row.grid(row=5, column=1, sticky="ew",
                         padx=(0, PAD_M), pady=(0, PAD_M))
         self._preset_menu = ctk.CTkOptionMenu(
             preset_row, variable=self.preset_name,
@@ -1444,15 +1496,129 @@ class OrganizeFrame(ctk.CTkFrame):
         logger.info(f"Preset '{name}' charge")
 
     def _save_preset_dialog(self):
-        # Petit dialog inline via simpledialog — léger et natif tkinter
-        from tkinter import simpledialog
-        name = simpledialog.askstring(
-            "Sauvegarder le preset", "Nom du preset :",
-            parent=self.winfo_toplevel(),
+        """Modale de sauvegarde de preset (audit 2026-05-15).
+
+        Remplace l'ancien ``simpledialog.askstring`` (trop petit, illisible)
+        par une vraie modale 520×360 avec :
+        - Logo PhotoOrganizer en haut-gauche
+        - Champ Nom (entry)
+        - Récap synthétique de ce qui sera sauvegardé (label scrollable)
+        - Boutons Annuler / Enregistrer
+        """
+        from ui.theme import BTN_H_PRIMARY, add_logo_to_modal
+
+        win = ctk.CTkToplevel(self)
+        win.title("Sauvegarder un preset")
+        win.geometry("520x360")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+        win.columnconfigure(1, weight=1)
+        win.rowconfigure(3, weight=1)
+
+        # Logo + titre (row 0)
+        add_logo_to_modal(win, size=40, text="Sauvegarder un preset")
+
+        # Champ Nom (row 1)
+        ctk.CTkLabel(
+            win, text="Nom du preset :",
+            font=font_label(weight="bold"),
+        ).grid(row=1, column=0, sticky="w", padx=PAD_L, pady=(PAD_M, PAD_S))
+        name_var = ctk.StringVar()
+        name_entry = ctk.CTkEntry(
+            win, textvariable=name_var, height=BTN_H_STD,
+            placeholder_text="ex : vacances-ete-2026",
         )
-        if not name:
-            return
-        name = name.strip()
+        name_entry.grid(row=1, column=1, sticky="ew",
+                        padx=(0, PAD_L), pady=(PAD_M, PAD_S))
+        name_entry.focus_set()
+
+        # Hint nom (row 2)
+        ctk.CTkLabel(
+            win,
+            text="    Caractères autorisés : lettres, chiffres, tirets, "
+                 "soulignés. Pas d'espace.",
+            font=font_hint(), text_color=HINT_COLOR,
+            anchor="w", justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="ew",
+               padx=PAD_L, pady=(0, PAD_S))
+
+        # Récap des options sauvegardées (row 3, expand)
+        recap_frame = ctk.CTkFrame(win)
+        recap_frame.grid(row=3, column=0, columnspan=2, sticky="nsew",
+                         padx=PAD_L, pady=PAD_S)
+        ctk.CTkLabel(
+            recap_frame, text="📋 Contenu du preset",
+            font=font_label(weight="bold"), anchor="w",
+        ).pack(fill="x", padx=PAD_M, pady=(PAD_S, 2))
+        recap_box = ctk.CTkTextbox(recap_frame, height=140, font=font_hint())
+        recap_box.pack(fill="both", expand=True, padx=PAD_M, pady=(0, PAD_M))
+        # Construction du récap textuel
+        recap_lines = [
+            f"• Organisation : date={self.organize_by_date.get()}, "
+            f"camera={self.organize_by_camera.get()}, "
+            f"lieu={self.organize_by_location.get()}",
+            f"• Multicouche : {self.multilayer.get()}  ·  "
+            f"ordre={', '.join(self._criteria_order)}",
+            f"• Format date : {self.date_format.get()}",
+            f"• Mode : {'COPIER' if self.copy_not_move.get() else 'DÉPLACER'}",
+            f"• Récursif : {self.recursive.get()}",
+            f"• Types : images={self.include_images.get()}, "
+            f"raw={self.include_raw.get()}, vidéos={self.include_videos.get()}",
+            f"• Filtres : date [{self.filter_date_min.get() or '—'} → "
+            f"{self.filter_date_max.get() or '—'}], "
+            f"taille [{self.filter_size_min.get() or '—'} → "
+            f"{self.filter_size_max.get() or '—'}], "
+            f"note ≥ {self.filter_rating_min.get()}",
+            f"• Renommage : {self.rename_template.get() or '(nom d origine)'}",
+        ]
+        recap_box.insert("end", "\n".join(recap_lines))
+        recap_box.configure(state="disabled")
+
+        # Boutons (row 4)
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.grid(row=4, column=0, columnspan=2, sticky="ew",
+                     padx=PAD_L, pady=(0, PAD_L))
+        btn_row.columnconfigure(1, weight=1)
+
+        result = {"name": None}
+
+        def _on_save():
+            n = name_var.get().strip()
+            if not n:
+                messagebox.showerror(
+                    "Preset", "Le nom est obligatoire.", parent=win,
+                )
+                return
+            if any(c in n for c in r' /\:*?"<>|'):
+                messagebox.showerror(
+                    "Preset",
+                    "Caractères interdits dans le nom (espace, /, \\, etc).",
+                    parent=win,
+                )
+                return
+            result["name"] = n
+            win.destroy()
+
+        ctk.CTkButton(
+            btn_row, text="Annuler",
+            command=win.destroy, height=BTN_H_STD,
+            fg_color=("gray70", "gray30"),
+            hover_color=("gray60", "gray40"),
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkButton(
+            btn_row, text="💾 Enregistrer",
+            command=_on_save, height=BTN_H_PRIMARY,
+            font=font_label(weight="bold"),
+        ).grid(row=0, column=2, sticky="e")
+
+        # Raccourci Enter = enregistrer, Echap = annuler
+        win.bind("<Return>", lambda _e: _on_save())
+        win.bind("<Escape>", lambda _e: win.destroy())
+
+        win.wait_window()
+
+        name = result["name"]
         if not name:
             return
         data = {
