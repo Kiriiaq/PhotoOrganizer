@@ -66,6 +66,24 @@ class AppConfig:
     # ---- État UI persisté entre sessions ----
     rename_collapsed: bool = False          # pliage de la section Renommage
 
+    # ---- Notifications & Index (refactor 2026-05-15) ----
+    # Auparavant dans Options avancées > Comportement. Déplacé vers
+    # Paramètres pour libérer de l'espace et clarifier que ce sont des
+    # préférences globales, pas des options ponctuelles d'organisation.
+    notify_on_finish: bool = True           # toast système après organisation
+    export_index_csv: bool = False          # exporte un index CSV des ops
+    export_index_json: bool = False         # idem mais JSON
+
+    # ---- Nouveaux filtres (refactor 2026-05-15) ----
+    # Persistance UI ; les vars sur OrganizeFrame se synchronisent à
+    # l'init et à chaque modification.
+    filter_extensions: str = ""             # ex : "jpg,raw"
+    filter_dim_min: str = ""                # ex : "1920x1080"
+    filter_dim_max: str = ""                # ex : "8000x6000"
+    filter_camera_make: str = ""            # ex : "Sony,Canon"
+    filter_gps_required: str = "any"        # "any" | "with" | "without"
+    filter_orientation: str = "any"         # "any" | "landscape" | "portrait" | "square"
+
 
 class ConfigManager:
     """Gestionnaire de configuration."""

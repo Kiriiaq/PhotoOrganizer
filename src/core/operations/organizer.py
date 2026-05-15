@@ -54,6 +54,19 @@ class OrganizationOptions:
     rating_min: int = 0  # 0..5, 0 = pas de filtre
     keywords_filter: List[str] = field(default_factory=list)  # OR : un seul match suffit
 
+    # ---- Nouveaux filtres (refactor 2026-05-15) ----
+    # Liste d'extensions normalisées (sans point, lowercase) — vide = pas de filtre
+    extensions_filter: List[str] = field(default_factory=list)
+    # Dimensions min/max (largeur, hauteur) — None = pas de filtre côté concerné
+    dim_min: Optional[tuple] = None  # (w, h)
+    dim_max: Optional[tuple] = None  # (w, h)
+    # Marques caméra (EXIF Make), normalisées lowercase — vide = pas de filtre
+    camera_makes_filter: List[str] = field(default_factory=list)
+    # GPS : "any" | "with" | "without"
+    gps_required: str = "any"
+    # Orientation : "any" | "landscape" | "portrait" | "square"
+    orientation_filter: str = "any"
+
     # ---- Comportements avancés ----
     skip_if_identical: bool = False  # R2 : si dest existe ET hash identique → skip
     keep_raw_jpeg_pairs: bool = False  # R3 : co-localiser les paires *.RAW + *.JPG
@@ -77,12 +90,25 @@ class OrganizationOptions:
     #
     # Mode (audit 2026-05-15) :
     #   "manual" : seuil fixe = ``burst_threshold_seconds`` (défaut)
-    #   "auto"   : seuil calculé = max(1, mean(deltas) - stddev(deltas))
+    #   "auto"   : seuil calculé = clamp(mean(Δ) - stddev(Δ),
+    #              ``burst_auto_min_seconds``, ``burst_auto_max_seconds``)
     #              sur les écarts entre photos consécutives du dossier.
+    #
+    # Audit 2026-05-15 (élargissement) : les bornes du clamp ``auto``
+    # sont désormais exposées (defaut 1 s … 600 s, idem ancien
+    # comportement). Permet à un utilisateur expert :
+    #   - de RELÂCHER l'auto (auto_max = 3600) pour capturer des
+    #     séries plus étalées (timelapse, photos d'événement en
+    #     mode pose).
+    #   - ou de la SERRER (auto_min = 5) pour ne capturer que des
+    #     vraies rafales rapides et ignorer les pauses normales
+    #     entre clichés d'un même endroit.
     detect_bursts: bool = False
     burst_mode: str = "manual"  # "manual" | "auto"
     burst_threshold_seconds: int = 3
     burst_min_count: int = 3
+    burst_auto_min_seconds: int = 1
+    burst_auto_max_seconds: int = 600
 
     # ---- Mode incrémental (S5) ----
     # Persiste un index ``.photoorganizer_index.json`` dans la destination,
@@ -271,6 +297,8 @@ class SmartOrganizer:
                     threshold_seconds=options.burst_threshold_seconds,
                     min_count=options.burst_min_count,
                     mode=getattr(options, "burst_mode", "manual"),
+                    auto_min_seconds=getattr(options, "burst_auto_min_seconds", 1),
+                    auto_max_seconds=getattr(options, "burst_auto_max_seconds", 600),
                 )
                 self._burst_membership.update(sub)
 
@@ -680,12 +708,26 @@ class SmartOrganizer:
         file_path: str,
         options: OrganizationOptions,
     ) -> bool:
-        """Filtre pré-traitement (R1) : date, taille, rating, mots-clés.
+        """Filtre pré-traitement (R1 + refactor 2026-05-15).
 
         Renvoie True si le fichier doit être traité, False sinon. Les filtres
-        désactivés (None / 0 / [] selon le type) passent toujours.
+        désactivés (None / 0 / [] / "any" selon le type) passent toujours.
+
+        Ordre d'évaluation = du moins coûteux au plus coûteux :
+          1. Extension (suffix string compare)
+          2. Taille (os.path.getsize)
+          3. EXIF (date, rating, keywords, camera, GPS)
+          4. Dimensions / orientation (PIL.Image.open header)
         """
-        # Filtre taille — bon marché, on commence par lui
+        # 1) Extension — extrêmement bon marché, on commence par lui
+        if options.extensions_filter:
+            ext = os.path.splitext(file_path)[1].lstrip('.').lower()
+            allowed = {e.strip().lstrip('.').lower()
+                       for e in options.extensions_filter if e.strip()}
+            if allowed and ext not in allowed:
+                return False
+
+        # 2) Taille
         if options.size_min_bytes or options.size_max_bytes:
             try:
                 size = os.path.getsize(file_path)
@@ -696,46 +738,102 @@ class SmartOrganizer:
             if options.size_max_bytes and size > options.size_max_bytes:
                 return False
 
-        # Filtres EXIF : on lit l'EXIF UNE seule fois si nécessaire
+        # 3) Filtres EXIF : on lit l'EXIF UNE seule fois si nécessaire
         needs_exif = (
             options.date_min is not None
             or options.date_max is not None
             or options.rating_min > 0
             or options.keywords_filter
+            or options.camera_makes_filter
+            or options.gps_required != "any"
         )
-        if not needs_exif:
-            return True
-
-        try:
-            exif = get_exif_data(file_path)
-        except Exception:
-            return True  # en cas d'erreur EXIF, on garde le fichier
-
-        # Filtre date
-        if options.date_min is not None or options.date_max is not None:
+        if needs_exif:
             try:
-                file_date = extract_date(file_path, exif)
+                exif = get_exif_data(file_path)
             except Exception:
-                file_date = None
-            if file_date is None:
-                # Pas de date EXIF : si l'utilisateur a posé un filtre, on rejette
-                return False
-            if options.date_min is not None and file_date < options.date_min:
-                return False
-            if options.date_max is not None and file_date > options.date_max:
-                return False
+                exif = {}
 
-        # Filtre rating (sur 5)
-        if options.rating_min > 0:
-            rating = self._extract_rating(exif)
-            if rating < options.rating_min:
-                return False
+            # Filtre date
+            if options.date_min is not None or options.date_max is not None:
+                try:
+                    file_date = extract_date(file_path, exif)
+                except Exception:
+                    file_date = None
+                if file_date is None:
+                    return False
+                if options.date_min is not None and file_date < options.date_min:
+                    return False
+                if options.date_max is not None and file_date > options.date_max:
+                    return False
 
-        # Filtre mots-clés (OR : un seul match suffit)
-        if options.keywords_filter:
-            keywords_in_file = self._extract_keywords(exif)
-            wanted = {kw.strip().lower() for kw in options.keywords_filter if kw.strip()}
-            if not (wanted & keywords_in_file):
+            # Filtre rating (sur 5)
+            if options.rating_min > 0:
+                rating = self._extract_rating(exif)
+                if rating < options.rating_min:
+                    return False
+
+            # Filtre mots-clés (OR : un seul match suffit)
+            if options.keywords_filter:
+                keywords_in_file = self._extract_keywords(exif)
+                wanted = {kw.strip().lower() for kw in options.keywords_filter if kw.strip()}
+                if not (wanted & keywords_in_file):
+                    return False
+
+            # Filtre marque caméra (refactor 2026-05-15)
+            if options.camera_makes_filter:
+                make = ""
+                for key in ("Make", "EXIF:Make", "Image Make"):
+                    v = exif.get(key)
+                    if v:
+                        make = str(v).strip().lower()
+                        break
+                wanted_makes = {m.strip().lower()
+                                for m in options.camera_makes_filter if m.strip()}
+                if wanted_makes and not any(w in make for w in wanted_makes):
+                    return False
+
+            # Filtre GPS (refactor 2026-05-15)
+            if options.gps_required != "any":
+                from core.metadata import get_gps_coordinates
+                try:
+                    lat, lon = get_gps_coordinates(file_path)
+                    has_gps = lat is not None and lon is not None
+                except Exception:
+                    has_gps = False
+                if options.gps_required == "with" and not has_gps:
+                    return False
+                if options.gps_required == "without" and has_gps:
+                    return False
+
+        # 4) Dimensions / orientation (refactor 2026-05-15) — coûteux car
+        #    ouverture de l'image. On l'évite si possible.
+        needs_dim = (
+            options.dim_min is not None
+            or options.dim_max is not None
+            or options.orientation_filter != "any"
+        )
+        if needs_dim:
+            try:
+                from PIL import Image
+                with Image.open(file_path) as img:
+                    w, h = img.size
+            except Exception:
+                # Image non lisible (vidéo, RAW non supporté) : on garde
+                return True
+
+            if options.dim_min is not None:
+                wmin, hmin = options.dim_min
+                if w < wmin or h < hmin:
+                    return False
+            if options.dim_max is not None:
+                wmax, hmax = options.dim_max
+                if w > wmax or h > hmax:
+                    return False
+            if options.orientation_filter == "landscape" and not (w > h):
+                return False
+            if options.orientation_filter == "portrait" and not (h > w):
+                return False
+            if options.orientation_filter == "square" and not (w == h):
                 return False
 
         return True
@@ -918,6 +1016,8 @@ class SmartOrganizer:
         threshold_seconds: int = 3,
         min_count: int = 3,
         mode: str = "manual",
+        auto_min_seconds: float = 1.0,
+        auto_max_seconds: float = 600.0,
     ) -> Dict[str, Optional[str]]:
         """Détecte les rafales (Lot S1) en groupant par DateTimeOriginal.
 
@@ -929,7 +1029,8 @@ class SmartOrganizer:
 
         Mode (audit 2026-05-15) :
             - ``manual`` (défaut) : seuil = ``threshold_seconds`` (fixe)
-            - ``auto``            : seuil = max(1, mean(Δ) − stddev(Δ))
+            - ``auto``            : seuil = clamp(mean(Δ) − stddev(Δ),
+              ``auto_min_seconds``, ``auto_max_seconds``)
               calculé sur les écarts entre photos consécutives du dossier.
               Heuristique : les Δ « courts » (en dessous de la moyenne)
               sont caractéristiques d'une rafale, alors que les Δ
@@ -937,9 +1038,24 @@ class SmartOrganizer:
               distinctes. Soustraire l'écart-type rend le seuil plus
               strict (ne capture que les Δ vraiment courts).
 
+        Élargissement audit 2026-05-15 : les bornes ``auto_min_seconds`` et
+        ``auto_max_seconds`` permettent à l'utilisateur d'élargir le filet
+        (auto_max=3600 pour des timelapse / poses longues) ou de le serrer
+        (auto_min=5 pour ignorer les pauses normales entre clichés du même
+        lieu). Defaults [1 s ; 600 s] = comportement historique.
+
         Retourne : ``{file_path: burst_id_or_None}``. Les burst_id ont la
         forme ``Burst_01``, ``Burst_02``, … (numérotation chronologique).
         """
+        # Garde-fou : si l'appelant inverse les bornes par erreur on les
+        # remet dans le bon ordre plutôt que de planter ou d'avoir un
+        # comportement silencieusement aberrant.
+        if auto_min_seconds > auto_max_seconds:
+            auto_min_seconds, auto_max_seconds = auto_max_seconds, auto_min_seconds
+        # auto_min ne peut pas descendre sous 1 s — sinon le clamp ne ferait
+        # rien d'utile (les Δ EXIF ont une résolution de 1 s).
+        auto_min_seconds = max(1.0, float(auto_min_seconds))
+        auto_max_seconds = max(auto_min_seconds, float(auto_max_seconds))
         # Récupérer (path, date) pour chaque fichier
         dated: List[Tuple[str, datetime]] = []
         for fp in file_paths:
@@ -971,10 +1087,15 @@ class SmartOrganizer:
 
                 mean = statistics.mean(deltas)
                 stddev = statistics.pstdev(deltas) if len(deltas) > 1 else 0.0
-                # Seuil = mean - stddev, clampé à [1 s ; 600 s]
-                auto_thr = max(1.0, min(mean - stddev, 600.0))
+                # Seuil = mean - stddev, clampé à [auto_min ; auto_max] —
+                # bornes exposées comme options avancées depuis 2026-05-15.
+                auto_thr = max(auto_min_seconds, min(mean - stddev, auto_max_seconds))
                 effective_threshold = int(round(auto_thr))
-                logger.info(f"Bursts mode auto : mean={mean:.1f}s, stddev={stddev:.1f}s → seuil={effective_threshold}s")
+                logger.info(
+                    f"Bursts mode auto : mean={mean:.1f}s, stddev={stddev:.1f}s "
+                    f"→ seuil={effective_threshold}s "
+                    f"(clamp [{int(auto_min_seconds)}s ; {int(auto_max_seconds)}s])"
+                )
 
         membership: Dict[str, Optional[str]] = {fp: None for fp in file_paths}
         groups: List[List[str]] = []

@@ -430,6 +430,177 @@ def test_burst_detection_numbers_independently_per_destination(tmp_path):
     assert not (dest / "2026" / "05" / "2026_05_07" / "Burst_02").exists()
 
 
+def test_burst_detection_auto_clamp_bounds_are_configurable(tmp_path):
+    """Audit 2026-05-15 (élargissement) — bornes auto exposées.
+
+    Sans bornes étendues : 7 photos espacées d'une heure (Δ = 3600 s)
+    → en mode auto le seuil tomberait à 1 s (clamp historique [1; 600]),
+    aucune photo n'est regroupée → 0 burst.
+
+    Avec auto_max élargi à 7200 s : mean − stddev ≈ 3600 s,
+    clampé à 7200 → seuil ≈ 3600 s → toutes les photos forment 1 burst.
+
+    Couvre le scénario timelapse / pose lente qui motive l'option.
+    """
+    from datetime import datetime as dt
+    from datetime import timedelta
+
+    import piexif
+    from PIL import Image
+
+    def make_photo(name: str, when: dt):
+        path = tmp_path / name
+        img = Image.new("RGB", (40, 40))
+        exif_dict = {
+            "Exif": {piexif.ExifIFD.DateTimeOriginal: when.strftime("%Y:%m:%d %H:%M:%S").encode()},
+        }
+        img.save(path, exif=piexif.dump(exif_dict))
+        return path
+
+    base = dt(2026, 6, 1, 8, 0, 0)
+    paths = [make_photo(f"t_{i}.jpg", base + timedelta(hours=i)) for i in range(7)]
+
+    # 1ʳᵉ exécution : bornes par défaut [1 ; 600] → seuil clampé à 600 s,
+    # Δ réels 3600 s >> 600 s → aucun burst.
+    org1 = SmartOrganizer()
+    opts_default = OrganizationOptions(
+        organize_by_date=True,
+        organize_by_camera=False,
+        date_format="year",
+        detect_bursts=True,
+        burst_mode="auto",
+        burst_threshold_seconds=999,
+        burst_min_count=3,
+        validate_disk_space=False,
+    )
+    dest1 = tmp_path / "out1"
+    res1 = org1.organize([str(p) for p in paths], str(dest1), opts_default)
+    assert res1.processed == 7
+    assert not any(p.is_dir() and p.name.startswith("Burst_") for p in (dest1 / "2026").iterdir()), (
+        "Pas de burst attendu avec bornes par défaut"
+    )
+
+    # 2ᵉ exécution : auto_max élargi à 7200 s → seuil clampé sous 3600 s
+    # → toutes les photos rentrent dans un seul Burst_01.
+    org2 = SmartOrganizer()
+    opts_wide = OrganizationOptions(
+        organize_by_date=True,
+        organize_by_camera=False,
+        date_format="year",
+        detect_bursts=True,
+        burst_mode="auto",
+        burst_threshold_seconds=999,
+        burst_min_count=3,
+        burst_auto_min_seconds=1,
+        burst_auto_max_seconds=7200,
+        validate_disk_space=False,
+    )
+    dest2 = tmp_path / "out2"
+    res2 = org2.organize([str(p) for p in paths], str(dest2), opts_wide)
+    assert res2.processed == 7
+    burst_dir = dest2 / "2026" / "Burst_01"
+    assert burst_dir.is_dir(), f"Burst attendu avec auto_max=7200 — got: {list(dest2.rglob('*'))}"
+    assert len(list(burst_dir.glob("*.jpg"))) == 7
+
+
+def test_burst_detection_auto_min_clamp_floors_threshold(tmp_path):
+    """Audit 2026-05-15 — auto_min permet d'ignorer les vraies rafales.
+
+    8 photos avec un Δ tres court (1 s) entre 4 premières (qui seraient
+    un burst en defaut), puis 4 photos plus espacées (Δ 30 s) :
+    avec auto_min=20 s, le clamp force le seuil à >= 20 s, donc toutes
+    les photos rentrent dans le même groupe. On obtient 1 seul burst
+    de 8 (au lieu de 2 séparés).
+    """
+    from datetime import datetime as dt
+    from datetime import timedelta
+
+    import piexif
+    from PIL import Image
+
+    def make_photo(name: str, when: dt):
+        path = tmp_path / name
+        img = Image.new("RGB", (40, 40))
+        exif_dict = {
+            "Exif": {piexif.ExifIFD.DateTimeOriginal: when.strftime("%Y:%m:%d %H:%M:%S").encode()},
+        }
+        img.save(path, exif=piexif.dump(exif_dict))
+        return path
+
+    base = dt(2026, 7, 1, 10, 0, 0)
+    paths = []
+    # 4 photos rapprochées (Δ 1 s)
+    for i in range(4):
+        paths.append(make_photo(f"a_{i}.jpg", base + timedelta(seconds=i)))
+    # 4 photos plus espacées (Δ 30 s à partir de la dernière rapide)
+    for i in range(4):
+        paths.append(make_photo(f"b_{i}.jpg", base + timedelta(seconds=3 + 30 * (i + 1))))
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=True,
+        organize_by_camera=False,
+        date_format="year",
+        detect_bursts=True,
+        burst_mode="auto",
+        burst_threshold_seconds=999,
+        burst_min_count=3,
+        burst_auto_min_seconds=60,  # force seuil ≥ 60 s
+        burst_auto_max_seconds=600,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    res = org.organize([str(p) for p in paths], str(dest), opts)
+    assert res.processed == 8
+    # Avec un seuil ≥ 60 s, les Δ de 1 s et 30 s sont tous sous le seuil
+    # → on doit avoir UN seul Burst_01 contenant les 8 photos.
+    burst_dir = dest / "2026" / "Burst_01"
+    assert burst_dir.is_dir(), f"Burst_01 attendu — got: {list(dest.rglob('*'))}"
+    assert len(list(burst_dir.glob("*.jpg"))) == 8
+    # Et pas de Burst_02 ailleurs.
+    assert not (dest / "2026" / "Burst_02").exists()
+
+
+def test_burst_detection_auto_bounds_inverted_are_repaired(tmp_path):
+    """Audit 2026-05-15 — robustesse : si auto_min > auto_max par erreur,
+    le code remet les bornes dans le bon ordre plutôt que de cracher."""
+    from datetime import datetime as dt
+    from datetime import timedelta
+
+    import piexif
+    from PIL import Image
+
+    def make_photo(name: str, when: dt):
+        path = tmp_path / name
+        img = Image.new("RGB", (40, 40))
+        exif_dict = {
+            "Exif": {piexif.ExifIFD.DateTimeOriginal: when.strftime("%Y:%m:%d %H:%M:%S").encode()},
+        }
+        img.save(path, exif=piexif.dump(exif_dict))
+        return path
+
+    base = dt(2026, 8, 15, 12, 0, 0)
+    paths = [make_photo(f"x_{i}.jpg", base + timedelta(seconds=i)) for i in range(4)]
+
+    org = SmartOrganizer()
+    opts = OrganizationOptions(
+        organize_by_date=True,
+        organize_by_camera=False,
+        date_format="year",
+        detect_bursts=True,
+        burst_mode="auto",
+        burst_min_count=3,
+        # Bornes inversées : min > max
+        burst_auto_min_seconds=600,
+        burst_auto_max_seconds=1,
+        validate_disk_space=False,
+    )
+    dest = tmp_path / "out"
+    # Ne doit pas lever — les bornes sont remises à [1 ; 600] en interne.
+    res = org.organize([str(p) for p in paths], str(dest), opts)
+    assert res.processed == 4
+
+
 def test_burst_detection_auto_mode_uses_per_folder_stats(tmp_path):
     """Audit 2026-05-15 — mode auto : mean/stddev calculé PAR dossier.
 

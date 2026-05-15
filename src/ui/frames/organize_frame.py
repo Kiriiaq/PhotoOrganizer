@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # Si absente, l'app fonctionne normalement, juste sans le glisser-déposer.
 try:
     from tkinterdnd2 import DND_FILES  # noqa: F401
+
     DND_AVAILABLE = True
 except ImportError:
     DND_AVAILABLE = False
@@ -58,12 +59,12 @@ def _open_folder(path: str):
         logger.warning(f"_open_folder: chemin introuvable {path}")
         return
     try:
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             os.startfile(path)
-        elif sys.platform == 'darwin':
-            subprocess.Popen(['open', path])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
         else:
-            subprocess.Popen(['xdg-open', path])
+            subprocess.Popen(["xdg-open", path])
     except Exception as exc:
         logger.warning(f"Impossible d'ouvrir {path}: {exc}")
 
@@ -77,9 +78,12 @@ def _windows_toast(title: str, message: str):
     """
     try:
         from plyer import notification
+
         notification.notify(
-            title=title, message=message,
-            app_name='PhotoOrganizer', timeout=5,
+            title=title,
+            message=message,
+            app_name="PhotoOrganizer",
+            timeout=5,
         )
         return
     except Exception as exc:
@@ -92,9 +96,11 @@ def _windows_toast(title: str, message: str):
         win = ctk.CTkToplevel()
         win.title(title)
         win.geometry("360x90+1400+50")
-        win.attributes('-topmost', True)
+        win.attributes("-topmost", True)
         ctk.CTkLabel(
-            win, text=title, font=ctk.CTkFont(size=14, weight='bold'),
+            win,
+            text=title,
+            font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(padx=10, pady=(8, 2))
         ctk.CTkLabel(win, text=message, wraplength=340).pack(padx=10, pady=(0, 8))
         win.after(4000, win.destroy)
@@ -109,14 +115,12 @@ def _parse_size_input(text: str) -> int:
     """
     if not text:
         return 0
-    text = text.strip().upper().replace(' ', '')
-    units = {'B': 1, 'KB': 1024, 'K': 1024,
-             'MB': 1024 ** 2, 'M': 1024 ** 2,
-             'GB': 1024 ** 3, 'G': 1024 ** 3}
+    text = text.strip().upper().replace(" ", "")
+    units = {"B": 1, "KB": 1024, "K": 1024, "MB": 1024**2, "M": 1024**2, "GB": 1024**3, "G": 1024**3}
     for unit, mult in units.items():
         if text.endswith(unit):
             try:
-                return int(float(text[:-len(unit)]) * mult)
+                return int(float(text[: -len(unit)]) * mult)
             except ValueError:
                 return 0
     try:
@@ -138,9 +142,9 @@ HEADER_TITLE_SIZE = 16
 
 # Couleurs explicites pour les checkboxes/radios — la couleur active rend
 # l'état coché beaucoup plus visible qu'en gris CTk par défaut.
-CHECK_FG = ("#1f6aa5", "#1f6aa5")          # bleu cohérent avec color_theme=blue
+CHECK_FG = ("#1f6aa5", "#1f6aa5")  # bleu cohérent avec color_theme=blue
 CHECK_HOVER = ("#144870", "#144870")
-CHECK_BORDER = ("gray40", "gray60")        # bordure visible dark + light
+CHECK_BORDER = ("gray40", "gray60")  # bordure visible dark + light
 CHECK_BORDER_WIDTH = 2
 
 
@@ -183,7 +187,7 @@ class OrganizeFrame(ctk.CTkFrame):
         source_var: ctk.StringVar,
         dest_var: ctk.StringVar,
         file_manager: Optional[FileManager] = None,
-        status_callback: Optional[Callable] = None
+        status_callback: Optional[Callable] = None,
     ):
         """
         Initialise le frame d'organisation.
@@ -220,7 +224,7 @@ class OrganizeFrame(ctk.CTkFrame):
         #   YYYY / MM / YYYY_MM_DD / Canon EOS R5 / photo.jpg
         # tandis que ['camera', 'date', 'location'] crée
         #   Canon EOS R5 / YYYY / MM / YYYY_MM_DD / Paris / photo.jpg
-        self._criteria_order: List[str] = ['date', 'camera', 'location']
+        self._criteria_order: List[str] = ["date", "camera", "location"]
         self._criteria_rows: dict = {}  # key -> (frame, label, up_btn, down_btn)
 
         # Options d'organisation
@@ -244,23 +248,58 @@ class OrganizeFrame(ctk.CTkFrame):
         self.filter_date_max = ctk.StringVar(value="")
         self.filter_size_min = ctk.StringVar(value="")  # ex: "100KB"
         self.filter_size_max = ctk.StringVar(value="")
-        self.filter_rating_min = ctk.IntVar(value=0)    # 0..5
+        self.filter_rating_min = ctk.IntVar(value=0)  # 0..5
         self.filter_keywords = ctk.StringVar(value="")  # CSV
 
+        # Nouveaux filtres (refactor 2026-05-15) — persistés dans AppConfig
+        _cfg_app = get_config().config
+        self.filter_extensions = ctk.StringVar(value=getattr(_cfg_app, "filter_extensions", ""))
+        self.filter_dim_min = ctk.StringVar(value=getattr(_cfg_app, "filter_dim_min", ""))
+        self.filter_dim_max = ctk.StringVar(value=getattr(_cfg_app, "filter_dim_max", ""))
+        self.filter_camera_make = ctk.StringVar(value=getattr(_cfg_app, "filter_camera_make", ""))
+        self.filter_gps_required = ctk.StringVar(value=getattr(_cfg_app, "filter_gps_required", "any"))
+        self.filter_orientation = ctk.StringVar(value=getattr(_cfg_app, "filter_orientation", "any"))
+
         # ---- Toggles avancés ----
-        self.skip_if_identical = ctk.BooleanVar(value=False)   # R2
-        self.keep_raw_jpeg_pairs = ctk.BooleanVar(value=False) # R3
-        self.cleanup_empty_source = ctk.BooleanVar(value=False)# R5
+        self.skip_if_identical = ctk.BooleanVar(value=False)  # R2
+        self.keep_raw_jpeg_pairs = ctk.BooleanVar(value=False)  # R3
+        self.cleanup_empty_source = ctk.BooleanVar(value=False)  # R5
         self.validate_disk_space = ctk.BooleanVar(value=True)  # R6
-        self.export_index_csv = ctk.BooleanVar(value=False)    # R7
-        self.export_index_json = ctk.BooleanVar(value=False)
-        self.notify_on_finish = ctk.BooleanVar(value=True)     # Q5
+        # Refactor 2026-05-15 : Notifications + Index déplacés en Paramètres.
+        # Les BooleanVars restent sur OrganizeFrame (pour _get_options) mais
+        # leur état est persisté dans AppConfig (sync bidirectionnelle).
+        self.export_index_csv = ctk.BooleanVar(value=getattr(_cfg_app, "export_index_csv", False))
+        self.export_index_json = ctk.BooleanVar(value=getattr(_cfg_app, "export_index_json", False))
+        self.notify_on_finish = ctk.BooleanVar(value=getattr(_cfg_app, "notify_on_finish", True))
+
+        # Sync bidirectionnelle vers AppConfig pour toutes les vars persistées.
+        # Utilise un helper de méthode pour éviter les closures multiples
+        # (cf. fix bug définition après usage du refactor 2026-05-15).
+        for fname in (
+            "notify_on_finish",
+            "export_index_csv",
+            "export_index_json",
+            "filter_extensions",
+            "filter_dim_min",
+            "filter_dim_max",
+            "filter_camera_make",
+            "filter_gps_required",
+            "filter_orientation",
+        ):
+            getattr(self, fname).trace_add(
+                "write",
+                self._make_config_persist_cb(fname),
+            )
 
         # ---- Bursts S1 + Incremental S5 ----
         self.detect_bursts = ctk.BooleanVar(value=False)
         self.burst_mode = ctk.StringVar(value="manual")  # "manual" | "auto"
-        self.burst_threshold = ctk.IntVar(value=3)             # secondes
+        self.burst_threshold = ctk.IntVar(value=3)  # secondes
         self.burst_min_count = ctk.IntVar(value=3)
+        # Bornes du clamp en mode auto (audit 2026-05-15 — option avancée).
+        # Defaults [1 s ; 600 s] = comportement historique.
+        self.burst_auto_min = ctk.IntVar(value=1)
+        self.burst_auto_max = ctk.IntVar(value=600)
         self.incremental_mode = ctk.BooleanVar(value=False)
 
         # ---- Planification E5 ----
@@ -291,13 +330,14 @@ class OrganizeFrame(ctk.CTkFrame):
         # Lazy import pour ne pas tirer la dépendance si la feature n'est
         # jamais activée (et garder le démarrage rapide).
         from core.scheduler import JobScheduler
+
         self._scheduler = JobScheduler(callback=self._scheduled_run_callback)
 
         # Restaurer l'état planifié depuis AppConfig
         cfg = get_config().config
-        if getattr(cfg, 'schedule_enabled', False):
+        if getattr(cfg, "schedule_enabled", False):
             self.schedule_enabled.set(True)
-            self.schedule_time.set(getattr(cfg, 'schedule_time', '23:00'))
+            self.schedule_time.set(getattr(cfg, "schedule_time", "23:00"))
             # Auto-démarrer
             self._scheduler.configure(True, self.schedule_time.get())
         # Mettre à jour le label statut
@@ -351,11 +391,11 @@ class OrganizeFrame(ctk.CTkFrame):
         self._bottom_zone = bottom
 
         # Création des sections dans leur zone respective
-        self._create_folders_section()       # zone top
-        self._create_options_section()       # scroll row=0 (critères + types)
-        self._create_advanced_section()      # scroll row=1 (collapsible)
-        self._create_rename_section()        # scroll row=2 (1 ligne)
-        self._create_actions_section()       # zone bottom
+        self._create_folders_section()  # zone top
+        self._create_options_section()  # scroll row=0 (critères + types)
+        self._create_advanced_section()  # scroll row=1 (collapsible)
+        self._create_rename_section()  # scroll row=2 (1 ligne)
+        self._create_actions_section()  # zone bottom
 
         # Section Planification déplacée vers SettingsFrame — l'attribut
         # `schedule_status_var` reste utilisé par le scheduler.
@@ -379,14 +419,19 @@ class OrganizeFrame(ctk.CTkFrame):
         title_row = ctk.CTkFrame(folders, fg_color="transparent")
         title_row.grid(row=0, column=0, columnspan=3, sticky="ew", padx=PAD_M, pady=(PAD_M, PAD_S))
         ctk.CTkLabel(
-            title_row, text="📁 Sélection des dossiers",
+            title_row,
+            text="📁 Sélection des dossiers",
             font=font_section(),
         ).pack(side="left")
 
         # Ligne Source — un seul dossier, plus de séparateur ;
-        ctk.CTkLabel(folders, text="Source :",
-                     font=font_label(), width=90, anchor="w",
-                     ).grid(row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
+        ctk.CTkLabel(
+            folders,
+            text="Source :",
+            font=font_label(),
+            width=90,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
         self.source_entry = ctk.CTkEntry(
             folders,
             textvariable=self.source_var,
@@ -395,16 +440,22 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.source_entry.grid(row=1, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
         self.browse_source_btn = icon_button(
-            folders, text="📂", command=self._browse_source,
+            folders,
+            text="📂",
+            command=self._browse_source,
         )
         self.browse_source_btn.grid(row=1, column=2, padx=(PAD_S, PAD_M), pady=PAD_S)
         # Le bouton « + Source » (multi-source) a été retiré — W08 retour
         # testeur : « supprime le bouton car inutile ».
 
         # Ligne Destination
-        ctk.CTkLabel(folders, text="Destination :",
-                     font=font_label(), width=90, anchor="w",
-                     ).grid(row=2, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
+        ctk.CTkLabel(
+            folders,
+            text="Destination :",
+            font=font_label(),
+            width=90,
+            anchor="w",
+        ).grid(row=2, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
 
         # Sous-frame pour entry + bouton ↗ "Ouvrir dest" qui restent
         # accessibles. Le bouton 📂 Parcourir occupe la colonne 2.
@@ -420,13 +471,16 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.dest_entry.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
         self.open_dest_btn = icon_button(
-            dest_row, text="↗",
+            dest_row,
+            text="↗",
             command=lambda: _open_folder(self.dest_var.get()),
         )
         self.open_dest_btn.grid(row=0, column=1)
 
         self.browse_dest_btn = icon_button(
-            folders, text="📂", command=self._browse_dest,
+            folders,
+            text="📂",
+            command=self._browse_dest,
         )
         self.browse_dest_btn.grid(row=2, column=2, padx=(PAD_S, PAD_M), pady=PAD_S)
 
@@ -440,19 +494,27 @@ class OrganizeFrame(ctk.CTkFrame):
             text_color=LABEL_MUTED,
         )
         self.file_count_label.grid(
-            row=3, column=0, columnspan=3,
-            sticky="ew", padx=PAD_M, pady=(0, PAD_M),
+            row=3,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            padx=PAD_M,
+            pady=(0, PAD_M),
         )
 
         # Lot B audit 2026-05-14 (T-030..T-033) : bouton « 📋 » qui ouvre une
         # modale listant les fichiers détectés. Réponse au retour testeur
         # "je ne vois pas le titre/chemin des fichiers sélectionnés".
         self.show_files_btn = icon_button(
-            folders, text="📋",
+            folders,
+            text="📋",
             command=self._show_files_list,
         )
         self.show_files_btn.grid(
-            row=3, column=3, padx=(0, PAD_M), pady=(0, PAD_M),
+            row=3,
+            column=3,
+            padx=(0, PAD_M),
+            pady=(0, PAD_M),
         )
 
         # Drag-and-drop retiré (W06) — la méthode _setup_drag_drop reste
@@ -465,48 +527,39 @@ class OrganizeFrame(ctk.CTkFrame):
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=PAD_S)
 
         ctk.CTkLabel(
-            left_frame,
-            text="🗂️ Critères d'organisation",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
+            left_frame, text="🗂️ Critères d'organisation", font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         # Organiser par date
-        _make_checkbox(
-            left_frame,
-            text="Par date de prise de vue",
-            variable=self.organize_by_date
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(left_frame, text="Par date de prise de vue", variable=self.organize_by_date).pack(
+            anchor="w", padx=20, pady=3
+        )
 
         # Format de date
         date_format_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         date_format_frame.pack(fill="x", padx=40, pady=2)
 
         ctk.CTkLabel(
-            date_format_frame, text="Format :",
+            date_format_frame,
+            text="Format :",
             font=ctk.CTkFont(size=LABEL_FONT_SIZE),
         ).pack(side="left")
         self.date_format_menu = ctk.CTkOptionMenu(
             date_format_frame,
             variable=self.date_format,
-            values=["year/month/day", "year/month", "year", "year_month_day", "year_month"]
+            values=["year/month/day", "year/month", "year", "year_month_day", "year_month"],
         )
         self.date_format_menu.pack(side="left", padx=5)
 
         # Organiser par appareil
-        _make_checkbox(
-            left_frame,
-            text="Par appareil photo",
-            variable=self.organize_by_camera
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(left_frame, text="Par appareil photo", variable=self.organize_by_camera).pack(
+            anchor="w", padx=20, pady=3
+        )
 
         # Organiser par localisation GPS
         # On garde une référence à la case pour positionner les sous-options
         # GPS juste en dessous via pack(after=…) — cf. W17/W18 retour testeur.
-        self._gps_checkbox = _make_checkbox(
-            left_frame,
-            text="Par localisation GPS",
-            variable=self.organize_by_location
-        )
+        self._gps_checkbox = _make_checkbox(left_frame, text="Par localisation GPS", variable=self.organize_by_location)
         self._gps_checkbox.pack(anchor="w", padx=20, pady=3)
 
         # Sous-options GPS — cachées si organize_by_location est OFF.
@@ -517,13 +570,15 @@ class OrganizeFrame(ctk.CTkFrame):
         gps_top = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
         gps_top.pack(fill="x", padx=20, pady=2)
         _make_checkbox(
-            gps_top, text="Géocodage (nom du lieu)",
+            gps_top,
+            text="Géocodage (nom du lieu)",
             variable=self.use_geocoding,
         ).pack(side="left")
         ctk.CTkLabel(
             gps_top,
             text="(sinon : Lat_x_Lon_y brutes)",
-            font=ctk.CTkFont(size=11), text_color=("gray45", "gray65"),
+            font=ctk.CTkFont(size=11),
+            text_color=("gray45", "gray65"),
         ).pack(side="left", padx=8)
 
         # Slider distance max — pas large 1 km au glissement, ajustement
@@ -531,31 +586,41 @@ class OrganizeFrame(ctk.CTkFrame):
         gps_slider = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
         gps_slider.pack(fill="x", padx=20, pady=(2, 6))
         ctk.CTkLabel(
-            gps_slider, text="Distance max :",
+            gps_slider,
+            text="Distance max :",
             font=ctk.CTkFont(size=LABEL_FONT_SIZE),
         ).pack(side="left", padx=(0, 5))
 
         ctk.CTkButton(
-            gps_slider, text="◀", width=28,
+            gps_slider,
+            text="◀",
+            width=28,
             command=lambda: self._step_max_distance(-self.MAX_DIST_FINE_STEP),
         ).pack(side="left", padx=(0, 2))
 
         self.max_distance_slider = ctk.CTkSlider(
-            gps_slider, from_=0, to=50,
-            number_of_steps=50,                 # pas 1 km au glissement
-            variable=self.max_distance, width=160,
+            gps_slider,
+            from_=0,
+            to=50,
+            number_of_steps=50,  # pas 1 km au glissement
+            variable=self.max_distance,
+            width=160,
             command=self._on_max_distance_change,
         )
         self.max_distance_slider.pack(side="left", padx=(0, 2))
 
         ctk.CTkButton(
-            gps_slider, text="▶", width=28,
+            gps_slider,
+            text="▶",
+            width=28,
             command=lambda: self._step_max_distance(self.MAX_DIST_FINE_STEP),
         ).pack(side="left", padx=(2, 5))
 
         ctk.CTkLabel(
-            gps_slider, textvariable=self.max_distance_label_var,
-            width=64, anchor="w",
+            gps_slider,
+            textvariable=self.max_distance_label_var,
+            width=64,
+            anchor="w",
             font=ctk.CTkFont(size=LABEL_FONT_SIZE, weight="bold"),
         ).pack(side="left")
 
@@ -566,9 +631,7 @@ class OrganizeFrame(ctk.CTkFrame):
             lambda *_: self._on_max_distance_change(self.max_distance.get()),
         )
         # Affichage conditionnel des sous-options selon la case « Par localisation »
-        self.organize_by_location.trace_add(
-            "write", lambda *_: self._refresh_gps_options_visibility()
-        )
+        self.organize_by_location.trace_add("write", lambda *_: self._refresh_gps_options_visibility())
         self._refresh_gps_options_visibility()
 
         # ---- Séparateur visuel + section « Organisation multicouche » -----
@@ -576,9 +639,7 @@ class OrganizeFrame(ctk.CTkFrame):
         # plusieurs critères en cascade). On la met clairement en évidence
         # via un séparateur, un titre dédié et un widget Switch (plus visible
         # qu'une CTkCheckBox pour les modes ON/OFF).
-        ctk.CTkFrame(left_frame, height=2, fg_color=("gray70", "gray30")).pack(
-            fill="x", padx=10, pady=(12, 6)
-        )
+        ctk.CTkFrame(left_frame, height=2, fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(12, 6))
         ctk.CTkLabel(
             left_frame,
             text="🧩 Organisation avancée",
@@ -616,17 +677,12 @@ class OrganizeFrame(ctk.CTkFrame):
         # Conteneur des lignes — re-créé entièrement à chaque réordonnancement
         # via _render_criteria_order, ce qui garde le code simple (pas de
         # gestion de drag-and-drop, juste 6 boutons à recâbler).
-        self.criteria_rows_container = ctk.CTkFrame(
-            self.criteria_order_frame, fg_color="transparent"
-        )
+        self.criteria_rows_container = ctk.CTkFrame(self.criteria_order_frame, fg_color="transparent")
         self.criteria_rows_container.pack(fill="x", padx=10, pady=(0, 6))
 
         ctk.CTkLabel(
             self.criteria_order_frame,
-            text=(
-                "Astuce : un critère grisé est désactivé (cocher la case "
-                "correspondante au-dessus pour l'activer)."
-            ),
+            text=("Astuce : un critère grisé est désactivé (cocher la case correspondante au-dessus pour l'activer)."),
             font=ctk.CTkFont(size=11),
             text_color=("gray45", "gray65"),
             justify="left",
@@ -635,9 +691,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Premier rendu + branchement du toggle
         self._render_criteria_order()
-        self.multilayer.trace_add(
-            "write", lambda *_: self._update_criteria_visibility()
-        )
+        self.multilayer.trace_add("write", lambda *_: self._update_criteria_visibility())
         # Les checkboxes des critères influencent l'aspect grisé/actif :
         # on rerend le panneau quand l'une d'elles bascule.
         for v in (self.organize_by_date, self.organize_by_camera):
@@ -649,9 +703,7 @@ class OrganizeFrame(ctk.CTkFrame):
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=PAD_S)
 
         ctk.CTkLabel(
-            right_frame,
-            text="⚙️ Options de traitement",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
+            right_frame, text="⚙️ Options de traitement", font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         # Action
@@ -659,56 +711,35 @@ class OrganizeFrame(ctk.CTkFrame):
         action_frame.pack(fill="x", padx=10, pady=5)
 
         ctk.CTkLabel(
-            action_frame, text="Action :",
+            action_frame,
+            text="Action :",
             font=ctk.CTkFont(size=LABEL_FONT_SIZE),
         ).pack(side="left", padx=5)
-        _make_radio(
-            action_frame,
-            text="Copier",
-            variable=self.copy_not_move,
-            value=True
-        ).pack(side="left", padx=10)
-        _make_radio(
-            action_frame,
-            text="Déplacer",
-            variable=self.copy_not_move,
-            value=False
-        ).pack(side="left", padx=10)
+        _make_radio(action_frame, text="Copier", variable=self.copy_not_move, value=True).pack(side="left", padx=10)
+        _make_radio(action_frame, text="Déplacer", variable=self.copy_not_move, value=False).pack(side="left", padx=10)
 
         # Options avancées
-        _make_checkbox(
-            right_frame,
-            text="Parcourir les sous-dossiers",
-            variable=self.recursive
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(right_frame, text="Parcourir les sous-dossiers", variable=self.recursive).pack(
+            anchor="w", padx=20, pady=3
+        )
 
         # Types de fichiers
-        ctk.CTkFrame(right_frame, height=2, fg_color=("gray70", "gray30")).pack(
-            fill="x", padx=10, pady=(10, 4)
-        )
+        ctk.CTkFrame(right_frame, height=2, fg_color=("gray70", "gray30")).pack(fill="x", padx=10, pady=(10, 4))
         ctk.CTkLabel(
-            right_frame,
-            text="📂 Types de fichiers",
-            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
+            right_frame, text="📂 Types de fichiers", font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
         ).pack(anchor="w", padx=10, pady=(0, 4))
 
-        _make_checkbox(
-            right_frame,
-            text="Images (JPG, PNG, HEIC…)",
-            variable=self.include_images
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(right_frame, text="Images (JPG, PNG, HEIC…)", variable=self.include_images).pack(
+            anchor="w", padx=20, pady=3
+        )
 
-        _make_checkbox(
-            right_frame,
-            text="RAW (ARW, CR2, NEF…)",
-            variable=self.include_raw
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(right_frame, text="RAW (ARW, CR2, NEF…)", variable=self.include_raw).pack(
+            anchor="w", padx=20, pady=3
+        )
 
-        _make_checkbox(
-            right_frame,
-            text="Vidéos (MP4, MOV, AVI…)",
-            variable=self.include_videos
-        ).pack(anchor="w", padx=20, pady=3)
+        _make_checkbox(right_frame, text="Vidéos (MP4, MOV, AVI…)", variable=self.include_videos).pack(
+            anchor="w", padx=20, pady=3
+        )
 
     # =================================================================
     # Sections "avancées" (filtres + comportements + renommage + presets)
@@ -726,14 +757,14 @@ class OrganizeFrame(ctk.CTkFrame):
         """
         # Container externe : occupe les 2 colonnes du scroll
         wrapper = ctk.CTkFrame(self._scroll)
-        wrapper.grid(row=1, column=0, columnspan=2, sticky="ew",
-                     padx=PAD_S, pady=PAD_S)
+        wrapper.grid(row=1, column=0, columnspan=2, sticky="ew", padx=PAD_S, pady=PAD_S)
         wrapper.columnconfigure(0, weight=1)
 
         # En-tête cliquable : titre + flèche, occupe toute la largeur
         self._adv_collapsed = True  # état initial
         self._adv_toggle_btn = ctk.CTkButton(
-            wrapper, text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)",
+            wrapper,
+            text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)",
             command=self._toggle_advanced_section,
             anchor="w",
             font=font_section(),
@@ -742,8 +773,7 @@ class OrganizeFrame(ctk.CTkFrame):
             hover_color=("gray85", "gray25"),
             height=BTN_H_STD,
         )
-        self._adv_toggle_btn.grid(row=0, column=0, sticky="ew",
-                                  padx=PAD_M, pady=PAD_S)
+        self._adv_toggle_btn.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
 
         # Container interne (caché par défaut) — 2 colonnes (filtres / comportements)
         self._adv_content = ctk.CTkFrame(wrapper, fg_color="transparent")
@@ -752,205 +782,386 @@ class OrganizeFrame(ctk.CTkFrame):
         self._adv_content.columnconfigure(1, weight=1, uniform="adv")
 
         # ===== Colonne gauche : filtres pré-traitement =====
-        filters = ctk.CTkFrame(self._adv_content, fg_color="transparent")
+        # Refactor 2026-05-15 : enveloppé dans un CTkScrollableFrame car
+        # la liste de filtres a doublé (extensions, dimensions, caméra,
+        # GPS, orientation). Hauteur fixée pour rester équilibré avec la
+        # colonne Comportement à droite (qui n'a plus Notif/Index).
+        filters = ctk.CTkScrollableFrame(
+            self._adv_content,
+            fg_color="transparent",
+            height=440,
+        )
         filters.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=0)
 
-        ctk.CTkLabel(filters, text="🔍 Filtres",
-                     font=font_label(weight="bold"),
-                     ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
+        ctk.CTkLabel(
+            filters,
+            text="🔍 Filtres",
+            font=font_label(weight="bold"),
+        ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
+        # ---- Bloc Entrées texte (date, taille, dimensions, caméra, ext, mots-clés) ----
         # W30-W35 (retour testeur 2026-05-13) : placeholders enrichis avec
         # un exemple concret et le format attendu, plus une ligne grise
         # sous chaque champ qui rappelle le format en clair.
+        # Refactor 2026-05-15 : nouveaux champs Extension, Dimensions, Caméra.
         for label, var, placeholder, hint in [
-            ("Date min :",   self.filter_date_min,  "ex. 2024-06-01",
-             "Format YYYY-MM-DD  ·  ex. 2024-06-01"),
-            ("Date max :",   self.filter_date_max,  "ex. 2024-12-31",
-             "Format YYYY-MM-DD  ·  laisser vide = pas de limite"),
-            ("Taille min :", self.filter_size_min,  "ex. 100KB",
-             "Unités acceptées : B, KB, MB, GB  ·  ex. 100KB, 5MB"),
-            ("Taille max :", self.filter_size_max,  "ex. 50MB",
-             "Unités acceptées : B, KB, MB, GB  ·  vide = pas de limite"),
+            ("Date min :", self.filter_date_min, "ex. 2024-06-01", "Format YYYY-MM-DD  ·  ex. 2024-06-01"),
+            (
+                "Date max :",
+                self.filter_date_max,
+                "ex. 2024-12-31",
+                "Format YYYY-MM-DD  ·  laisser vide = pas de limite",
+            ),
+            ("Taille min :", self.filter_size_min, "ex. 100KB", "Unités : B/KB/MB/GB  ·  ex. 100KB, 5MB"),
+            ("Taille max :", self.filter_size_max, "ex. 50MB", "Unités : B/KB/MB/GB  ·  vide = pas de limite"),
+            (
+                "Extension :",
+                self.filter_extensions,
+                "ex. jpg,raw,heic",
+                "Liste CSV  ·  match si l'extension du fichier est listée",
+            ),
+            ("Dim. min :", self.filter_dim_min, "ex. 1920x1080", "Format WxH  ·  ignore les photos plus petites"),
+            ("Dim. max :", self.filter_dim_max, "ex. 8000x6000", "Format WxH  ·  ignore les photos plus grandes"),
+            (
+                "Caméra :",
+                self.filter_camera_make,
+                "ex. Sony,Canon",
+                "Liste CSV  ·  match si EXIF Make contient l'un des noms",
+            ),
         ]:
             row = ctk.CTkFrame(filters, fg_color="transparent")
             row.pack(fill="x", padx=PAD_S, pady=(2, 0))
-            ctk.CTkLabel(row, text=label, width=86, anchor="w",
-                         font=font_label()).pack(side="left")
-            ctk.CTkEntry(row, textvariable=var, placeholder_text=placeholder,
-                         height=BTN_H_STD).pack(side="left", padx=PAD_S, fill="x", expand=True)
+            ctk.CTkLabel(row, text=label, width=86, anchor="w", font=font_label()).pack(side="left")
+            ctk.CTkEntry(row, textvariable=var, placeholder_text=placeholder, height=BTN_H_STD).pack(
+                side="left", padx=PAD_S, fill="x", expand=True
+            )
             # Hint format en italique gris sous le champ
-            ctk.CTkLabel(filters, text=f"    {hint}",
-                         font=font_hint(), text_color=HINT_COLOR, anchor="w",
-                         ).pack(fill="x", padx=PAD_S, pady=(0, 2))
+            ctk.CTkLabel(
+                filters,
+                text=f"    {hint}",
+                font=font_hint(),
+                text_color=HINT_COLOR,
+                anchor="w",
+            ).pack(fill="x", padx=PAD_S, pady=(0, 2))
 
         # Note EXIF
         rating_row = ctk.CTkFrame(filters, fg_color="transparent")
         rating_row.pack(fill="x", padx=PAD_S, pady=2)
-        ctk.CTkLabel(rating_row, text="Note ≥ :", width=86, anchor="w",
-                     font=font_label()).pack(side="left")
+        ctk.CTkLabel(rating_row, text="Note ≥ :", width=86, anchor="w", font=font_label()).pack(side="left")
         ctk.CTkOptionMenu(
-            rating_row, variable=self.filter_rating_min,
-            values=["0", "1", "2", "3", "4", "5"], width=70, height=BTN_H_STD,
+            rating_row,
+            variable=self.filter_rating_min,
+            values=["0", "1", "2", "3", "4", "5"],
+            width=70,
+            height=BTN_H_STD,
             command=lambda v: self.filter_rating_min.set(int(v)),
         ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(rating_row, text="(0 = inactif)",
-                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        ctk.CTkLabel(rating_row, text="(0 = inactif)", font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+
+        # GPS présent / absent (refactor 2026-05-15) — OptionMenu 3 valeurs
+        gps_row = ctk.CTkFrame(filters, fg_color="transparent")
+        gps_row.pack(fill="x", padx=PAD_S, pady=2)
+        ctk.CTkLabel(gps_row, text="GPS :", width=86, anchor="w", font=font_label()).pack(side="left")
+        ctk.CTkOptionMenu(
+            gps_row,
+            variable=self.filter_gps_required,
+            values=["any", "with", "without"],
+            width=110,
+            height=BTN_H_STD,
+        ).pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(
+            filters,
+            text="    any = tous  ·  with = uniquement avec GPS  ·  without = uniquement sans GPS",
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+        ).pack(fill="x", padx=PAD_S, pady=(0, 2))
+
+        # Orientation (refactor 2026-05-15) — OptionMenu 4 valeurs
+        ori_row = ctk.CTkFrame(filters, fg_color="transparent")
+        ori_row.pack(fill="x", padx=PAD_S, pady=2)
+        ctk.CTkLabel(ori_row, text="Orientation :", width=86, anchor="w", font=font_label()).pack(side="left")
+        ctk.CTkOptionMenu(
+            ori_row,
+            variable=self.filter_orientation,
+            values=["any", "landscape", "portrait", "square"],
+            width=120,
+            height=BTN_H_STD,
+        ).pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(
+            filters,
+            text="    landscape = W>H  ·  portrait = H>W  ·  square = W==H",
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+        ).pack(fill="x", padx=PAD_S, pady=(0, 2))
 
         # Mots-clés — W35 : placeholder + hint format
         kw_row = ctk.CTkFrame(filters, fg_color="transparent")
         kw_row.pack(fill="x", padx=PAD_S, pady=(2, 0))
-        ctk.CTkLabel(kw_row, text="Mots-clés :", width=86, anchor="w",
-                     font=font_label()).pack(side="left")
-        ctk.CTkEntry(kw_row, textvariable=self.filter_keywords,
-                     placeholder_text="ex. vacances, mariage, été",
-                     height=BTN_H_STD,
-                     ).pack(side="left", padx=PAD_S, fill="x", expand=True)
+        ctk.CTkLabel(kw_row, text="Mots-clés :", width=86, anchor="w", font=font_label()).pack(side="left")
+        ctk.CTkEntry(
+            kw_row,
+            textvariable=self.filter_keywords,
+            placeholder_text="ex. vacances, mariage, été",
+            height=BTN_H_STD,
+        ).pack(side="left", padx=PAD_S, fill="x", expand=True)
         ctk.CTkLabel(
             filters,
             text="    Séparateur : virgule  ·  match si AU MOINS UN mot-clé EXIF correspond",
-            font=font_hint(), text_color=HINT_COLOR, anchor="w",
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
         ).pack(fill="x", padx=PAD_S, pady=(0, PAD_S))
 
         # ===== Colonne droite : comportements + bursts + incremental + index =====
         behaviors = ctk.CTkFrame(self._adv_content, fg_color="transparent")
         behaviors.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=0)
 
-        ctk.CTkLabel(behaviors, text="🛠️ Comportements",
-                     font=font_label(weight="bold"),
-                     ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
+        ctk.CTkLabel(
+            behaviors,
+            text="🛠️ Comportements",
+            font=font_label(weight="bold"),
+        ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
-        # Comportements regroupés par catégorie (audit 2026-05-15) — au lieu
-        # d'une longue liste à plat, on présente 4 sous-groupes lisibles.
-        # Chaque sous-groupe a un sous-titre gris et 1-3 toggles indentés.
+        # Comportements regroupés par catégorie (refactor 2026-05-15).
+        #
+        # Refactor 2026-05-15 (suite testeur) :
+        # - La section « 🔔 Notification » est DÉPLACÉE dans Paramètres.
+        # - La section « 📋 Index » est DÉPLACÉE dans Paramètres.
+        # - Les sous-options bursts (mode/écart/min) apparaissent désormais
+        #   DIRECTEMENT sous la checkbox « Détection de rafales » (et non
+        #   plus en fin de panneau Comportements après Notifications),
+        #   ce qui était illisible.
+        #
+        # Le rendu dynamique (show/hide) des sous-options bursts est piloté
+        # par une trace sur ``self.detect_bursts`` (voir _refresh_burst_subopts).
         behavior_groups = [
-            ("📦 Conservation des doublons", [
-                ("Skip si fichier identique déjà présent",
-                 self.skip_if_identical,
-                 "ex : 2 photos identiques (hash égal) → seule la 1ère est traitée"),
-                ("Garder les paires RAW + JPEG ensemble",
-                 self.keep_raw_jpeg_pairs,
-                 "ex : IMG_001.CR2 + IMG_001.JPG → même dossier final"),
-            ]),
-            ("🧹 Nettoyage / sécurité", [
-                ("Nettoyer les dossiers source vides (Déplacer)",
-                 self.cleanup_empty_source,
-                 "ex : après MOVE, supprime D:/Vacances/Jour1/ s'il devient vide"),
-                ("Vérifier l'espace disque avant exécution",
-                 self.validate_disk_space,
-                 "ex : refuse de copier 80 Go vers un disque qui en a 50"),
-            ]),
-            ("🔍 Détection / mode", [
-                ("Détection de rafales → sous-dossier Burst_NN/",
-                 self.detect_bursts,
-                 "ex : 5 photos prises en 2 s → Burst_01/"),
-                ("Mode incrémental (skip déjà organisés)",
-                 self.incremental_mode,
-                 "ex : 2e exécution du même dossier → ne retraite que les nouveaux"),
-            ]),
-            ("🔔 Notification", [
-                ("Notification système à la fin",
-                 self.notify_on_finish,
-                 "ex : toast Windows « 1245 fichiers traités » à la fin"),
-            ]),
+            (
+                "📦 Conservation des doublons",
+                [
+                    (
+                        "Skip si fichier identique déjà présent",
+                        self.skip_if_identical,
+                        "ex : 2 photos identiques (hash égal) → seule la 1ère est traitée",
+                    ),
+                    (
+                        "Garder les paires RAW + JPEG ensemble",
+                        self.keep_raw_jpeg_pairs,
+                        "ex : IMG_001.CR2 + IMG_001.JPG → même dossier final",
+                    ),
+                ],
+            ),
+            (
+                "🧹 Nettoyage / sécurité",
+                [
+                    (
+                        "Nettoyer les dossiers source vides (Déplacer)",
+                        self.cleanup_empty_source,
+                        "ex : après MOVE, supprime D:/Vacances/Jour1/ s'il devient vide",
+                    ),
+                    (
+                        "Vérifier l'espace disque avant exécution",
+                        self.validate_disk_space,
+                        "ex : refuse de copier 80 Go vers un disque qui en a 50",
+                    ),
+                ],
+            ),
+            (
+                "🔍 Détection / mode",
+                [
+                    (
+                        "Détection de rafales → sous-dossier Burst_NN/",
+                        self.detect_bursts,
+                        "ex : 5 photos prises en 2 s → Burst_01/",
+                    ),
+                    (
+                        "Mode incrémental (skip déjà organisés)",
+                        self.incremental_mode,
+                        "ex : 2e exécution du même dossier → ne retraite que les nouveaux",
+                    ),
+                ],
+            ),
         ]
         for group_title, toggles in behavior_groups:
             ctk.CTkLabel(
-                behaviors, text=group_title,
-                font=font_hint(), text_color=HINT_COLOR,
+                behaviors,
+                text=group_title,
+                font=font_hint(),
+                text_color=HINT_COLOR,
                 anchor="w",
             ).pack(fill="x", padx=PAD_S, pady=(PAD_S, 0))
             for text, var, hint in toggles:
-                _make_checkbox(behaviors, text=text, variable=var
-                               ).pack(anchor="w", padx=(PAD_L, PAD_S), pady=(2, 0))
+                _make_checkbox(behaviors, text=text, variable=var).pack(anchor="w", padx=(PAD_L, PAD_S), pady=(2, 0))
                 # Note inline avec un "ex : …" sous chaque toggle.
                 ctk.CTkLabel(
-                    behaviors, text=f"    {hint}",
-                    font=font_hint(), text_color=HINT_COLOR,
-                    anchor="w", justify="left",
+                    behaviors,
+                    text=f"    {hint}",
+                    font=font_hint(),
+                    text_color=HINT_COLOR,
+                    anchor="w",
+                    justify="left",
                 ).pack(fill="x", padx=(PAD_L, PAD_S), pady=(0, PAD_S))
 
-        # Sous-options bursts inline — mode manuel / auto (audit 2026-05-15).
-        # En mode manuel : seuil temporel choisi par l'utilisateur.
-        # En mode auto : seuil = mean - stddev des deltas du dossier final.
-        burst_sub = ctk.CTkFrame(behaviors, fg_color="transparent")
-        burst_sub.pack(fill="x", padx=(28, PAD_S), pady=(0, PAD_S))
+                # Fix bug bursts (audit 2026-05-15) : les sous-options
+                # bursts apparaissent IMMÉDIATEMENT sous la checkbox
+                # « Détection de rafales », plus en fin de panneau.
+                # Affichage dynamique (show/hide selon detect_bursts).
+                if var is self.detect_bursts:
+                    self._burst_subopts = ctk.CTkFrame(
+                        behaviors,
+                        fg_color="transparent",
+                    )
+                    self._build_burst_subopts(self._burst_subopts)
+                    # État initial : visible si detect_bursts est True.
+                    if self.detect_bursts.get():
+                        self._burst_subopts.pack(
+                            fill="x",
+                            padx=(PAD_L * 2, PAD_S),
+                            pady=(0, PAD_S),
+                        )
+                    # Trace pour show/hide dynamique au clic
+                    self.detect_bursts.trace_add("write", lambda *_: self._refresh_burst_subopts())
 
+    def _make_config_persist_cb(self, attr_name):
+        """Renvoie un callback `trace_add("write", ...)` qui persiste
+        ``self.<attr_name>`` dans AppConfig dès qu'il change.
+
+        Méthode (et pas closure dans __init__) pour éviter les problèmes
+        d'ordre de définition entre les blocs de vars (refactor 2026-05-15).
+        """
+
+        def _cb(*_args):
+            try:
+                get_config().set(attr_name, getattr(self, attr_name).get())
+            except Exception as exc:
+                logger.debug(f"persist {attr_name}: {exc}")
+
+        return _cb
+
+    def _build_burst_subopts(self, container):
+        """Construit le sous-bloc 'mode/écart/min photos' des bursts.
+
+        Extrait dans une méthode pour pouvoir l'attacher juste sous la
+        checkbox « Détection de rafales » (cf. fix bug 2026-05-15).
+        """
         # Ligne 1 : choix du mode (radios)
-        mode_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        mode_row = ctk.CTkFrame(container, fg_color="transparent")
         mode_row.pack(fill="x", pady=(0, 2))
-        ctk.CTkLabel(mode_row, text="Mode :", width=80, anchor="w",
-                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        ctk.CTkLabel(mode_row, text="Mode :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR).pack(
+            side="left"
+        )
         _make_radio(
-            mode_row, text="Manuel (seuil fixe)",
-            variable=self.burst_mode, value="manual",
+            mode_row,
+            text="Manuel (seuil fixe)",
+            variable=self.burst_mode,
+            value="manual",
             command=lambda: self._refresh_burst_mode_ui(),
         ).pack(side="left", padx=(0, PAD_M))
         _make_radio(
-            mode_row, text="Auto (Δ moyen − σ)",
-            variable=self.burst_mode, value="auto",
+            mode_row,
+            text="Auto (Δ moyen − σ)",
+            variable=self.burst_mode,
+            value="auto",
             command=lambda: self._refresh_burst_mode_ui(),
         ).pack(side="left")
 
         # Ligne 2 : Écart max (visible seulement en mode manuel)
-        self._burst_manual_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        self._burst_manual_row = ctk.CTkFrame(container, fg_color="transparent")
         self._burst_manual_row.pack(fill="x", pady=(0, 2))
-        ctk.CTkLabel(self._burst_manual_row, text="Écart max :", width=80, anchor="w",
-                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        ctk.CTkLabel(
+            self._burst_manual_row, text="Écart max :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR
+        ).pack(side="left")
         ctk.CTkOptionMenu(
-            self._burst_manual_row, variable=self.burst_threshold,
+            self._burst_manual_row,
+            variable=self.burst_threshold,
             values=["1", "2", "3", "5", "10", "30", "60"],
-            width=70, height=BTN_H_STD,
+            width=70,
+            height=BTN_H_STD,
             command=lambda v: self.burst_threshold.set(int(v)),
         ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(self._burst_manual_row, text="s",
-                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        ctk.CTkLabel(self._burst_manual_row, text="s", font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+
+        # Ligne 2 bis : bornes auto (visibles seulement en mode auto)
+        # Audit 2026-05-15 (élargissement) — expose le clamp historique
+        # [1 s ; 600 s] comme option avancée. L'utilisateur peut élargir
+        # (timelapse, pauses longues) ou serrer (vraies rafales rapides).
+        self._burst_auto_row = ctk.CTkFrame(container, fg_color="transparent")
+        ctk.CTkLabel(
+            self._burst_auto_row, text="Bornes auto :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR
+        ).pack(side="left")
+        ctk.CTkLabel(self._burst_auto_row, text="min", font=font_hint(), text_color=HINT_COLOR).pack(
+            side="left", padx=(0, 2)
+        )
+        ctk.CTkOptionMenu(
+            self._burst_auto_row,
+            variable=self.burst_auto_min,
+            values=["1", "2", "3", "5", "10", "30"],
+            width=60,
+            height=BTN_H_STD,
+            command=lambda v: self.burst_auto_min.set(int(v)),
+        ).pack(side="left", padx=(0, PAD_S))
+        ctk.CTkLabel(self._burst_auto_row, text="s  ·  max", font=font_hint(), text_color=HINT_COLOR).pack(
+            side="left", padx=(0, 2)
+        )
+        ctk.CTkOptionMenu(
+            self._burst_auto_row,
+            variable=self.burst_auto_max,
+            values=["60", "120", "300", "600", "1800", "3600"],
+            width=70,
+            height=BTN_H_STD,
+            command=lambda v: self.burst_auto_max.set(int(v)),
+        ).pack(side="left", padx=(0, PAD_S))
+        ctk.CTkLabel(self._burst_auto_row, text="s", font=font_hint(), text_color=HINT_COLOR).pack(side="left")
 
         # Ligne 3 : Min photos par burst (visible dans les 2 modes)
-        min_row = ctk.CTkFrame(burst_sub, fg_color="transparent")
+        min_row = ctk.CTkFrame(container, fg_color="transparent")
         min_row.pack(fill="x")
-        ctk.CTkLabel(min_row, text="Min photos :", width=80, anchor="w",
-                     font=font_hint(), text_color=HINT_COLOR).pack(side="left")
+        ctk.CTkLabel(min_row, text="Min photos :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR).pack(
+            side="left"
+        )
         ctk.CTkOptionMenu(
-            min_row, variable=self.burst_min_count,
-            values=["2", "3", "4", "5", "8"], width=60, height=BTN_H_STD,
+            min_row,
+            variable=self.burst_min_count,
+            values=["2", "3", "4", "5", "8"],
+            width=60,
+            height=BTN_H_STD,
             command=lambda v: self.burst_min_count.set(int(v)),
         ).pack(side="left", padx=PAD_S)
         ctk.CTkLabel(
-            min_row, text="par groupe",
-            font=font_hint(), text_color=HINT_COLOR,
+            min_row,
+            text="par groupe",
+            font=font_hint(),
+            text_color=HINT_COLOR,
         ).pack(side="left")
 
         # État initial (manuel par défaut)
         self._refresh_burst_mode_ui()
 
-        # Index export — séparateur + 2 cases compactes en bas
-        ctk.CTkFrame(behaviors, height=1, fg_color=SEPARATOR_COLOR).pack(
-            fill="x", padx=PAD_M, pady=(PAD_S, PAD_S)
-        )
-        idx_row = ctk.CTkFrame(behaviors, fg_color="transparent")
-        idx_row.pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
-        ctk.CTkLabel(idx_row, text="📋 Index :",
-                     font=font_label()).pack(side="left", padx=(0, PAD_S))
-        _make_checkbox(idx_row, text="CSV",
-                       variable=self.export_index_csv).pack(side="left", padx=(0, PAD_M))
-        _make_checkbox(idx_row, text="JSON",
-                       variable=self.export_index_json).pack(side="left")
+    def _refresh_burst_subopts(self):
+        """Show/hide des sous-options bursts selon ``detect_bursts``."""
+        try:
+            if self.detect_bursts.get():
+                self._burst_subopts.pack(
+                    fill="x",
+                    padx=(PAD_L * 2, PAD_S),
+                    pady=(0, PAD_S),
+                )
+            else:
+                self._burst_subopts.pack_forget()
+        except (AttributeError, tk.TclError):
+            pass
 
     def _toggle_advanced_section(self):
         """Bascule le panneau Avancé (collapse/expand)."""
         if self._adv_collapsed:
             # Affiche le contenu
-            self._adv_content.grid(row=1, column=0, sticky="ew",
-                                   padx=PAD_M, pady=(0, PAD_M))
-            self._adv_toggle_btn.configure(
-                text="▼  ⚙️ Options avancées (cliquez pour replier)"
-            )
+            self._adv_content.grid(row=1, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            self._adv_toggle_btn.configure(text="▼  ⚙️ Options avancées (cliquez pour replier)")
             self._adv_collapsed = False
         else:
             self._adv_content.grid_forget()
-            self._adv_toggle_btn.configure(
-                text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)"
-            )
+            self._adv_toggle_btn.configure(text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)")
             self._adv_collapsed = True
 
     def _create_schedule_section(self):
@@ -983,14 +1194,11 @@ class OrganizeFrame(ctk.CTkFrame):
         """
         # Container externe — wrapper qui contient le toggle + le contenu
         wrapper = ctk.CTkFrame(self._scroll)
-        wrapper.grid(row=2, column=0, columnspan=2, sticky="ew",
-                     padx=PAD_S, pady=(PAD_S, 0))
+        wrapper.grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_S, pady=(PAD_S, 0))
         wrapper.columnconfigure(0, weight=1)
 
         # En-tête cliquable — toggle ▼ / ▶
-        self._rename_collapsed = bool(
-            getattr(get_config().config, 'rename_collapsed', False)
-        )
+        self._rename_collapsed = bool(getattr(get_config().config, "rename_collapsed", False))
         self._rename_toggle_btn = ctk.CTkButton(
             wrapper,
             text=self._rename_toggle_label(),
@@ -1002,8 +1210,7 @@ class OrganizeFrame(ctk.CTkFrame):
             hover_color=("gray85", "gray25"),
             height=BTN_H_STD,
         )
-        self._rename_toggle_btn.grid(row=0, column=0, sticky="ew",
-                                     padx=PAD_M, pady=PAD_S)
+        self._rename_toggle_btn.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
 
         # Content frame (2 colonnes) — affiché ou caché selon état
         self._rename_content = ctk.CTkFrame(wrapper, fg_color="transparent")
@@ -1012,18 +1219,21 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # ===== Colonne gauche : exemples cliquables =====
         examples_box = ctk.CTkFrame(self._rename_content)
-        examples_box.grid(row=0, column=0, sticky="nsew",
-                          padx=(PAD_M, PAD_S), pady=(0, PAD_M))
+        examples_box.grid(row=0, column=0, sticky="nsew", padx=(PAD_M, PAD_S), pady=(0, PAD_M))
 
         ctk.CTkLabel(
-            examples_box, text="📋 Exemples cliquables",
+            examples_box,
+            text="📋 Exemples cliquables",
             font=font_label(weight="bold"),
         ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
 
         # Scrollable list (les 10 exemples, ~28 px par ligne)
         from ui.prompt_examples import RENAME_TEMPLATES
+
         examples_scroll = ctk.CTkScrollableFrame(
-            examples_box, height=180, fg_color="transparent",
+            examples_box,
+            height=180,
+            fg_color="transparent",
         )
         examples_scroll.pack(fill="both", expand=True, padx=PAD_S, pady=(0, PAD_S))
 
@@ -1032,20 +1242,23 @@ class OrganizeFrame(ctk.CTkFrame):
             row = ctk.CTkFrame(examples_scroll, fg_color="transparent")
             row.pack(fill="x", pady=1)
             btn = ctk.CTkButton(
-                row, text=f"• {tpl.label}",
+                row,
+                text=f"• {tpl.label}",
                 anchor="w",
                 fg_color="transparent",
                 hover_color=("gray85", "gray25"),
                 text_color=("gray10", "#DCE4EE"),
                 command=lambda t=tpl.template: self._apply_rename_example(t),
-                height=24, font=font_label(),
+                height=24,
+                font=font_label(),
             )
             btn.pack(fill="x")
             self._rename_example_btns.append((btn, tpl))
 
         # Bouton Réinitialiser
         ctk.CTkButton(
-            examples_box, text="🔄 Réinitialiser",
+            examples_box,
+            text="🔄 Réinitialiser",
             command=lambda: self._apply_rename_example(""),
             height=BTN_H_STD,
             font=font_label(),
@@ -1053,42 +1266,45 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # ===== Colonne droite : zone d'édition + presets =====
         edit_box = ctk.CTkFrame(self._rename_content)
-        edit_box.grid(row=0, column=1, sticky="nsew",
-                      padx=(0, PAD_M), pady=(0, PAD_M))
+        edit_box.grid(row=0, column=1, sticky="nsew", padx=(0, PAD_M), pady=(0, PAD_M))
         edit_box.columnconfigure(1, weight=1)
 
         # Template entry (la "textbox" demandée par le prompt)
-        ctk.CTkLabel(edit_box, text="Template :",
-                     font=font_label()).grid(row=0, column=0, sticky="w",
-                                             padx=PAD_M, pady=(PAD_M, PAD_S))
-        self.rename_entry = ctk.CTkEntry(
-            edit_box, textvariable=self.rename_template,
-            placeholder_text="(vide = nom d'origine conservé)",
-            height=BTN_H_STD, font=font_label(),
+        ctk.CTkLabel(edit_box, text="Template :", font=font_label()).grid(
+            row=0, column=0, sticky="w", padx=PAD_M, pady=(PAD_M, PAD_S)
         )
-        self.rename_entry.grid(row=0, column=1, sticky="ew",
-                               padx=(0, PAD_M), pady=(PAD_M, PAD_S))
+        self.rename_entry = ctk.CTkEntry(
+            edit_box,
+            textvariable=self.rename_template,
+            placeholder_text="(vide = nom d'origine conservé)",
+            height=BTN_H_STD,
+            font=font_label(),
+        )
+        self.rename_entry.grid(row=0, column=1, sticky="ew", padx=(0, PAD_M), pady=(PAD_M, PAD_S))
 
         # Aperçu live
         self.rename_preview_var = ctk.StringVar(value="(aucun template)")
-        ctk.CTkLabel(edit_box, text="Aperçu :",
-                     font=font_label()).grid(row=1, column=0, sticky="w",
-                                             padx=PAD_M, pady=PAD_S)
-        ctk.CTkLabel(
-            edit_box, textvariable=self.rename_preview_var,
-            font=font_hint(), text_color=HINT_COLOR, anchor="w", justify="left",
-        ).grid(row=1, column=1, sticky="ew", padx=(0, PAD_M), pady=PAD_S)
-        self.rename_template.trace_add(
-            "write", lambda *_: self._refresh_rename_preview()
+        ctk.CTkLabel(edit_box, text="Aperçu :", font=font_label()).grid(
+            row=1, column=0, sticky="w", padx=PAD_M, pady=PAD_S
         )
+        ctk.CTkLabel(
+            edit_box,
+            textvariable=self.rename_preview_var,
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+        ).grid(row=1, column=1, sticky="ew", padx=(0, PAD_M), pady=PAD_S)
+        self.rename_template.trace_add("write", lambda *_: self._refresh_rename_preview())
 
         # Tokens disponibles + exemples concrets (audit 2026-05-15)
         ctk.CTkLabel(
             edit_box,
             text="Tokens : {original}, {ext}, {date:%Y%m%d}, {camera}, {counter:03d}",
-            font=font_hint(), text_color=HINT_COLOR, anchor="w",
-        ).grid(row=2, column=0, columnspan=2, sticky="ew",
-               padx=PAD_M, pady=(PAD_S, 0))
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_M, pady=(PAD_S, 0))
         ctk.CTkLabel(
             edit_box,
             text=(
@@ -1099,57 +1315,64 @@ class OrganizeFrame(ctk.CTkFrame):
                 "    ex : {date:%Y-%m}_VAC_{counter:03d}{ext}   →    "
                 "2026-05_VAC_001.jpg"
             ),
-            font=font_hint(), text_color=HINT_COLOR,
-            anchor="w", justify="left",
-        ).grid(row=3, column=0, columnspan=2, sticky="ew",
-               padx=PAD_M, pady=(0, PAD_M))
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
 
         # Séparateur entre Renommage et Presets
         ctk.CTkFrame(edit_box, height=1, fg_color=SEPARATOR_COLOR).grid(
-            row=4, column=0, columnspan=2, sticky="ew",
-            padx=PAD_M, pady=(0, PAD_S),
+            row=4,
+            column=0,
+            columnspan=2,
+            sticky="ew",
+            padx=PAD_M,
+            pady=(0, PAD_S),
         )
 
         # Ligne Presets
-        ctk.CTkLabel(edit_box, text="Preset :",
-                     font=font_label()).grid(row=5, column=0, sticky="w",
-                                             padx=PAD_M, pady=(0, PAD_M))
+        ctk.CTkLabel(edit_box, text="Preset :", font=font_label()).grid(
+            row=5, column=0, sticky="w", padx=PAD_M, pady=(0, PAD_M)
+        )
         preset_row = ctk.CTkFrame(edit_box, fg_color="transparent")
-        preset_row.grid(row=5, column=1, sticky="ew",
-                        padx=(0, PAD_M), pady=(0, PAD_M))
+        preset_row.grid(row=5, column=1, sticky="ew", padx=(0, PAD_M), pady=(0, PAD_M))
         self._preset_menu = ctk.CTkOptionMenu(
-            preset_row, variable=self.preset_name,
+            preset_row,
+            variable=self.preset_name,
             values=self._list_preset_names(),
             command=self._on_preset_selected,
-            width=180, height=BTN_H_STD,
+            width=180,
+            height=BTN_H_STD,
         )
         self._preset_menu.pack(side="left", padx=(0, PAD_S))
-        icon_button(preset_row, text="💾",
-                    command=self._save_preset_dialog).pack(side="left", padx=(0, PAD_S))
-        icon_button(preset_row, text="🗑",
-                    command=self._delete_preset).pack(side="left")
+        icon_button(preset_row, text="💾", command=self._save_preset_dialog).pack(side="left", padx=(0, PAD_S))
+        icon_button(preset_row, text="🗑", command=self._delete_preset).pack(side="left")
 
         # État initial
         if not self._rename_collapsed:
             self._rename_content.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
 
     def _rename_toggle_label(self) -> str:
-        return "▶  🏷️ Renommage & Presets" if self._rename_collapsed \
-               else "▼  🏷️ Renommage & Presets"
+        return "▶  🏷️ Renommage & Presets" if self._rename_collapsed else "▼  🏷️ Renommage & Presets"
 
     def _refresh_burst_mode_ui(self):
-        """Affiche/cache la ligne Écart max selon le mode burst.
+        """Affiche/cache les sous-options bursts selon le mode actif.
 
-        Mode manuel → ligne visible (l'utilisateur règle le seuil)
-        Mode auto   → ligne cachée (le seuil est calculé à l'exécution)
+        Mode manuel → ``_burst_manual_row`` (Écart max) visible,
+                      ``_burst_auto_row`` (bornes auto) caché.
+        Mode auto   → l'inverse : on cache l'Écart max et on expose les
+                      bornes du clamp auto (min/max) pour permettre à
+                      l'utilisateur d'ajuster la sensibilité (audit
+                      2026-05-15 élargissement).
         """
         try:
             if self.burst_mode.get() == "manual":
                 self._burst_manual_row.pack(fill="x", pady=(0, 2))
-                # Réordonner avant la ligne min — repack après le pack_forget
-                # du min n'est pas nécessaire ici car min_row n'est pas masquée.
+                self._burst_auto_row.pack_forget()
             else:
                 self._burst_manual_row.pack_forget()
+                self._burst_auto_row.pack(fill="x", pady=(0, 2))
         except AttributeError:
             # Pas encore créé (appel pendant l'init)
             pass
@@ -1164,7 +1387,7 @@ class OrganizeFrame(ctk.CTkFrame):
         self._rename_toggle_btn.configure(text=self._rename_toggle_label())
         # Persistance
         try:
-            get_config().set('rename_collapsed', self._rename_collapsed)
+            get_config().set("rename_collapsed", self._rename_collapsed)
         except Exception:
             pass
 
@@ -1197,22 +1420,29 @@ class OrganizeFrame(ctk.CTkFrame):
         progress_row.columnconfigure(0, weight=1)
 
         self.progress_bar = ctk.CTkProgressBar(
-            progress_row, height=20,
-            border_width=1, border_color=("gray60", "gray40"),
+            progress_row,
+            height=20,
+            border_width=1,
+            border_color=("gray60", "gray40"),
         )
         self.progress_bar.grid(row=0, column=0, sticky="ew", padx=(0, PAD_S))
         self.progress_bar.set(0)
 
         self.progress_pct_var = ctk.StringVar(value="0 %")
         ctk.CTkLabel(
-            progress_row, textvariable=self.progress_pct_var,
-            font=font_label(weight="bold"), width=44, anchor="e",
+            progress_row,
+            textvariable=self.progress_pct_var,
+            font=font_label(weight="bold"),
+            width=44,
+            anchor="e",
         ).grid(row=0, column=1, sticky="e")
 
         # Label de progression
         self.progress_label = ctk.CTkLabel(
-            parent, text="Prêt",
-            font=font_label(), anchor="w",
+            parent,
+            text="Prêt",
+            font=font_label(),
+            anchor="w",
             text_color=LABEL_MUTED,
         )
         self.progress_label.grid(row=1, column=0, sticky="ew", pady=(0, PAD_S))
@@ -1225,24 +1455,32 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # GAUCHE : actions secondaires (analyse, preview)
         self.analyze_button = neutral_button(
-            buttons, text="📊 Analyser", command=self._analyze_files,
+            buttons,
+            text="📊 Analyser",
+            command=self._analyze_files,
         )
         self.analyze_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
 
         self.preview_button = neutral_button(
-            buttons, text="👁 Aperçu", command=self._show_dry_run_preview,
+            buttons,
+            text="👁 Aperçu",
+            command=self._show_dry_run_preview,
         )
         self.preview_button.grid(row=0, column=1, padx=(0, PAD_S), sticky="w")
 
         # DROITE : annuler (destructif) + action principale
         self.cancel_button = danger_button(
-            buttons, text="❌ Annuler",
-            command=self._cancel_operation, state="disabled",
+            buttons,
+            text="❌ Annuler",
+            command=self._cancel_operation,
+            state="disabled",
         )
         self.cancel_button.grid(row=0, column=3, padx=(0, PAD_S), sticky="e")
 
         self.organize_button = primary_button(
-            buttons, text="🚀 Organiser", command=self._organize_files,
+            buttons,
+            text="🚀 Organiser",
+            command=self._organize_files,
         )
         self.organize_button.grid(row=0, column=4, sticky="e")
 
@@ -1250,14 +1488,14 @@ class OrganizeFrame(ctk.CTkFrame):
     # Ordre des critères en mode multicouche
     # ------------------------------------------------------------------
     CRITERIA_LABELS = {
-        'date':     ('📅', 'Date'),
-        'camera':   ('📷', 'Appareil'),
-        'location': ('🌍', 'Localisation'),
+        "date": ("📅", "Date"),
+        "camera": ("📷", "Appareil"),
+        "location": ("🌍", "Localisation"),
     }
     CRITERIA_ENABLE_VAR = {
-        'date':     'organize_by_date',
-        'camera':   'organize_by_camera',
-        'location': 'organize_by_location',
+        "date": "organize_by_date",
+        "camera": "organize_by_camera",
+        "location": "organize_by_location",
     }
 
     def _update_criteria_visibility(self):
@@ -1295,8 +1533,7 @@ class OrganizeFrame(ctk.CTkFrame):
             ctk.CTkLabel(
                 row,
                 text=f"{index + 1}.  {emoji}  {label}",
-                font=ctk.CTkFont(size=LABEL_FONT_SIZE,
-                                 weight="bold" if enabled else "normal"),
+                font=ctk.CTkFont(size=LABEL_FONT_SIZE, weight="bold" if enabled else "normal"),
                 text_color=text_color,
                 anchor="w",
                 width=180,
@@ -1311,18 +1548,26 @@ class OrganizeFrame(ctk.CTkFrame):
                 ).pack(side="left", padx=4)
 
             up_btn = ctk.CTkButton(
-                row, text="▲", width=30, height=28,
+                row,
+                text="▲",
+                width=30,
+                height=28,
                 command=lambda k=key: self._move_criterion(k, -1),
                 state="disabled" if index == 0 else "normal",
-                fg_color=CHECK_FG, hover_color=CHECK_HOVER,
+                fg_color=CHECK_FG,
+                hover_color=CHECK_HOVER,
             )
             up_btn.pack(side="right", padx=(2, 6), pady=3)
 
             down_btn = ctk.CTkButton(
-                row, text="▼", width=30, height=28,
+                row,
+                text="▼",
+                width=30,
+                height=28,
                 command=lambda k=key: self._move_criterion(k, 1),
                 state="disabled" if index == n - 1 else "normal",
-                fg_color=CHECK_FG, hover_color=CHECK_HOVER,
+                fg_color=CHECK_FG,
+                hover_color=CHECK_HOVER,
             )
             down_btn.pack(side="right", padx=(2, 2), pady=3)
 
@@ -1348,8 +1593,8 @@ class OrganizeFrame(ctk.CTkFrame):
     # Bornes et précision du slider de distance max (km)
     MAX_DIST_MIN = 0.0
     MAX_DIST_MAX = 50.0
-    MAX_DIST_FINE_STEP = 0.1   # pas 100 m via les boutons ◀ / ▶
-    MAX_DIST_PRECISION = 10    # 1 / 0.1 → arrondi 100 m
+    MAX_DIST_FINE_STEP = 0.1  # pas 100 m via les boutons ◀ / ▶
+    MAX_DIST_PRECISION = 10  # 1 / 0.1 → arrondi 100 m
 
     def _snap_max_distance(self, value: float) -> float:
         """Arrondit la valeur à 100 m près."""
@@ -1384,7 +1629,9 @@ class OrganizeFrame(ctk.CTkFrame):
         """
         if self.organize_by_location.get():
             self.gps_options_frame.pack(
-                fill="x", padx=40, pady=(0, 4),
+                fill="x",
+                padx=40,
+                pady=(0, 4),
                 after=self._gps_checkbox,
             )
         else:
@@ -1425,6 +1672,7 @@ class OrganizeFrame(ctk.CTkFrame):
             return
         try:
             from tkinterdnd2 import DND_FILES
+
             for entry, var in (
                 (self.source_entry, self.source_var),
                 (self.dest_entry, self.dest_var),
@@ -1444,11 +1692,11 @@ class OrganizeFrame(ctk.CTkFrame):
                     if not folders:
                         return
                     if is_source and len(folders) > 1:
-                        v.set(';'.join(folders))
+                        v.set(";".join(folders))
                     else:
                         v.set(folders[0])
 
-                tk_widget.dnd_bind('<<Drop>>', _on_drop)
+                tk_widget.dnd_bind("<<Drop>>", _on_drop)
             logger.debug("Drag-and-drop active sur source/dest entries")
         except Exception as exc:
             logger.warning(f"Echec setup drag-and-drop : {exc}")
@@ -1459,14 +1707,14 @@ class OrganizeFrame(ctk.CTkFrame):
         des paths avec espaces sous Windows)."""
         out, buf, in_brace = [], "", False
         for c in raw:
-            if c == '{':
+            if c == "{":
                 in_brace = True
-            elif c == '}':
+            elif c == "}":
                 in_brace = False
                 if buf:
                     out.append(buf)
                     buf = ""
-            elif c == ' ' and not in_brace:
+            elif c == " " and not in_brace:
                 if buf:
                     out.append(buf)
                     buf = ""
@@ -1485,9 +1733,11 @@ class OrganizeFrame(ctk.CTkFrame):
             return
         try:
             sample = SmartOrganizer._apply_rename_template(
-                "IMG_0001.jpg", tpl,
+                "IMG_0001.jpg",
+                tpl,
                 date_taken=datetime(2026, 5, 7, 14, 30),
-                make="Sony", model="ILCE-7M3",
+                make="Sony",
+                model="ILCE-7M3",
                 counter=42,
             )
             self.rename_preview_var.set(f"IMG_0001.jpg → {sample}")
@@ -1515,29 +1765,29 @@ class OrganizeFrame(ctk.CTkFrame):
             return
         # Appliquer chaque clé connue
         mapping = {
-            'organize_by_date': self.organize_by_date,
-            'organize_by_camera': self.organize_by_camera,
-            'multilayer': self.multilayer,
-            'copy_not_move': self.copy_not_move,
-            'date_format': self.date_format,
-            'recursive': self.recursive,
-            'include_images': self.include_images,
-            'include_raw': self.include_raw,
-            'include_videos': self.include_videos,
-            'filter_date_min': self.filter_date_min,
-            'filter_date_max': self.filter_date_max,
-            'filter_size_min': self.filter_size_min,
-            'filter_size_max': self.filter_size_max,
-            'filter_rating_min': self.filter_rating_min,
-            'filter_keywords': self.filter_keywords,
-            'skip_if_identical': self.skip_if_identical,
-            'keep_raw_jpeg_pairs': self.keep_raw_jpeg_pairs,
-            'cleanup_empty_source': self.cleanup_empty_source,
-            'validate_disk_space': self.validate_disk_space,
-            'export_index_csv': self.export_index_csv,
-            'export_index_json': self.export_index_json,
-            'notify_on_finish': self.notify_on_finish,
-            'rename_template': self.rename_template,
+            "organize_by_date": self.organize_by_date,
+            "organize_by_camera": self.organize_by_camera,
+            "multilayer": self.multilayer,
+            "copy_not_move": self.copy_not_move,
+            "date_format": self.date_format,
+            "recursive": self.recursive,
+            "include_images": self.include_images,
+            "include_raw": self.include_raw,
+            "include_videos": self.include_videos,
+            "filter_date_min": self.filter_date_min,
+            "filter_date_max": self.filter_date_max,
+            "filter_size_min": self.filter_size_min,
+            "filter_size_max": self.filter_size_max,
+            "filter_rating_min": self.filter_rating_min,
+            "filter_keywords": self.filter_keywords,
+            "skip_if_identical": self.skip_if_identical,
+            "keep_raw_jpeg_pairs": self.keep_raw_jpeg_pairs,
+            "cleanup_empty_source": self.cleanup_empty_source,
+            "validate_disk_space": self.validate_disk_space,
+            "export_index_csv": self.export_index_csv,
+            "export_index_json": self.export_index_json,
+            "notify_on_finish": self.notify_on_finish,
+            "rename_template": self.rename_template,
         }
         for k, var in mapping.items():
             if k in data:
@@ -1545,8 +1795,8 @@ class OrganizeFrame(ctk.CTkFrame):
                     var.set(data[k])
                 except Exception:
                     pass
-        if 'criteria_order' in data:
-            order = data['criteria_order']
+        if "criteria_order" in data:
+            order = data["criteria_order"]
             if isinstance(order, list) and all(c in self._criteria_order for c in order):
                 self._criteria_order = list(order)
                 self._render_criteria_order()
@@ -1577,35 +1827,38 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Champ Nom (row 1)
         ctk.CTkLabel(
-            win, text="Nom du preset :",
+            win,
+            text="Nom du preset :",
             font=font_label(weight="bold"),
         ).grid(row=1, column=0, sticky="w", padx=PAD_L, pady=(PAD_M, PAD_S))
         name_var = ctk.StringVar()
         name_entry = ctk.CTkEntry(
-            win, textvariable=name_var, height=BTN_H_STD,
+            win,
+            textvariable=name_var,
+            height=BTN_H_STD,
             placeholder_text="ex : vacances-ete-2026",
         )
-        name_entry.grid(row=1, column=1, sticky="ew",
-                        padx=(0, PAD_L), pady=(PAD_M, PAD_S))
+        name_entry.grid(row=1, column=1, sticky="ew", padx=(0, PAD_L), pady=(PAD_M, PAD_S))
         name_entry.focus_set()
 
         # Hint nom (row 2)
         ctk.CTkLabel(
             win,
-            text="    Caractères autorisés : lettres, chiffres, tirets, "
-                 "soulignés. Pas d'espace.",
-            font=font_hint(), text_color=HINT_COLOR,
-            anchor="w", justify="left",
-        ).grid(row=2, column=0, columnspan=2, sticky="ew",
-               padx=PAD_L, pady=(0, PAD_S))
+            text="    Caractères autorisés : lettres, chiffres, tirets, soulignés. Pas d'espace.",
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_S))
 
         # Récap des options sauvegardées (row 3, expand)
         recap_frame = ctk.CTkFrame(win)
-        recap_frame.grid(row=3, column=0, columnspan=2, sticky="nsew",
-                         padx=PAD_L, pady=PAD_S)
+        recap_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=PAD_L, pady=PAD_S)
         ctk.CTkLabel(
-            recap_frame, text="📋 Contenu du preset",
-            font=font_label(weight="bold"), anchor="w",
+            recap_frame,
+            text="📋 Contenu du preset",
+            font=font_label(weight="bold"),
+            anchor="w",
         ).pack(fill="x", padx=PAD_M, pady=(PAD_S, 2))
         recap_box = ctk.CTkTextbox(recap_frame, height=140, font=font_hint())
         recap_box.pack(fill="both", expand=True, padx=PAD_M, pady=(0, PAD_M))
@@ -1614,8 +1867,7 @@ class OrganizeFrame(ctk.CTkFrame):
             f"• Organisation : date={self.organize_by_date.get()}, "
             f"camera={self.organize_by_camera.get()}, "
             f"lieu={self.organize_by_location.get()}",
-            f"• Multicouche : {self.multilayer.get()}  ·  "
-            f"ordre={', '.join(self._criteria_order)}",
+            f"• Multicouche : {self.multilayer.get()}  ·  ordre={', '.join(self._criteria_order)}",
             f"• Format date : {self.date_format.get()}",
             f"• Mode : {'COPIER' if self.copy_not_move.get() else 'DÉPLACER'}",
             f"• Récursif : {self.recursive.get()}",
@@ -1633,8 +1885,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Boutons (row 4)
         btn_row = ctk.CTkFrame(win, fg_color="transparent")
-        btn_row.grid(row=4, column=0, columnspan=2, sticky="ew",
-                     padx=PAD_L, pady=(0, PAD_L))
+        btn_row.grid(row=4, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_L))
         btn_row.columnconfigure(1, weight=1)
 
         result = {"name": None}
@@ -1643,7 +1894,9 @@ class OrganizeFrame(ctk.CTkFrame):
             n = name_var.get().strip()
             if not n:
                 messagebox.showerror(
-                    "Preset", "Le nom est obligatoire.", parent=win,
+                    "Preset",
+                    "Le nom est obligatoire.",
+                    parent=win,
                 )
                 return
             if any(c in n for c in r' /\:*?"<>|'):
@@ -1657,15 +1910,19 @@ class OrganizeFrame(ctk.CTkFrame):
             win.destroy()
 
         ctk.CTkButton(
-            btn_row, text="Annuler",
-            command=win.destroy, height=BTN_H_STD,
+            btn_row,
+            text="Annuler",
+            command=win.destroy,
+            height=BTN_H_STD,
             fg_color=("gray70", "gray30"),
             hover_color=("gray60", "gray40"),
         ).grid(row=0, column=0, sticky="w")
 
         ctk.CTkButton(
-            btn_row, text="💾 Enregistrer",
-            command=_on_save, height=BTN_H_PRIMARY,
+            btn_row,
+            text="💾 Enregistrer",
+            command=_on_save,
+            height=BTN_H_PRIMARY,
             font=font_label(weight="bold"),
         ).grid(row=0, column=2, sticky="e")
 
@@ -1679,30 +1936,30 @@ class OrganizeFrame(ctk.CTkFrame):
         if not name:
             return
         data = {
-            'organize_by_date': self.organize_by_date.get(),
-            'organize_by_camera': self.organize_by_camera.get(),
-            'multilayer': self.multilayer.get(),
-            'copy_not_move': self.copy_not_move.get(),
-            'date_format': self.date_format.get(),
-            'recursive': self.recursive.get(),
-            'include_images': self.include_images.get(),
-            'include_raw': self.include_raw.get(),
-            'include_videos': self.include_videos.get(),
-            'criteria_order': list(self._criteria_order),
-            'filter_date_min': self.filter_date_min.get(),
-            'filter_date_max': self.filter_date_max.get(),
-            'filter_size_min': self.filter_size_min.get(),
-            'filter_size_max': self.filter_size_max.get(),
-            'filter_rating_min': self.filter_rating_min.get(),
-            'filter_keywords': self.filter_keywords.get(),
-            'skip_if_identical': self.skip_if_identical.get(),
-            'keep_raw_jpeg_pairs': self.keep_raw_jpeg_pairs.get(),
-            'cleanup_empty_source': self.cleanup_empty_source.get(),
-            'validate_disk_space': self.validate_disk_space.get(),
-            'export_index_csv': self.export_index_csv.get(),
-            'export_index_json': self.export_index_json.get(),
-            'notify_on_finish': self.notify_on_finish.get(),
-            'rename_template': self.rename_template.get(),
+            "organize_by_date": self.organize_by_date.get(),
+            "organize_by_camera": self.organize_by_camera.get(),
+            "multilayer": self.multilayer.get(),
+            "copy_not_move": self.copy_not_move.get(),
+            "date_format": self.date_format.get(),
+            "recursive": self.recursive.get(),
+            "include_images": self.include_images.get(),
+            "include_raw": self.include_raw.get(),
+            "include_videos": self.include_videos.get(),
+            "criteria_order": list(self._criteria_order),
+            "filter_date_min": self.filter_date_min.get(),
+            "filter_date_max": self.filter_date_max.get(),
+            "filter_size_min": self.filter_size_min.get(),
+            "filter_size_max": self.filter_size_max.get(),
+            "filter_rating_min": self.filter_rating_min.get(),
+            "filter_keywords": self.filter_keywords.get(),
+            "skip_if_identical": self.skip_if_identical.get(),
+            "keep_raw_jpeg_pairs": self.keep_raw_jpeg_pairs.get(),
+            "cleanup_empty_source": self.cleanup_empty_source.get(),
+            "validate_disk_space": self.validate_disk_space.get(),
+            "export_index_csv": self.export_index_csv.get(),
+            "export_index_json": self.export_index_json.get(),
+            "notify_on_finish": self.notify_on_finish.get(),
+            "rename_template": self.rename_template.get(),
         }
         try:
             get_config().save_preset(name, data)
@@ -1738,19 +1995,19 @@ class OrganizeFrame(ctk.CTkFrame):
         enabled = self.schedule_enabled.get()
         time_str = self.schedule_time.get().strip()
         cfg = get_config()
-        cfg.set('schedule_enabled', enabled)
-        cfg.set('schedule_time', time_str)
+        cfg.set("schedule_enabled", enabled)
+        cfg.set("schedule_time", time_str)
         # Source / destination courantes mémorisées pour le run automatique.
-        cfg.set('schedule_source', self.source_var.get())
-        cfg.set('schedule_destination', self.dest_var.get())
-        cfg.set('schedule_preset', self.preset_name.get())
+        cfg.set("schedule_source", self.source_var.get())
+        cfg.set("schedule_destination", self.dest_var.get())
+        cfg.set("schedule_preset", self.preset_name.get())
         self._scheduler.configure(enabled, time_str)
         self._refresh_schedule_status()
 
     def _on_schedule_time_change(self):
         """Reconfigure le scheduler quand l'utilisateur modifie l'heure."""
         cfg = get_config()
-        cfg.set('schedule_time', self.schedule_time.get().strip())
+        cfg.set("schedule_time", self.schedule_time.get().strip())
         if self.schedule_enabled.get():
             self._scheduler.configure(True, self.schedule_time.get())
         self._refresh_schedule_status()
@@ -1764,9 +2021,7 @@ class OrganizeFrame(ctk.CTkFrame):
         if nxt is None:
             self.schedule_status_var.set("⚠️ Heure invalide (utiliser HH:MM)")
         else:
-            self.schedule_status_var.set(
-                f"⏰ Prochaine exécution : {nxt.strftime('%Y-%m-%d %H:%M')}"
-            )
+            self.schedule_status_var.set(f"⏰ Prochaine exécution : {nxt.strftime('%Y-%m-%d %H:%M')}")
 
     def _scheduled_run_callback(self):
         """Callback appelé par le JobScheduler à l'heure planifiée.
@@ -1788,19 +2043,43 @@ class OrganizeFrame(ctk.CTkFrame):
         Inclut les filtres pré-traitement, les comportements avancés, le
         template de renommage et les flags d'export d'index.
         """
+
         # Parse dates filtre
         def _parse_date(s: str) -> Optional[datetime]:
             s = (s or "").strip()
             if not s:
                 return None
-            for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y'):
+            for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y"):
                 try:
                     return datetime.strptime(s, fmt)
                 except ValueError:
                     continue
             return None
 
-        keywords = [k.strip() for k in self.filter_keywords.get().split(',') if k.strip()]
+        keywords = [k.strip() for k in self.filter_keywords.get().split(",") if k.strip()]
+
+        # Nouveaux filtres (refactor 2026-05-15) — parsing CSV / WxH
+        ext_list = [
+            e.strip().lstrip('.').lower()
+            for e in self.filter_extensions.get().split(",") if e.strip()
+        ]
+        cam_list = [
+            c.strip() for c in self.filter_camera_make.get().split(",") if c.strip()
+        ]
+
+        def _parse_dim(s: str) -> Optional[tuple]:
+            """Parse 'WxH' / 'WXH' → (w, h) ; None si vide ou invalide."""
+            s = (s or "").strip().lower()
+            if not s:
+                return None
+            for sep in ('x', '×'):
+                if sep in s:
+                    parts = s.split(sep, 1)
+                    try:
+                        return int(parts[0]), int(parts[1])
+                    except (ValueError, IndexError):
+                        return None
+            return None
 
         return OrganizationOptions(
             organize_by_date=self.organize_by_date.get(),
@@ -1819,6 +2098,13 @@ class OrganizeFrame(ctk.CTkFrame):
             size_max_bytes=_parse_size_input(self.filter_size_max.get()) or None,
             rating_min=self.filter_rating_min.get(),
             keywords_filter=keywords,
+            # Nouveaux filtres (refactor 2026-05-15)
+            extensions_filter=ext_list,
+            dim_min=_parse_dim(self.filter_dim_min.get()),
+            dim_max=_parse_dim(self.filter_dim_max.get()),
+            camera_makes_filter=cam_list,
+            gps_required=self.filter_gps_required.get(),
+            orientation_filter=self.filter_orientation.get(),
             # Comportements
             skip_if_identical=self.skip_if_identical.get(),
             keep_raw_jpeg_pairs=self.keep_raw_jpeg_pairs.get(),
@@ -1834,6 +2120,8 @@ class OrganizeFrame(ctk.CTkFrame):
             burst_mode=self.burst_mode.get(),
             burst_threshold_seconds=self.burst_threshold.get(),
             burst_min_count=self.burst_min_count.get(),
+            burst_auto_min_seconds=self.burst_auto_min.get(),
+            burst_auto_max_seconds=self.burst_auto_max.get(),
             incremental_mode=self.incremental_mode.get(),
         )
 
@@ -1876,8 +2164,7 @@ class OrganizeFrame(ctk.CTkFrame):
         if hasattr(self, "show_files_btn"):
             attach_tooltip(
                 self.show_files_btn,
-                "Affiche la liste détaillée des fichiers détectés "
-                "(jusqu'à 500) avec les filtres actuels.",
+                "Affiche la liste détaillée des fichiers détectés (jusqu'à 500) avec les filtres actuels.",
             )
 
         # Cases / radios des critères et types
@@ -1903,10 +2190,10 @@ class OrganizeFrame(ctk.CTkFrame):
             attach_tooltip(self._preset_menu, TIPS["preset_menu"])
 
         # Boutons d'action — zone bottom
-        attach_tooltip(self.analyze_button,  TIPS["btn_analyze"])
-        attach_tooltip(self.preview_button,  TIPS["btn_preview"])
+        attach_tooltip(self.analyze_button, TIPS["btn_analyze"])
+        attach_tooltip(self.preview_button, TIPS["btn_preview"])
         attach_tooltip(self.organize_button, TIPS["btn_organize"])
-        attach_tooltip(self.cancel_button,   TIPS["btn_cancel"])
+        attach_tooltip(self.cancel_button, TIPS["btn_cancel"])
 
         # Filtres avancés (parcours descendants pour trouver les Entry par
         # textvariable — évite de stocker chaque widget individuellement)
@@ -1915,11 +2202,11 @@ class OrganizeFrame(ctk.CTkFrame):
     def _attach_tooltips_to_filter_entries(self):
         """Attache les tooltips aux Entry des filtres avancés via leur var."""
         var_to_tip = {
-            id(self.filter_date_min):   TIPS["filter_date_min"],
-            id(self.filter_date_max):   TIPS["filter_date_max"],
-            id(self.filter_size_min):   TIPS["filter_size_min"],
-            id(self.filter_size_max):   TIPS["filter_size_max"],
-            id(self.filter_keywords):   TIPS["filter_keywords"],
+            id(self.filter_date_min): TIPS["filter_date_min"],
+            id(self.filter_date_max): TIPS["filter_date_max"],
+            id(self.filter_size_min): TIPS["filter_size_min"],
+            id(self.filter_size_max): TIPS["filter_size_max"],
+            id(self.filter_keywords): TIPS["filter_keywords"],
         }
         for child in self._iter_descendants(self):
             try:
@@ -1933,11 +2220,17 @@ class OrganizeFrame(ctk.CTkFrame):
                 # On compare via le nom Tcl interne
                 try:
                     matching = next(
-                        (v for v in (
-                            self.filter_date_min, self.filter_date_max,
-                            self.filter_size_min, self.filter_size_max,
-                            self.filter_keywords,
-                        ) if str(v) == var_name and id(v) == var_id),
+                        (
+                            v
+                            for v in (
+                                self.filter_date_min,
+                                self.filter_date_max,
+                                self.filter_size_min,
+                                self.filter_size_max,
+                                self.filter_keywords,
+                            )
+                            if str(v) == var_name and id(v) == var_id
+                        ),
                         None,
                     )
                     if matching is not None:
@@ -1973,7 +2266,8 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Logo haut-gauche
         add_logo_to_modal(
-            win, size=40,
+            win,
+            size=40,
             text=f"📋 {len(files)} fichier(s) détecté(s) avec les filtres actuels",
         )
 
@@ -1983,7 +2277,8 @@ class OrganizeFrame(ctk.CTkFrame):
 
         if not files:
             ctk.CTkLabel(
-                body, text="Aucun fichier trouvé.",
+                body,
+                text="Aucun fichier trouvé.",
                 text_color=LABEL_MUTED,
             ).pack(padx=PAD_L, pady=PAD_M)
         else:
@@ -1996,7 +2291,9 @@ class OrganizeFrame(ctk.CTkFrame):
             box.configure(state="disabled")
 
         ctk.CTkButton(
-            body, text="Fermer", command=win.destroy,
+            body,
+            text="Fermer",
+            command=win.destroy,
             height=BTN_H_STD,
         ).pack(pady=PAD_M)
 
@@ -2044,9 +2341,7 @@ class OrganizeFrame(ctk.CTkFrame):
             except (OSError, ValueError) as exc:
                 err = str(exc)
                 logger.warning(f"Comptage echoue: {err}")
-                self._safe_after(
-                    0, lambda m=err: self.file_count_var.set(f"Erreur de comptage : {m}")
-                )
+                self._safe_after(0, lambda m=err: self.file_count_var.set(f"Erreur de comptage : {m}"))
 
         threading.Thread(target=count_thread, daemon=True).start()
 
@@ -2058,8 +2353,7 @@ class OrganizeFrame(ctk.CTkFrame):
             if getattr(self, "_cancel_requested", False):
                 messagebox.showinfo(
                     "Annulation en cours",
-                    "L'opération est en cours d'annulation.\n"
-                    "Patientez quelques secondes avant de relancer.",
+                    "L'opération est en cours d'annulation.\nPatientez quelques secondes avant de relancer.",
                 )
             else:
                 logger.debug("Analyse déjà en cours, ignore clic redondant")
@@ -2091,23 +2385,13 @@ class OrganizeFrame(ctk.CTkFrame):
                 return
 
             # Statistiques
-            stats = {
-                'total': total,
-                'with_date': 0,
-                'with_camera': 0,
-                'with_gps': 0,
-                'by_year': {},
-                'by_camera': {}
-            }
+            stats = {"total": total, "with_date": 0, "with_camera": 0, "with_gps": 0, "by_year": {}, "by_camera": {}}
 
             for i, file_path in enumerate(files):
                 if self._cancel_requested:
                     break
 
-                self._update_progress(
-                    f"Analyse de {os.path.basename(file_path)} ({i+1}/{total})",
-                    (i + 1) / total
-                )
+                self._update_progress(f"Analyse de {os.path.basename(file_path)} ({i + 1}/{total})", (i + 1) / total)
 
                 try:
                     exif_data = get_exif_data(file_path)
@@ -2116,17 +2400,17 @@ class OrganizeFrame(ctk.CTkFrame):
                     gps = get_gps_coordinates(file_path)
 
                     if date:
-                        stats['with_date'] += 1
+                        stats["with_date"] += 1
                         year = date.year
-                        stats['by_year'][year] = stats['by_year'].get(year, 0) + 1
+                        stats["by_year"][year] = stats["by_year"].get(year, 0) + 1
 
-                    if make != 'Unknown':
-                        stats['with_camera'] += 1
+                    if make != "Unknown":
+                        stats["with_camera"] += 1
                         camera = f"{make} {model}"
-                        stats['by_camera'][camera] = stats['by_camera'].get(camera, 0) + 1
+                        stats["by_camera"][camera] = stats["by_camera"].get(camera, 0) + 1
 
                     if gps[0] is not None:
-                        stats['with_gps'] += 1
+                        stats["with_gps"] += 1
 
                 except (OSError, ValueError) as exc:
                     logger.warning(f"Analyse echouee pour {file_path}: {exc}")
@@ -2155,8 +2439,7 @@ class OrganizeFrame(ctk.CTkFrame):
                 # Annulation en cours mais worker pas encore sorti.
                 messagebox.showinfo(
                     "Annulation en cours",
-                    "L'opération est en cours d'annulation.\n"
-                    "Patientez quelques secondes avant de relancer.",
+                    "L'opération est en cours d'annulation.\nPatientez quelques secondes avant de relancer.",
                 )
             else:
                 logger.debug("Org déjà en cours, ignore clic redondant")
@@ -2183,10 +2466,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # Confirmation
         action = "copier" if self.copy_not_move.get() else "déplacer"
-        if not messagebox.askyesno(
-            "Confirmation",
-            f"Voulez-vous {action} les fichiers de:\n{source}\nvers:\n{dest}?"
-        ):
+        if not messagebox.askyesno("Confirmation", f"Voulez-vous {action} les fichiers de:\n{source}\nvers:\n{dest}?"):
             return
 
         def organize():
@@ -2297,6 +2577,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
     def _update_progress(self, message: str, progress: Optional[float]):
         """Met à jour la barre de progression et le label %."""
+
         def update():
             self.progress_label.configure(text=message)
             if progress is not None:
@@ -2313,20 +2594,21 @@ class OrganizeFrame(ctk.CTkFrame):
 
     def _show_analysis_results(self, stats: dict):
         """Affiche les résultats de l'analyse."""
+
         def show():
             message = f"""
 Résultats de l'analyse:
 
-Total de fichiers: {stats['total']}
-Avec date: {stats['with_date']} ({stats['with_date']*100//max(1,stats['total'])}%)
-Avec appareil: {stats['with_camera']} ({stats['with_camera']*100//max(1,stats['total'])}%)
-Avec GPS: {stats['with_gps']} ({stats['with_gps']*100//max(1,stats['total'])}%)
+Total de fichiers: {stats["total"]}
+Avec date: {stats["with_date"]} ({stats["with_date"] * 100 // max(1, stats["total"])}%)
+Avec appareil: {stats["with_camera"]} ({stats["with_camera"] * 100 // max(1, stats["total"])}%)
+Avec GPS: {stats["with_gps"]} ({stats["with_gps"] * 100 // max(1, stats["total"])}%)
 
 Distribution par année:
-{chr(10).join(f'  {y}: {c} fichiers' for y, c in sorted(stats['by_year'].items()))}
+{chr(10).join(f"  {y}: {c} fichiers" for y, c in sorted(stats["by_year"].items()))}
 
 Distribution par appareil:
-{chr(10).join(f'  {c}: {n} fichiers' for c, n in sorted(stats['by_camera'].items(), key=lambda x: -x[1])[:5])}
+{chr(10).join(f"  {c}: {n} fichiers" for c, n in sorted(stats["by_camera"].items(), key=lambda x: -x[1])[:5])}
 """
             messagebox.showinfo("Analyse terminée", message)
             self._update_progress("Analyse terminée", 1)
@@ -2357,11 +2639,11 @@ Distribution par appareil:
         full_message = f"Organisation terminée!\n\n{summary}"
 
         # Bloc stats GPS si la localisation a été appliquée
-        with_gps = getattr(result, 'files_with_gps', 0)
-        without_gps = getattr(result, 'files_without_gps', 0)
+        with_gps = getattr(result, "files_with_gps", 0)
+        without_gps = getattr(result, "files_without_gps", 0)
         if with_gps or without_gps:
-            geocoded = getattr(result, 'files_geocoded', 0)
-            raw_coords = getattr(result, 'files_raw_coords', 0)
+            geocoded = getattr(result, "files_geocoded", 0)
+            raw_coords = getattr(result, "files_raw_coords", 0)
             full_message += (
                 f"\n\n🌍 Localisation GPS\n"
                 f"  Avec GPS    : {with_gps}\n"
@@ -2373,14 +2655,12 @@ Distribution par appareil:
         if result.error_messages:
             full_message += "\n\nErreurs:\n" + "\n".join(result.error_messages[:5])
             if len(result.error_messages) > 5:
-                full_message += (
-                    f"\n... et {len(result.error_messages) - 5} autres erreurs"
-                )
+                full_message += f"\n... et {len(result.error_messages) - 5} autres erreurs"
 
         # Q5 — Notification système non-modale (fond + barre des tâches)
         if self.notify_on_finish.get():
             try:
-                _windows_toast("PhotoOrganizer", summary.replace('\n', ' • '))
+                _windows_toast("PhotoOrganizer", summary.replace("\n", " • "))
             except Exception as exc:
                 logger.debug(f"toast non envoye : {exc}")
 
@@ -2419,12 +2699,11 @@ Distribution par appareil:
 
         if dest:
             ctk.CTkButton(
-                btn_row, text="📂 Ouvrir destination",
+                btn_row,
+                text="📂 Ouvrir destination",
                 command=lambda: _open_folder(dest),
             ).pack(side="left", padx=4, expand=True, fill="x")
-        ctk.CTkButton(btn_row, text="Fermer", command=win.destroy).pack(
-            side="left", padx=4, expand=True, fill="x"
-        )
+        ctk.CTkButton(btn_row, text="Fermer", command=win.destroy).pack(side="left", padx=4, expand=True, fill="x")
 
     def _show_dry_run_preview(self):
         """Q2 — Aperçu dry-run : applique les options pour les 100 premiers
@@ -2451,10 +2730,7 @@ Distribution par appareil:
         eligible = [f for f in files if organizer._passes_filters(f, options)]
 
         # Détection paires si demandé (impact visuel)
-        pairs = (
-            organizer._detect_raw_jpeg_pairs(eligible)
-            if options.keep_raw_jpeg_pairs else {}
-        )
+        pairs = organizer._detect_raw_jpeg_pairs(eligible) if options.keep_raw_jpeg_pairs else {}
 
         # Pour chaque fichier, calculer le chemin cible (sans copier)
         sample = eligible[:100]
@@ -2471,17 +2747,15 @@ Distribution par appareil:
                 if options.multilayer:
                     crits = options.criteria_order
                 elif options.organize_by_date:
-                    crits = ['date']
+                    crits = ["date"]
                 elif options.organize_by_camera:
-                    crits = ['camera']
+                    crits = ["camera"]
                 else:
                     crits = []
                 for c in crits:
-                    if c == 'date' and options.organize_by_date:
+                    if c == "date" and options.organize_by_date:
                         if date_taken:
-                            y, m, d = (str(date_taken.year),
-                                       f"{date_taken.month:02d}",
-                                       f"{date_taken.day:02d}")
+                            y, m, d = (str(date_taken.year), f"{date_taken.month:02d}", f"{date_taken.day:02d}")
                             mapping = {
                                 "year/month/day": [y, m, f"{y}_{m}_{d}"],
                                 "year/month": [y, f"{y}_{m}"],
@@ -2493,19 +2767,25 @@ Distribution par appareil:
                                 path = os.path.join(path, seg)
                         else:
                             path = os.path.join(path, "Sans date")
-                    elif c == 'camera' and options.organize_by_camera:
-                        cam = (f"{make} {model}".strip()
-                               if (make != 'Unknown' or model != 'Unknown')
-                               else "Appareil inconnu")
-                        path = os.path.join(path, cam.replace('/', '_'))
+                    elif c == "camera" and options.organize_by_camera:
+                        cam = (
+                            f"{make} {model}".strip()
+                            if (make != "Unknown" or model != "Unknown")
+                            else "Appareil inconnu"
+                        )
+                        path = os.path.join(path, cam.replace("/", "_"))
 
                 # Renommage
                 fname = os.path.basename(fp)
                 if options.rename_template:
                     try:
                         fname = SmartOrganizer._apply_rename_template(
-                            fname, options.rename_template,
-                            date_taken, make, model, counter,
+                            fname,
+                            options.rename_template,
+                            date_taken,
+                            make,
+                            model,
+                            counter,
                         )
                     except Exception:
                         pass
@@ -2530,17 +2810,13 @@ Distribution par appareil:
         body = ctk.CTkFrame(win, fg_color="transparent")
         body.pack(fill="both", expand=True)
 
-        header_text = (
-            f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
-        )
+        header_text = f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
         if options.keep_raw_jpeg_pairs and pairs:
             header_text += f"  •  {len(pairs)} paire(s) RAW+JPEG détectée(s)"
         header_text += f"\n📁 Destination : {dest}"
         if len(eligible) > 100:
             header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
-        ctk.CTkLabel(body, text=header_text, justify="left", anchor="w").pack(
-            fill="x", padx=12, pady=(12, 4)
-        )
+        ctk.CTkLabel(body, text=header_text, justify="left", anchor="w").pack(fill="x", padx=12, pady=(12, 4))
 
         textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
         textbox.pack(fill="both", expand=True, padx=12, pady=4)
@@ -2553,6 +2829,4 @@ Distribution par appareil:
                 textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
         textbox.configure(state="disabled")
 
-        ctk.CTkButton(body, text="Fermer", command=win.destroy).pack(
-            padx=12, pady=(4, 12)
-        )
+        ctk.CTkButton(body, text="Fermer", command=win.destroy).pack(padx=12, pady=(4, 12))

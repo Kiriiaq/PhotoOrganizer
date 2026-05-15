@@ -100,9 +100,11 @@ class SettingsFrame(ctk.CTkFrame):
 
         # Sections W102 (Apparence), W103-W104 (Comportement défaut),
         # W105-W107 (Performance/Cache) retirées suite aux retours testeur.
-        self._create_schedule_section(scrollable)   # Planification
-        self._create_api_section(scrollable)        # API & Services
-        self._create_data_section(scrollable)       # Logs & Données
+        self._create_schedule_section(scrollable)       # Planification
+        self._create_notifications_section(scrollable)  # Notifications (déplacé)
+        self._create_index_section(scrollable)          # Index export (déplacé)
+        self._create_api_section(scrollable)            # API & Services
+        self._create_data_section(scrollable)           # Logs & Données
 
         # ZONE 2 : boutons sticky bottom (toujours visibles)
         self._create_buttons_sticky()
@@ -171,6 +173,95 @@ class SettingsFrame(ctk.CTkFrame):
             return self.winfo_toplevel().organize_frame
         except AttributeError:
             return None
+
+    def _create_notifications_section(self, parent):
+        """Section Notifications (refactor 2026-05-15 — déplacée depuis Organize).
+
+        L'utilisateur retrouve ici la préférence « toast système après
+        organisation ». La var réelle est sur OrganizeFrame.notify_on_finish,
+        avec persistance bidirectionnelle vers AppConfig.
+        """
+        org_frame = self._get_organize_frame()
+        if org_frame is None:
+            return
+
+        section = ctk.CTkFrame(parent)
+        section.pack(fill="x", pady=PAD_M)
+
+        ctk.CTkLabel(
+            section, text="🔔 Notifications",
+            font=font_section(),
+        ).pack(anchor="w", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        notify_cb = _make_checkbox(
+            section,
+            text="Notification système à la fin",
+            variable=org_frame.notify_on_finish,
+        )
+        notify_cb.pack(anchor="w", padx=PAD_L, pady=(0, 2))
+        attach_tooltip(
+            notify_cb,
+            "Affiche un toast Windows à la fin de l'organisation "
+            "(« 1245 fichiers traités »). Non-bloquant.",
+        )
+        ctk.CTkLabel(
+            section,
+            text="    ex : toast Windows « 1245 fichiers traités »",
+            font=font_hint(), text_color=HINT_COLOR,
+            anchor="w",
+        ).pack(fill="x", padx=PAD_L, pady=(0, PAD_M))
+
+    def _create_index_section(self, parent):
+        """Section Index (refactor 2026-05-15 — déplacée depuis Organize).
+
+        L'utilisateur retrouve ici les deux toggles export CSV / JSON.
+        Les vars réelles sont sur OrganizeFrame avec persistance AppConfig.
+        """
+        org_frame = self._get_organize_frame()
+        if org_frame is None:
+            return
+
+        section = ctk.CTkFrame(parent)
+        section.pack(fill="x", pady=PAD_M)
+
+        ctk.CTkLabel(
+            section, text="📋 Index des opérations",
+            font=font_section(),
+        ).pack(anchor="w", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        ctk.CTkLabel(
+            section,
+            text="Génère après chaque organisation un fichier listant "
+                 "toutes les opérations effectuées (copies, déplacements, "
+                 "skips). Utile pour audit et rapports.",
+            font=font_hint(), text_color=HINT_COLOR,
+            anchor="w", justify="left", wraplength=560,
+        ).pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
+
+        toggles_row = ctk.CTkFrame(section, fg_color="transparent")
+        toggles_row.pack(fill="x", padx=PAD_L, pady=(0, PAD_M))
+
+        csv_cb = _make_checkbox(
+            toggles_row, text="CSV",
+            variable=org_frame.export_index_csv,
+        )
+        csv_cb.pack(side="left", padx=(0, PAD_L))
+        attach_tooltip(
+            csv_cb,
+            "Génère un fichier .csv (Excel-compatible) listant toutes "
+            "les opérations effectuées.",
+        )
+
+        json_cb = _make_checkbox(
+            toggles_row, text="JSON",
+            variable=org_frame.export_index_json,
+        )
+        json_cb.pack(side="left")
+        attach_tooltip(
+            json_cb,
+            "Génère un fichier .json structuré listant toutes les "
+            "opérations effectuées (intégration outils).",
+        )
 
     def _create_appearance_section(self, parent):
         """Crée la section Apparence."""
