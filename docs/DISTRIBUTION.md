@@ -1,345 +1,208 @@
 # PhotoOrganizer — Plateformes de distribution & visibilité
 
-> Phase 6 de l'audit méta-projet. Ordre de publication, titres/descriptions optimisés par plateforme, calendrier séquencé sur 6 semaines.
-> Date : 2026-05-19. Pré-requis : Phase 5 ([docs/MONETIZATION.md](MONETIZATION.md)) validée.
+> **Post-pivot 2026-05-26.** Ce document remplace l'ancienne stratégie de
+> distribution alignée sur le modèle freemium 19/49/99 €. L'ancien plan
+> détaillé (3 produits Lemon Squeezy, calendrier 6 semaines) est récupérable
+> via `git log -p -- docs/DISTRIBUTION.md`.
+
+L'objectif de la distribution est double :
+
+1. **Visibilité gratuite** = un volume suffisant de personnes voient le projet
+   pour que les conversions essai → achat à 10 € puissent générer du revenu
+   d'appoint (cible : 10-150 ventes sur 90 j).
+2. **Lead magnet** = le projet sert de démonstrateur de compétences pour
+   débloquer des missions freelance ou des opportunités d'embauche
+   (cf. `docs/MONETIZATION.md` §1, voie complémentaire).
+
+Les drafts à publier sont dans [LINKEDIN_DRAFTS.md](../LINKEDIN_DRAFTS.md).
 
 ---
 
-## 1. Synthèse — quelle plateforme pour quoi
+## 1. Plateformes par ordre de ROI estimé
 
-| Voie | Plateforme primaire | Plateformes secondaires |
+| # | Plateforme | Audience | Effort | ROI relatif | Bloquant ? |
+|---:|---|---|---|---|---|
+| 1 | **GitHub Releases** | Devs, power-users | 30 min | ⭐⭐⭐⭐⭐ | Oui — pré-requis tout le reste |
+| 2 | **LinkedIn (post pivot)** | Réseau personnel + 2e degré | 30 min/post | ⭐⭐⭐⭐ | Non |
+| 3 | **Reddit r/photography** | Photographes amateurs | 20 min + 4 h modération | ⭐⭐⭐⭐ | Non |
+| 4 | **Product Hunt** | Early adopters tech | 2 h prep + 6 h jour J | ⭐⭐⭐ | Non |
+| 5 | **Show HN** | Devs sceptiques | 1 h prep + 4 h modération | ⭐⭐⭐ | Non |
+| 6 | **Reddit r/datahoarder** | Niche cible parfaite | 20 min + 2 h modération | ⭐⭐⭐ | Non |
+| 7 | **PyPI** | Devs Python | 1-2 h | ⭐⭐ | Non (cosmétique credibilité) |
+| 8 | **AlternativeTo** | Recherche d'alternatives | 30 min | ⭐⭐ | Non |
+| 9 | **dev.to / Hashnode** | Devs (article technique) | 3-4 h par article | ⭐⭐ | Non |
+| 10 | **X / Twitter thread** | Public dev international | 1 h | ⭐ | Non (faible portée organique 2026) |
+
+---
+
+## 2. Calendrier de lancement court (3 semaines)
+
+Tableau condensé. Détail dans [NEXT_STEPS.html](../NEXT_STEPS.html) §F.
+
+| Jour | Action | Pré-requis |
 |---|---|---|
-| Distribution core (gratuit) | **GitHub Releases** | PyPI, AlternativeTo |
-| Distribution Pro (payant) | **Lemon Squeezy** | (pas de fallback recommandé) |
-| Lancement / découverte | **Product Hunt** | Show HN, Indie Hackers |
-| Communautés thématiques | **Reddit** (r/photography, r/datahoarder) | Forums photo FR (Chassimages, Phototrend) |
-| Réseaux sociaux | **LinkedIn** | X/Twitter, Mastodon |
-| Articles techniques | **dev.to** | Medium, Hashnode |
-| Démo vidéo | **YouTube** | LinkedIn (vidéo native) |
-| Recensement | **AlternativeTo** | Softpedia (low priority) |
+| **S-1** | Pré-requis : auto-entreprise, Privacy Policy publiée, S-01 + G-01 + S-02 dans `docs/media/`, setup Lemon Squeezy | NEXT_STEPS §D |
+| **S+0 lundi** | Push tag v2.3.0 → release auto + page Lemon Squeezy en mode publié | NEXT_STEPS §E.1 |
+| **S+0 mercredi** | LinkedIn post storytelling pivot (LINKEDIN_DRAFTS Format 1) | Release publique |
+| **S+1 mardi** | Reddit r/photography (Format 6) | LinkedIn S+0 OK |
+| **S+2 mardi 9h Paris** | Product Hunt (Format 4) + X thread (Format 8) | Compte PH > 7j |
+| **S+2 mardi 16h Paris** | Show HN (Format 5) — pas le même créneau que PH | — |
+| **S+3 lundi** | Reddit r/datahoarder (Format 7) | — |
+| **S+5 mercredi** | LinkedIn post technique PyInstaller (Format 2) | — |
+| **S+8 mercredi** | LinkedIn post portfolio (Format 3) | — |
+| **Continu** | Réponse < 4 h sur tous les threads ouverts | — |
+
+**Charge cumulée** : ~12-15 h sur 3 semaines, principalement de la modération
+de fils. Aucune sur-publication (la fatigue éditoriale et le burn-out de
+l'algorithme LinkedIn sont des écueils classiques).
 
 ---
 
-## 2. Détail par plateforme
+## 3. Titres et descriptions par plateforme
 
-### 2.1 GitHub Releases ⭐⭐⭐⭐⭐ — Distribution core (déjà actif)
+### 3.1 GitHub Release v2.3.0
 
-- **Statut actuel** : déjà actif (v1.0.0 publié déc 2025, v2.1.0 taggé). Workflow `release.yml` produit automatiquement le .exe au push d'un tag `v*`.
-- **Action** :
-  - Publier proprement la prochaine release (v2.2.0 ?) avec notes complètes basées sur [CHANGELOG.md](../CHANGELOG.md).
-  - Activer **GitHub Releases assets analytics** (gratuit, montre le nb de downloads).
-  - Ajouter le **social preview image** (1280×640 px) dans Settings → General → Social preview. À produire : cf. [MEDIA.md](MEDIA.md) L-04.
-- **Titre release** : `PhotoOrganizer v2.2.0 — Refonte panneau Organisation`
-- **Description type** (à adapter par release) :
+**Titre** : `v2.3.0 — Trial + unlock model · 10 free runs · 10€ lifetime`
 
-  ```markdown
-  ## What's new
-  - Refonte du panneau Organisation : onglets internes, exemples intégrés.
-  - Quarantaine réversible pour les doublons.
-  - Audit complet du projet (architecture, monétisation, plan optimisation EXE).
+**Description** :
 
-  ## Downloads
-  - `PhotoOrganizer-2.2.0.exe` (37 MB, Windows 10/11, windowed)
-  - `PhotoOrganizer-2.2.0-debug.exe` (37 MB, console + verbose logging)
+```markdown
+PhotoOrganizer adopts a "trial + unlock" model (Sublime Text style).
 
-  ## Verify integrity
-  See `checksums-sha256.txt` attached.
+### Highlights
+- 🆕 10 free organize runs per machine (counter signed HMAC SHA-256)
+- 🔓 10€ lifetime unlock per PC (machine binding via MachineGuid + Volume Serial)
+- 🛡️ Strict no-reissue policy on PC change (commercial gesture possible
+       case-by-case, never promised upfront)
+- 🧊 Pro modules (batch CLI, watch-folder, plugin API) deferred to v3.0+
 
-  ## Full changelog
-  https://github.com/Kiriiaq/PhotoOrganizer/blob/main/CHANGELOG.md
-  ```
+### Downloads
+- `PhotoOrganizer-2.3.0.exe` — main binary, Defender SmartScreen may warn
+  on first run (not code-signed, see SECURITY.md)
+- `PhotoOrganizer-2.3.0-debug.exe` — debug build with console
+- `checksums-sha256.txt`
 
-- **Tags GitHub repo** (Settings → Topics) : `python`, `customtkinter`, `photo-organizer`, `exif`, `windows`, `desktop-application`, `freemium`, `pyinstaller`, `apache-license`, `metadata-extraction`.
-- **Calendrier** : à chaque release. **Pré-condition** : assets visuels S-01 et G-01 au moins (cf. Phase 4 gap P0).
+### What's not included
+- ExifTool bundle (removed, GPL ambiguity gone — install separately via
+  `winget install exiftool` if you need the fallback)
 
-### 2.2 PyPI ⭐⭐⭐ — Distribution pip install
+### Test plan
+Run the EXE, organize 9 small folders → counter "Essai 9/10" appears.
+On 10th success, app moves to "Limit reached" state. Modal opens. Pay
+10€ on https://photoorganizer.lemonsqueezy.com, paste the emailed key.
+```
 
-- **Pertinence** : moyenne. Le projet est une **app GUI desktop** plus qu'une lib, donc `pip install photoorganizer` n'est pas le canal naturel. Mais cela permet à des power users / devs de lancer depuis sources rapidement.
-- **Action** :
-  - Vérifier que `pyproject.toml` produit un wheel propre : `python -m build`.
-  - Tester en local : `pip install dist/photoorganizer-2.2.0-py3-none-any.whl && photo-organizer`.
-  - Compte PyPI à créer (gratuit, 2FA obligatoire).
-  - Upload : `twine upload dist/*` ou via [trusted publisher GitHub Actions](https://docs.pypi.org/trusted-publishers/).
-- **Description PyPI** : reprendre le README.md (lu automatiquement).
-- **Keywords** : déjà dans `pyproject.toml` (à enrichir : `cli`, `gui`, `tkinter`, `desktop`).
-- **Conflit de nom** : vérifier `pip search photoorganizer` — si pris, fallback `photoorganizer-kiriiaq` ou `pyphotoorganizer`.
-- **Calendrier** : S+1 (après GitHub Release officielle). Effort 2-3 h.
-- **Risque** : nul. Gratuit, retirable.
+### 3.2 Product Hunt
 
-### 2.3 Lemon Squeezy ⭐⭐⭐⭐⭐ — Distribution Pro (Phase 5)
+Tagline + description + first comment : dans
+[LINKEDIN_DRAFTS.md Format 4](../LINKEDIN_DRAFTS.md).
 
-- **Statut actuel** : pas en place. Pré-requis Phase 5.
-- **Page produit (Lemon Squeezy Storefront ou site web custom)** :
-  - **Titre** : `PhotoOrganizer Pro — Batch CLI & Watch-Folder for Windows`
-  - **Tagline** : `Automate your photo organization. Run from terminal or auto-organize new photos as they arrive.`
-  - **Description** :
-    ```
-    The free PhotoOrganizer GUI handles your one-shot needs.
-    PhotoOrganizer Pro adds the two features power users keep asking for:
+**Stratégie**:
+- Submit un **mardi ou mercredi** entre 8 h et 9 h heure de Californie (= 17 h
+  ou 18 h Paris). Cible : maximiser les 24 h de fenêtre de vote.
+- Préparer 4-5 visuels : S-01 (capture statique), S-02 (modal d'activation),
+  G-01 (GIF 10 s), screenshot mode sombre.
+- Premier commentaire posté **dans les 30 s** après publication. Le ratio
+  commentaires/votes dans la première heure pèse lourd dans le ranking.
+- Disponible 4-6 h le jour J pour répondre aux commentaires.
 
-    1. Batch CLI — script your organization rules, schedule with Task Scheduler / cron.
-    2. Watch-Folder — drop a photo, it lands organized in the right folder automatically.
+### 3.3 Show HN
 
-    Built on the same proven core as the free version. One-time payment, offline activation, no subscription.
-    ```
-  - **Pricing display** : 3 cartes (Personnelle 19 € · Studio 49 € · Lifetime 99 €).
-  - **Code promo lancement** : `EARLY30` (-30 % les 30 premiers jours).
-- **Webhook** : `order.created` → Cloud Run / lambda gratuite → envoie email avec clé RSA signée.
-- **Calendrier** : S+1 (page créée silencieusement, prête mais pas annoncée).
-- **Effort** : 4-6 h (setup + page + webhook + test du flow).
+Titre + first comment : [LINKEDIN_DRAFTS.md Format 5](../LINKEDIN_DRAFTS.md).
 
-### 2.4 Product Hunt ⭐⭐⭐⭐⭐ — Lancement principal
+**Pièges à éviter**:
+- ❌ Lien direct vers Lemon Squeezy (HN flag commercial).
+- ❌ Demande explicite d'upvotes (HN ban à vie).
+- ✅ Lien GitHub uniquement. Le binaire payant est mentionné dans le first
+  comment.
+- ✅ Heure : mardi/mercredi 7 h PT (= 16 h Paris).
 
-- **Pertinence** : haute. Vise les early adopters tech/design, traffic spike sur 24-48 h (typique : 500-5 000 visiteurs si Top 5 du jour).
-- **Pré-requis stricts** :
-  - Compte créé > 7 jours avant le launch (anti-spam).
-  - Au moins **1 commentaire et 1 upvote sur 3-5 autres produits** dans la semaine précédente (signal de bonne foi).
-  - **Hunter recommandé** : un utilisateur Product Hunt influent qui submit pour toi (visibilité ×3-5). Trouver un hunter via [PHHunters](https://hunterboard.io/) ou demander dans Indie Hackers.
-- **Choix du jour** : **mardi** ou **mercredi** (concurrence plus faible que lundi, audience plus active que week-end). **Submission à 00:01 PT** (9h Paris).
-- **Page Product Hunt** :
-  - **Name** : `PhotoOrganizer`
-  - **Tagline** (60 chars max) : `Automate photo organization by date, camera & GPS. Free.`
-  - **Description** (260 chars max) :
-    ```
-    Sort thousands of photos by EXIF metadata in seconds. Multi-criteria
-    organization (date / camera / GPS), duplicate detection with reversible
-    quarantine, rollback history. Windows desktop, no install, free + open
-    source. Pro edition adds batch CLI & watch-folder ($19).
-    ```
-  - **Topics** (≤ 5) : `Photography`, `Productivity`, `Open Source`, `Windows`, `Developer Tools`.
-  - **Gallery** : 4-5 visuels (S-01, S-03, S-04, S-06, S-07 — voir [MEDIA.md](MEDIA.md)).
-  - **First comment** (à poster toi-même immédiatement après publication) :
-    ```
-    Hi PH 👋
+### 3.4 Reddit
 
-    I built PhotoOrganizer because my own photo library was a mess: thousands of
-    files from 3 cameras, 2 phones, and a drone, all dumped in folders named
-    "to_sort_2023". Lightroom does this but costs €120/yr. FastStone is dated.
-    Nothing felt right.
+**Règles d'or**:
+- **Lire la sidebar** du subreddit avant de poster (chaque sub a ses règles).
+- **r/photography** interdit certains types de "self-promotion". Vérifier que
+  "tool I built" est OK (généralement oui s'il y a une vraie value).
+- **r/datahoarder** est plus permissif mais préfère les posts factuels et
+  techniques.
+- **Premier commentaire** sur ton propre post : ne pas re-coller le lien.
+  Répondre à la première question légitime.
 
-    The free version handles 95% of needs (date / camera / GPS organization,
-    duplicate detection with reversible quarantine, full rollback history).
+### 3.5 PyPI
 
-    The Pro edition (€19 one-shot) adds:
-    - Batch CLI: scriptable, runs from terminal / Task Scheduler / cron.
-    - Watch-folder: drop a photo, it auto-organizes.
+**Pré-requis** : nom `photoorganizer` libre (à vérifier).
 
-    Tech stack for the curious: Python 3.11, CustomTkinter, PyInstaller onefile,
-    170 tests, Apache-2.0 core + proprietary Pro.
+```bash
+# Vérifier que le nom est libre
+curl -s https://pypi.org/pypi/photoorganizer/json
+# Si "Not Found" → libre. Sinon → adapter `name` dans pyproject.toml.
 
-    Happy to answer questions about the freemium architecture, the EXE size
-    optimization journey (37 MB → 22 MB target, audit published), or anything
-    else. Cheers!
-    ```
-- **Calendrier** : S+3, mardi 9h Paris.
-- **Effort** : 2-3 h le jour J pour répondre aux commentaires (critique pour le ranking).
+# Build
+pip install --upgrade build twine
+python -m build
+ls dist/   # photoorganizer-2.3.0-py3-none-any.whl + .tar.gz
 
-### 2.5 Hacker News — Show HN ⭐⭐⭐⭐ — Lancement technique
+# Upload TestPyPI d'abord
+twine upload --repository testpypi dist/*
 
-- **Pertinence** : haute pour un projet open-source avec angle technique fort. PhotoOrganizer en a deux : **EXE optimization** (audit publié) et **freemium architecture pure offline**.
-- **Format** : `Show HN: <title> — <one-line>` ; lien direct vers GitHub README (pas vers landing page commerciale, HN déteste ça).
-- **Titre** (deux versions A/B possibles) :
-  - Version A : `Show HN: PhotoOrganizer — Free Windows app to organize photos by EXIF metadata`
-  - Version B : `Show HN: How I went from 37 MB to 22 MB PyInstaller EXE — and the audit script`
-  - **Recommandation** : version B → angle technique = mieux pour HN, sera plus upvotée. Inclure PhotoOrganizer comme exemple, link vers `docs/exe-optimization.md`.
-- **Calendrier** : **S+4, mardi-mercredi 7h PT** (10h ET, 16h Paris). Pas le jour du Product Hunt (concentrer l'attention).
-- **Stratégie de réponse** : être disponible 4-6 h pour répondre aux commentaires (HN voit l'activité auteur comme un signal positif). Réponses techniques uniquement, pas commercial.
-- **Risque** : HN peut être hostile au freemium si présenté maladroitement. Le ton doit être "voici comment c'est construit", pas "venez acheter".
+# Puis prod
+twine upload dist/*
+```
 
-### 2.6 Indie Hackers ⭐⭐⭐ — Lancement business
+PyPI n'apporte pas de ventes directes mais améliore la crédibilité auprès
+des devs (le projet apparaît dans `pip search`, dans les badges, dans les
+ranking pypi.io).
 
-- **Pertinence** : audience makers/indie devs. Bon pour discuter le côté freemium/pricing.
-- **Section** : "Show IH" puis post Milestone quand 1ère vente.
-- **Titre** : `Launching PhotoOrganizer Pro — going freemium on a 16k LOC Python desktop app`
-- **Contenu** (extrait) :
-  ```
-  After 18 months on the open-source GUI, I'm launching a Pro edition.
-  Pricing: $19 / $49 / $99 lifetime. Platform: Lemon Squeezy.
-  
-  Decisions I'm second-guessing:
-  - Offline RSA license vs online auth server (chose offline for zero recurring cost)
-  - Bundling vs separate Pro EXE (chose separate to keep core install lean)
-  - 19€ vs 39€ entry price (chose 19€ — race to volume, not margin)
-  
-  Curious to hear from anyone who's gone freemium on a desktop app.
-  ```
-- **Calendrier** : S+4, même semaine que Show HN mais jour différent (jeudi).
+### 3.6 AlternativeTo
 
-### 2.7 Reddit ⭐⭐⭐⭐ — Communautés thématiques
+Recensement vs Lightroom, FastStone, IrfanView, ACDSee. Lien
+[alternativeto.net/category/photography/photo-organizers/](https://alternativeto.net/category/photography/photo-organizers/).
 
-- **Pertinence** : haute si bien ciblé. **Risque modéré** : Reddit déteste l'auto-promotion mal cadrée (règle 9:1 — 9 contributions pour 1 self-promo).
-- **Subreddits ciblés** :
+Effort : 30 min de création de fiche. ROI : 2-10 visites/mois sur le moyen
+terme, mais elles sont qualifiées (utilisateurs qui cherchent activement
+une alternative).
 
-  | Subreddit | Membres | Angle | Risque |
-  |---|---|---|---|
-  | r/photography | 5,2 M | Outil utile pour photographes amateurs | Modéré — peu de devs |
-  | r/datahoarder | 800 k | "Organize my 50 TB of photos" | Faible — public technique tolérant |
-  | r/Windows10 / r/Windows11 | 1,2 M / 600 k | App native Windows | Faible |
-  | r/AskPhotography | 250 k | Réponse à des questions de tri | Faible si contextualisé |
-  | r/photographyprotips | 95 k | Workflow pro | Modéré |
-  | r/Lightroom | 200 k | Alternative gratuite | Élevé — pas trop polariser |
-  | r/freeware | 200 k | App gratuite Windows | Faible |
-  | r/opensource | 230 k | Apache-2.0, freemium model | Faible |
+---
 
-- **Format à privilégier** : pas "I built X, here's the link" mais "I had problem Y, I built X to solve it, here's what I learned" (storytelling).
-- **Titre exemple r/datahoarder** : `Built a free Windows tool to organize 50k+ photos by EXIF metadata — sharing in case useful`
-- **Calendrier** : étaler sur 2 semaines, 1 subreddit / 3 jours max (pour ne pas être flagué multi-post). Préférer après Product Hunt (peut référencer "as featured on PH").
+## 4. KPI à suivre (90 jours)
 
-### 2.8 LinkedIn ⭐⭐⭐⭐⭐ — Audience perso + lead magnet
+| KPI | Source | Cible 90 j | Échec si < |
+|---|---|---|---|
+| GitHub stars | repo | 100-300 | 30 |
+| Downloads EXE | Release insights | 500-2 000 | 100 |
+| Ventes Lemon Squeezy | dashboard LS | 10-150 | 3 |
+| Taux conversion télécharg → vente | calculé | 1-5 % | < 0,5 % |
+| Demandes de réémission | email support | < 10 % des ventes | > 30 % |
+| Avis externes (Reddit, dev.to, etc.) | recherche Google "PhotoOrganizer Kiriiaq" | ≥ 3 | 0 |
 
-- **Pertinence** : critique pour le lead magnet (voie 5 monétisation). Public mixte décideurs / devs / recruteurs.
-- **Format** : 3 posts structurés (cf. Phase 7) sur 6 semaines.
-  - **Post 1** : technique court (800-1200 c) — l'optimisation EXE, le freemium architecture.
-  - **Post 2** : carrousel 6-8 slides — features, stack, archi.
-  - **Post 3** : storytelling long (1500-2000 c) — d'où vient le projet, friction, résultat.
-- **Hashtags** (3-5 max, pas en pavé) : `#Python`, `#WindowsDevelopment`, `#OpenSource`, `#IndieDev`.
-- **CTA** : lien GitHub + offre de discussion ("DM si tu veux échanger sur le tri d'images, le packaging Python, ou la stratégie freemium").
-- **Calendrier** : S+3 post 1, S+5 post 2, S+8 post 3. Espacement = pas saturer l'audience.
+---
 
-### 2.9 X / Twitter ⭐⭐⭐ — Snippets visuels
+## 5. Décision à T+90 jours
 
-- **Pertinence** : moyenne. Bon pour visibilité dev / photo. Format court.
-- **Thread structuré** : 4-6 tweets avec image par tweet.
-  - Tweet 1 : hook + screenshot S-01.
-  - Tweet 2 : problème en 1 phrase + chiffre (ex : "10 000 photos, 4 appareils").
-  - Tweet 3 : G-01 (GIF démo).
-  - Tweet 4 : stack tech (badge style).
-  - Tweet 5 : audit EXE optimization (1 chiffre marquant).
-  - Tweet 6 : CTA "Free on GitHub, Pro €19 — link in bio".
-- **Calendrier** : S+3 (en parallèle Product Hunt) puis 1 thread / mois.
-
-### 2.10 dev.to / Medium ⭐⭐⭐ — Articles techniques
-
-- **Pertinence** : moyenne-haute pour SEO et pour le lead magnet. Génère du backlink GitHub.
-- **Articles à écrire** :
-
-  | # | Titre | Plateforme | Effort | Quand |
-  |---|---|---|---|---|
-  | A1 | `How I reduced a PyInstaller .exe from 37 MB to 22 MB` | dev.to | 4-6 h | S+5 |
-  | A2 | `Freemium architecture for a Python desktop app: license validation without a server` | dev.to | 3-4 h | S+7 |
-  | A3 | `CustomTkinter in production: 5 patterns I wish I knew before shipping 16k LOC` | dev.to | 3-4 h | S+10 |
-- **Tags dev.to** (max 4) : `python`, `windows`, `opensource`, `tutorial`.
-- **Cross-post** Medium / Hashnode 1 semaine après dev.to (SEO non-cannibalisé).
-
-### 2.11 YouTube ⭐⭐ — Démo vidéo
-
-- **Pertinence** : moyenne. Investissement temps élevé pour résultat incertain sans audience pré-existante.
-- **Vidéo cible** : `intro.mp4` produite pour MEDIA.md V-01 (60 s pitch + démo).
-- **Titre** : `PhotoOrganizer — Auto-sort thousands of photos by EXIF (Windows, free + open source)`
-- **Description** : pitch + chapters + liens GitHub / Pro / Ko-fi.
-- **Tags YouTube** : `photo organizer`, `exif metadata`, `windows photo software`, `python desktop app`, `customtkinter`, `free photo software`.
-- **Calendrier** : S+5 (après production vidéo). Ne pas attendre la vidéo si elle bloque — c'est P2.
-
-### 2.12 AlternativeTo ⭐⭐⭐ — Recensement gratuit
-
-- **Pertinence** : SEO long terme. Quand quelqu'un cherche "Lightroom alternative free", PhotoOrganizer doit apparaître.
-- **Action** : créer une entrée [alternativeto.net/software/lightroom/](https://alternativeto.net/) → "Suggest alternative" → PhotoOrganizer.
-- **Description** : reprendre celle de Product Hunt.
-- **Tags** : free, open-source, windows, photo-management.
-- **Calendrier** : S+6 (après Product Hunt, pour pouvoir mentionner "Featured on PH").
-- **Effort** : 30 min.
-
-### 2.13 Plateformes écartées
-
-| Plateforme | Raison du rejet |
+| Si... | Alors... |
 |---|---|
-| **Microsoft Store** | Certification stricte, signature .exe payante (300 €+/an), processus 1-3 semaines. Pas rentable au niveau de ventes attendu. |
-| **Chocolatey** | Nécessite maintenance manifest + tests automatiques. Public dev/admin, pas la cible PhotoOrganizer. À reconsidérer si traction Windows pro. |
-| **Snap Store / Flathub** | App Windows uniquement. Hors scope. |
-| **Itch.io** | Plateforme game-focused. Hors scope. |
-| **VSCode / Chrome / Figma Marketplace** | Pas un plugin de ces écosystèmes. |
-| **Softpedia / FileHippo** | Audience qui ne convertit pas en Pro. Effort de soumission > gain. |
-| **Mastodon** | Pertinent mais audience tech faible vs LinkedIn/X. À cumuler si déjà actif, sinon pas la peine de créer un compte. |
+| Ventes > 100 | Continuer vers v3.0 (réactivation modules Pro batch/watch/plugins comme add-on payant séparé) |
+| Ventes 20-100 | Optimiser pricing/copy, ajuster la limite gratuite (10 → 15 ?), basculer en mode B automatique pour l'envoi clé |
+| Ventes < 20 | Garder la boutique en mode passif, repositionner le projet comme lead magnet portfolio (voie complémentaire MONETIZATION §1) |
 
 ---
 
-## 3. Calendrier de lancement sur 6 semaines
+## 6. Risques de distribution et mitigations
 
-> **Règle d'or** : ne **jamais** lancer plusieurs canaux le même jour. Étaler permet de capitaliser sur l'effet "as seen on X" pour la plateforme suivante.
-
-### Vue compacte
-
-```
-S-1 ────── S+0 ─── S+1 ─── S+2 ─── S+3 ─── S+4 ─── S+5 ─── S+6 ─── S+8 ─── S+10
- │           │       │       │       │       │       │       │       │       │
- prep      GitHub  PyPI    Reddit  Product  Show HN dev.to  Alt.To  LinkedIn dev.to
-           Release LSqueezy r/free  Hunt    Indie   article banner  post 2   art 2
-                            ware            Hackers A1      sociale  carrousel
-```
-
-### Détail jour par jour
-
-| Date | Plateforme | Action | Pré-requis | Effort |
-|---|---|---|---|---|
-| **S-1** (prep) | — | Produire S-01 + G-01 + L-03 logo (cf. [MEDIA.md](MEDIA.md)) | rien | 4-6 h |
-| **S-1** | GitHub | Préparer release notes complètes basées sur CHANGELOG | rien | 1 h |
-| **S-1** | Lemon Squeezy | Configurer compte, page produit en mode brouillon | Pro V1 build OK | 4-6 h |
-| **S+0 lundi** | GitHub | **Tag `v2.2.0` + Release** avec EXE + checksums | release notes | 1 h |
-| **S+0 lundi** | Lemon Squeezy | **Publier page** en live (mais ne pas annoncer) | webhook OK | 30 min |
-| **S+1 mercredi** | PyPI | **Upload `photoorganizer 2.2.0`** | wheel OK | 2-3 h |
-| **S+1 jeudi** | Reddit | Post r/freeware (court, factuel) | rien | 1 h |
-| **S+2 lundi** | Reddit | Post r/datahoarder (storytelling) | post r/freeware OK | 1 h |
-| **S+3 mardi 9h Paris** | **Product Hunt** | **Submission jour J** + first comment + monitoring 4-6 h | Hunter trouvé, 4-5 visuels | 4-6 h |
-| **S+3 mercredi** | LinkedIn | **Post 1** (technique court) | rien | 1 h écriture + 1 h interactions |
-| **S+3 mercredi** | X / Twitter | **Thread** 4-6 tweets en parallèle LinkedIn | visuels prêts | 1 h |
-| **S+4 mercredi** | **Hacker News** | **Show HN** : `How I went from 37 MB to 22 MB PyInstaller EXE` | audit EXE publié | 4-6 h monitoring |
-| **S+4 jeudi** | Indie Hackers | Post Milestone freemium launch | rien | 1 h |
-| **S+5 mardi** | Reddit | Post r/photography (positionnement utilisateur) | rien | 1 h |
-| **S+5 mercredi** | LinkedIn | **Post 2** : carrousel 6-8 slides | carrousel produit (Figma) | 4 h écriture + 1 h interactions |
-| **S+5 vendredi** | dev.to | **Article A1** : `How I reduced PyInstaller .exe from 37 MB to 22 MB` | audit publié | 4-6 h |
-| **S+6 lundi** | AlternativeTo | Créer entrée comme alternative à Lightroom, FastStone, IrfanView | rien | 30 min |
-| **S+7 mercredi** | dev.to | **Article A2** : `Freemium architecture for Python desktop app` | rien | 3-4 h |
-| **S+8 lundi** | LinkedIn | **Post 3** : storytelling long | rien | 3-4 h |
-| **S+10 mercredi** | dev.to | **Article A3** : `CustomTkinter in production` | rien | 3-4 h |
-
-### Effort cumulé
-
-- **Préparation S-1** : 9-13 h
-- **Semaines 0-2** (publication + premières communautés) : 10-15 h
-- **Semaines 3-4** (lancement Product Hunt + Show HN + LinkedIn) : 18-25 h
-- **Semaines 5-10** (marketing organique) : 20-30 h
-
-**Total 6-10 semaines : 60-85 h** (~ 8-11 jours-homme étalés).
+| Risque | Probabilité | Impact | Mitigation |
+|---|---|---|---|
+| Compte Lemon Squeezy bloqué (anti-fraude) | Faible | Haut | Lire les CGU LS avant inscription, fournir un site web vitrine (README GitHub suffit). Backup : Gumroad. |
+| Defender SmartScreen bloque l'EXE | Élevée | Modéré | Documenté dans README et SECURITY.md. Coût certificat code-sign ~80 €/an reporté à T+90 si traction. |
+| Product Hunt low score → invisibilité | Élevée | Faible (effort 2 h) | Submit un jour calme, préparer un hunter influent si possible. Ne pas en faire la stratégie principale. |
+| HN downvotes massifs | Modérée | Modéré | Soigner le first comment technique, accepter que HN soit imprévisible. |
+| Reddit ban pour auto-promo | Modérée | Modéré | Lire chaque sidebar avant de poster, espacer les posts, jamais de cross-post simultané. |
 
 ---
 
-## 4. Métriques à suivre (KPI)
+## 7. Documents associés
 
-| Métrique | Source | Cible 90 j |
-|---|---|---|
-| GitHub stars | github.com/Kiriiaq/PhotoOrganizer | 200-500 |
-| Downloads EXE | GitHub Release insights | 1 000-3 000 |
-| Visiteurs Product Hunt | dashboard PH | 500-3 000 |
-| Upvotes Show HN | news.ycombinator.com | 30-150 |
-| Followers LinkedIn (delta) | LinkedIn analytics | +50-200 |
-| Ventes Lemon Squeezy | dashboard LS | 10-100 |
-| Dons Ko-fi | dashboard Ko-fi | 5-30 |
-| Backlinks / mentions | Google Alerts `"PhotoOrganizer" Kiriiaq` | 5-20 |
-| Issues GitHub ouvertes | github issues | 5-30 |
-
-**Décision à T+90j** : si ventes Pro > 50 → continuer V2 modules (plugin API, rapports avancés). Si < 10 → bascule sur lead magnet seul (voie 5), pas V2 Pro.
-
----
-
-## 5. Erreurs à éviter
-
-1. **Tout lancer le même jour** : disperse l'attention, perd l'effet "as seen on X".
-2. **Soumettre Product Hunt sans Hunter** : visibilité ÷3-5. Soit attendre d'en trouver un, soit poster soi-même un mercredi calme.
-3. **Reddit auto-promo brute** : `"I built X check it out"` → downvote en 5 min. Toujours storytelling + valeur d'abord.
-4. **Show HN avec lien Lemon Squeezy en première place** : HN flag commercial. Lien GitHub README uniquement.
-5. **Spam de subreddits** : 1 par 3 jours max, jamais 2 le même jour.
-6. **LinkedIn hashtag-spam** (10+ #) : algorithme dévalorise. Max 5.
-7. **Vidéo YouTube générique sans hook 3 secondes** : 80 % drop avant 10 s. Investir dans le hook ou ne pas faire.
-8. **Annoncer Pro avant que le checkout marche** : 0 conversions, frustration utilisateur.
-
----
-
-## 6. Questions ouvertes (décision humaine)
-
-1. **Hunter Product Hunt** : as-tu un contact ou faut-il en trouver un via [PHHunters](https://hunterboard.io/) ?
-2. **Compte PyPI** : déjà existant sur ton email ?
-3. **Audience LinkedIn actuelle** : 500 ? 5 000 ? 50 000 ? (calibre les attentes posts).
-4. **Disponibilité 4-6 h le jour Product Hunt** : pour répondre aux commentaires en temps réel.
-5. **Tolérance Reddit** : OK pour gérer les downvotes / commentaires hostiles ?
-6. **Vidéo YouTube** : prioritaire ou différée ? (60 s = ~1 j de prod ; intro brute = 3 h).
-7. **Cible géographique** : francophone (forums photo FR) ou anglophone (PH, HN, Reddit US) en priorité ? Recommandé : anglophone pour volume, FR en complément.
+- **Drafts de publication** : [LINKEDIN_DRAFTS.md](../LINKEDIN_DRAFTS.md)
+- **Stratégie monétisation** : [docs/MONETIZATION.md](MONETIZATION.md)
+- **Procédure pas-à-pas** : [NEXT_STEPS.html](../NEXT_STEPS.html)
+- **Assets à produire** : [docs/MEDIA.md](MEDIA.md)
+- **Privacy Policy** : [docs/PRIVACY.md](PRIVACY.md)

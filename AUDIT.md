@@ -557,6 +557,56 @@ Fichiers standards créés : `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `
 
 ---
 
+## 15. Phase 8 — Pivot économique (2026-05-26)
+
+> ⚠️ **Cette Phase supersede la Phase 5 (monétisation freemium 19/49/99 €).**
+> L'analyse initiale de la Phase 5 reste valable comme exercice d'évaluation des 8 voies,
+> mais la voie 2 retenue (freemium par fonctionnalité) est abandonnée au profit d'un
+> modèle plus simple. Le détail Phase 5 est conservé pour traçabilité historique.
+
+### 15.1 Décision
+
+| Élément | Avant (Phase 5) | Après (Phase 8) |
+|---|---|---|
+| Architecture | Core gratuit + édition Pro séparée | **Édition unique** |
+| Tiers de prix | 19 € / 49 € / 99 € (Personal/Studio/Lifetime) | **10 € unique** |
+| Différentiateur | Features additionnelles (batch CLI, watch, plugins) | **Limite d'usage** (10 tris d'essai) |
+| Activation | Clé HMAC par édition | Clé HMAC universelle, **bound 1 PC** à la 1ère activation |
+| Politique réémission | Mises à jour 1-2 ans, support email | **Aucune réémission** (changement PC = rachat) |
+| Maintenance | 2 binaires (free + pro), 61 tests Pro | **1 binaire**, 61 tests Pro skippés v3.0+ |
+
+### 15.2 Raisonnement
+
+1. **Le testeur teste exactement ce qu'il achète** — modèle Sublime Text universellement compris.
+2. **Maintenance d'une seule codebase** — pas de `build.py --pro`, pas de double release.
+3. **Pricing simple** — 10 € one-shot, pas d'arbitrage entre 3 éditions au checkout.
+4. **Friction d'entrée minimale** — l'utilisateur peut essayer la valeur réelle (10 tris suffisent à valider l'utilité), pas une démo bridée.
+
+### 15.3 Implications
+
+- **Modules Pro existants** (`src/photoorganizer_pro/cli/`, `scheduler/`, `plugins/`) : gelés v3.0+ — entry points commentés, tests skippés. Conservés intacts pour réactivation conditionnelle si traction.
+- **Module licence** (`src/photoorganizer_pro/license/`) : conservé et **adapté** — la signature HMAC reste, on ajoute le `machine_id_bound`.
+- **Nouveau module à créer** : `src/utils/licensing.py` — gestion du compteur HMAC + machine binding + état trial/activée.
+- **Documentation à mettre à jour** : `CLAUDE.md` ✅, `docs/MONETIZATION.md` ✅, `NEXT_STEPS.html` ✅, `README.md` ✅, `CHANGELOG.md` ✅, `LINKEDIN_DRAFTS.md` (à faire).
+
+### 15.4 Recommandations actualisées (remplacent §14.4)
+
+| Ordre | Action | Référence | Effort | Bloque |
+|---:|---|:---:|:---:|---|
+| 1 | **P0** Créer `src/utils/licensing.py` (compteur + binding + tests) | NEXT_STEPS A.1-A.3 | 5-7 h | Toute la monétisation |
+| 2 | **P0** Modal inline d'activation/blocage + badge global | NEXT_STEPS A.4-A.6 | 4-5 h | UX du modèle |
+| 3 | **P0** Setup Lemon Squeezy (1 produit, 10 €) + mode envoi clé manuel | NEXT_STEPS B + C.1 | 1-2 h | Revenue |
+| 4 | **P0** Produire screenshots/GIF S-01, G-01, S-02 | NEXT_STEPS D.3 | 4-6 h | Communication |
+| 5 | **P0** Privacy Policy publiée (lien GitHub) | NEXT_STEPS D.4 | 15 min | Lemon Squeezy |
+| 6 | **P0** Auto-entreprise si pas créée | NEXT_STEPS D.1 | 5 min admin | Encaissement |
+| 7 | **P1** Vérifier clause employeur | NEXT_STEPS D.2 | 1 h | Légalité |
+| 8 | **P1** Réécrire LINKEDIN_DRAFTS.md sur le nouveau pitch | — | 1-2 h | Cohérence com |
+| 9 | **P1** Skip explicite des tests Pro v3.0+ + commentaires entry points | — | 30 min | Hygiène |
+
+**Cumul P0** : environ **15-20 h** entre code, légal, visuels et setup commercial.
+
+---
+
 ## Journal de l'audit projet
 
 | Date | Phase | Action |
@@ -565,4 +615,7 @@ Fichiers standards créés : `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `
 | 2026-05-19 | 2 | Restructuration appliquée — 572 renommages, 4 suppressions, 7 refactors, 0 régression de test. |
 | 2026-05-19 | 3 | Fichiers standards générés (README rewrité, CHANGELOG, CONTRIBUTING, SECURITY, CLAUDE, PROJECT_OVERVIEW, docs/ARCHITECTURE, docs/MEDIA). |
 | 2026-05-19 | 4 | Audit de complétude — 10 dimensions évaluées, 1 P0 (démo visuelle), 4 P1, plan d'action 6-8 h. |
+| 2026-05-19 | 5-7 | Phases monétisation + distribution + communication (freemium 19/49/99). **Superseded par Phase 8.** |
+| 2026-05-19 | Pro V1.1 | Livraison modules Pro (batch CLI, watch-folder, Plugin API, 61 tests). |
+| **2026-05-26** | **8** | **Pivot économique** — abandon édition Pro séparée, adoption modèle trial+unlock 10 € lifetime / 10 tris / 1 PC. Voir §15. |
 

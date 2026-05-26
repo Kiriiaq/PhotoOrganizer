@@ -8,9 +8,9 @@ Email: manugrolleau48@gmail.com
 Ko-fi: https://ko-fi.com/kiriiaq
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 
 # Configuration Windows pour l'icone dans la barre des taches
 if sys.platform == 'win32':

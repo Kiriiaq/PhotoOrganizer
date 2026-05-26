@@ -1,30 +1,17 @@
 """Watch-folder — feature Pro.
 
-Surveille un dossier et déclenche l'organisation automatique des
-nouveaux fichiers vers une destination triée.
+Surveille un dossier source et organise automatiquement chaque nouveau
+fichier vers une destination triée.
 
-Dépendance optionnelle : ``watchdog`` (extras ``pro`` de pyproject.toml).
-Sans watchdog, on retombe sur un polling simple (intervalle configurable).
+Backend : ``watchdog`` si disponible (extras ``pro`` de pyproject.toml),
+fallback polling toutes les 10 s sinon.
 
-Usage typique
--------------
+Sécurité de l'écriture en cours : un *debounce* (par défaut 5 s) est
+appliqué entre la détection et le traitement, pour laisser le temps à
+un transfert depuis carte SD de se terminer avant d'invoquer
+l'organiseur sur un fichier encore en cours d'écriture.
 
-::
-
-    photo-organizer-pro-watch \\
-        --source "D:/Camera Imports" \\
-        --dest "D:/Photos/library" \\
-        --by-date --by-camera \\
-        --copy
-
-    # Ctrl+C pour arrêter.
-
-Sous Windows : peut être enregistré comme service via
-`nssm <https://nssm.cc/>`_ pour tourner en arrière-plan au démarrage.
-
-Le délai par défaut entre la détection et l'organisation est de
-**5 secondes** : laisse le temps à un transfert depuis SD card de se
-terminer avant de tenter d'organiser un fichier encore en écriture.
+Service Windows : voir ``docs/PRO.md`` (section NSSM).
 """
 
 from __future__ import annotations
@@ -34,24 +21,31 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
 
-# Extensions surveillées (alignées avec core/operations/file_manager.py)
+# Extensions surveillées (alignées avec ``core/operations/file_manager.py``)
 WATCHED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif",
-    ".webp", ".jfif", ".jp2", ".heic", ".heif",
+    ".webp", ".jfif", ".jp2", ".heic", ".heif", ".avif",
     ".raw", ".arw", ".cr2", ".cr3", ".nef", ".orf", ".rw2", ".dng",
-    ".mp4", ".mov", ".avi", ".mkv",
+    ".3fr", ".raf", ".pef", ".srw", ".sr2", ".x3f", ".mef", ".iiq", ".rwl",
+    ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm",
+    ".3gp", ".m4v", ".mpg", ".mpeg", ".mts", ".ts", ".vob",
 }
 
 DEFAULT_DEBOUNCE_SECONDS = 5
 
 
 class WatchFolder:
-    """Surveille un dossier source et organise les nouveaux fichiers."""
+    """Surveille un dossier source et organise les nouveaux fichiers.
+
+    Conçu pour être instanciable et testable indépendamment de la couche
+    CLI : on peut piloter à la main les méthodes ``handle_path`` /
+    ``poll_once`` sans démarrer la vraie boucle de surveillance.
+    """
 
     def __init__(
         self,
@@ -64,6 +58,7 @@ class WatchFolder:
         date_format: str = "year/month",
         copy: bool = True,
         debounce_seconds: int = DEFAULT_DEBOUNCE_SECONDS,
+        sleep_fn: Callable[[float], None] = time.sleep,
     ):
         self.source = source
         self.dest = dest
@@ -73,11 +68,54 @@ class WatchFolder:
         self.date_format = date_format
         self.copy = copy
         self.debounce_seconds = debounce_seconds
-        self._processed: set[str] = set()
+        # Injection pour permettre aux tests de neutraliser sleep().
+        self._sleep = sleep_fn
+        # Anti-doublon : ne pas retraiter le même chemin.
+        self._processed: Set[str] = set()
 
+    # -----------------------------------------------------------------
+    # API publique (testable)
+    # -----------------------------------------------------------------
+    def is_watched(self, path: Path) -> bool:
+        """True si ``path`` est un fichier média qu'on doit traiter."""
+        return path.suffix.lower() in WATCHED_EXTENSIONS
+
+    def already_processed(self, path: Path) -> bool:
+        return str(path.resolve()) in self._processed
+
+    def mark_processed(self, path: Path) -> None:
+        self._processed.add(str(path.resolve()))
+
+    def handle_path(self, file_path: Path) -> bool:
+        """Traite UN fichier (debounce + organize). Retourne True si organisé.
+
+        N'attrape pas KeyboardInterrupt — la boucle parent s'en charge.
+        """
+        if not self.is_watched(file_path):
+            return False
+        if self.already_processed(file_path):
+            return False
+        # Debounce : laisser le temps à l'écriture de finir
+        if self.debounce_seconds > 0:
+            self._sleep(self.debounce_seconds)
+        if not file_path.exists():
+            return False  # supprimé entretemps
+        try:
+            ok = self._organize_one(file_path)
+        except Exception as exc:  # noqa: BLE001 — surveillance long-running, on log et continue
+            logger.error("Erreur sur %s : %s", file_path.name, exc)
+            return False
+        if ok:
+            logger.info("Organisé : %s", file_path.name)
+            self.mark_processed(file_path)
+        else:
+            logger.warning("Échec organisation : %s", file_path.name)
+        return ok
+
+    # -----------------------------------------------------------------
+    # Backend organisation (peut être patché en test)
+    # -----------------------------------------------------------------
     def _organize_one(self, file_path: Path) -> bool:
-        """Organise un seul fichier. Retourne True si réussi."""
-        # Import différé pour rester léger au démarrage.
         from src.core.operations import FileManager, OrganizationOptions, SmartOrganizer
 
         fm = FileManager()
@@ -86,40 +124,22 @@ class WatchFolder:
             organize_by_camera=self.by_camera,
             organize_by_location=self.by_gps,
             date_format=self.date_format,
-            copy_instead_of_move=self.copy,
+            copy_not_move=self.copy,
+            auto_rename=True,
         )
         organizer = SmartOrganizer(file_manager=fm)
         result = organizer.organize(
-            files=[str(file_path)],
-            source_dir=str(self.source),
-            dest_dir=str(self.dest),
+            file_paths=[str(file_path)],
+            target_dir=str(self.dest),
             options=opts,
         )
-        return result.success == 1
+        return result.success >= 1
 
-    def _handle_new_file(self, file_path: Path) -> None:
-        if file_path.suffix.lower() not in WATCHED_EXTENSIONS:
-            return
-        # Anti-doublon : ne pas retraiter le même chemin (peut arriver
-        # avec certains FS qui émettent plusieurs events pour 1 fichier).
-        key = str(file_path.resolve())
-        if key in self._processed:
-            return
-        # Debounce : attendre que l'écriture soit terminée.
-        time.sleep(self.debounce_seconds)
-        if not file_path.exists():
-            return  # supprimé pendant le debounce
-        try:
-            if self._organize_one(file_path):
-                logger.info("Organisé : %s", file_path.name)
-                self._processed.add(key)
-            else:
-                logger.warning("Échec organisation : %s", file_path.name)
-        except Exception as exc:  # noqa: BLE001  — boucle de surveillance, on log et continue
-            logger.error("Erreur sur %s : %s", file_path.name, exc)
-
+    # -----------------------------------------------------------------
+    # Boucles d'exécution
+    # -----------------------------------------------------------------
     def run(self) -> int:
-        """Lance la surveillance. Retourne quand l'utilisateur Ctrl+C."""
+        """Lance la surveillance. Retourne le code de sortie."""
         if not self.source.exists():
             print(f"ERREUR : source introuvable : {self.source}", file=sys.stderr)
             return 1
@@ -135,52 +155,80 @@ class WatchFolder:
             from watchdog.observers import Observer
         except ImportError:
             print(
-                "watchdog non installé — fallback en polling toutes les 10s. "
+                "watchdog non installé — fallback polling 10s. "
                 "Pour de meilleures performances : pip install watchdog",
                 file=sys.stderr,
             )
             return self._run_polling()
 
+        watcher = self
+
         class _Handler(FileSystemEventHandler):
-            def __init__(self, watcher: "WatchFolder"):
-                self.watcher = watcher
-
-            def on_created(self, event):
+            def on_created(self, event):  # noqa: D401
                 if not event.is_directory:
-                    self.watcher._handle_new_file(Path(event.src_path))
+                    watcher.handle_path(Path(event.src_path))
 
-            def on_moved(self, event):
-                # Un déplacement IN du dossier surveillé compte comme création.
-                if not event.is_directory and Path(event.dest_path).is_relative_to(self.watcher.source):
-                    self.watcher._handle_new_file(Path(event.dest_path))
+            def on_moved(self, event):  # noqa: D401
+                if event.is_directory:
+                    return
+                dest_path = Path(event.dest_path)
+                try:
+                    if dest_path.is_relative_to(watcher.source):
+                        watcher.handle_path(dest_path)
+                except (ValueError, AttributeError):
+                    # is_relative_to peut lever ValueError sur Py < 3.9 ;
+                    # on retombe sur l'ancienne forme.
+                    try:
+                        dest_path.relative_to(watcher.source)
+                        watcher.handle_path(dest_path)
+                    except ValueError:
+                        pass
 
         observer = Observer()
-        observer.schedule(_Handler(self), str(self.source), recursive=True)
+        observer.schedule(_Handler(), str(self.source), recursive=True)
         observer.start()
         try:
             while observer.is_alive():
                 observer.join(1)
         except KeyboardInterrupt:
+            print("\nArrêt utilisateur (Ctrl+C).", file=sys.stderr)
             observer.stop()
         observer.join()
         return 0
 
+    def poll_once(self, seen: Optional[Set[str]] = None) -> Set[str]:
+        """Un tour de polling. Retourne l'ensemble courant des chemins.
+
+        Exposée publiquement pour les tests : permet de simuler
+        l'apparition de nouveaux fichiers en injectant un ``seen`` initial
+        partiel.
+        """
+        current: Set[str] = set()
+        if not self.source.exists():
+            return current
+        for p in self.source.rglob("*"):
+            if p.is_file():
+                key = str(p.resolve())
+                current.add(key)
+                if seen is not None and key not in seen:
+                    self.handle_path(p)
+        return current
+
     def _run_polling(self) -> int:
-        """Fallback sans watchdog : poll toutes les 10 secondes."""
-        seen = {str(p.resolve()) for p in self.source.rglob("*") if p.is_file()}
+        seen = self.poll_once(seen=None)  # initial scan : on marque tout comme "déjà vu"
         try:
             while True:
-                time.sleep(10)
-                current = {str(p.resolve()): p for p in self.source.rglob("*") if p.is_file()}
-                new = set(current) - seen
-                for key in new:
-                    self._handle_new_file(current[key])
-                seen = set(current)
+                self._sleep(10)
+                seen = self.poll_once(seen=seen)
         except KeyboardInterrupt:
+            print("\nArrêt utilisateur (Ctrl+C).", file=sys.stderr)
             return 0
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+# -----------------------------------------------------------------
+# Entry point CLI
+# -----------------------------------------------------------------
+def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="photo-organizer-pro-watch",
         description="Surveille un dossier et organise les nouveaux fichiers (édition Pro).",
@@ -204,13 +252,12 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
-    # Licence Pro requise.
     from src.photoorganizer_pro.license import load_active_license
 
     if load_active_license() is None:
         print(
             "ERREUR : aucune licence Pro valide trouvée.\n"
-            "  Achetez ou activez votre licence : https://photoorganizer.lemonsqueezy.com",
+            "  Achète ou active ta licence : https://photoorganizer.lemonsqueezy.com",
             file=sys.stderr,
         )
         return 2

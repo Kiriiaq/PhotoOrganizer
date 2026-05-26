@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.metadata.gps_processor import get_processor as get_gps_processor
 from core.operations.file_manager import FileManager
+from utils import licensing
 from utils.cache import init_cache
 from utils.config import get_config
 
@@ -32,7 +33,7 @@ class PhotoOrganizerApp(ctk.CTk):
     """Application principale PhotoOrganizer."""
 
     APP_NAME = "PhotoOrganizer"
-    APP_VERSION = "2.2.0"
+    APP_VERSION = "2.3.0-dev"
 
     def __init__(self):
         """Initialise l'application."""
@@ -114,6 +115,9 @@ class PhotoOrganizerApp(ctk.CTk):
         if config.recent_destinations:
             self.dest_folder.set(config.recent_destinations[0])
 
+        # Initialise le badge d'état licence (essai / activée / bloqué)
+        self.refresh_license_badge()
+
     def _create_ui(self):
         """Crée l'interface utilisateur.
 
@@ -182,6 +186,19 @@ class PhotoOrganizerApp(ctk.CTk):
         )
         self.theme_button.pack(side="right", padx=PAD_S)
         attach_tooltip(self.theme_button, APP_TIPS["btn_theme"])
+
+        # Badge d'état licence (pivot 2026-05-26)
+        # Cliquable : ouvre le panneau d'activation dans l'onglet Organisation.
+        self.license_badge = ctk.CTkButton(
+            header_frame,
+            text="Essai —/10",
+            width=160, height=BTN_H_STD,
+            command=self._on_license_badge_click,
+            fg_color=("gray80", "gray25"),
+            hover_color=("gray70", "gray35"),
+            text_color=("gray10", "gray90"),
+        )
+        self.license_badge.pack(side="right", padx=PAD_S)
 
         help_button = ctk.CTkButton(
             header_frame,
@@ -285,6 +302,89 @@ class PhotoOrganizerApp(ctk.CTk):
 
         self.update_idletasks()
 
+    # ------------------------------------------------------------------
+    # Badge licence — visible dans le header, refresh sur événements
+    # ------------------------------------------------------------------
+    def refresh_license_badge(self):
+        """Met à jour le texte + la couleur du badge selon l'état licence.
+
+        Appelée :
+        - à l'initialisation de l'app
+        - après chaque tri réussi (depuis OrganizeFrame)
+        - après une activation réussie
+
+        États visuels :
+        - "Activée · MAC-XXXX-XXXX" : vert
+        - "Limite atteinte · Activer" : rouge
+        - "Essai N/10" (N >= 8) : orange (warning)
+        - "Essai N/10" (N < 8) : gris neutre
+        """
+        try:
+            state = licensing.get_state()
+        except Exception as exc:  # noqa: BLE001 — un crash crypto ne doit pas casser l'UI
+            logger.warning(f"refresh_license_badge: get_state a échoué : {exc}")
+            return
+
+        if not hasattr(self, "license_badge"):
+            # Header pas encore créé (cas d'appel précoce).
+            return
+
+        text = state.status_badge_text
+        if state.has_valid_license:
+            fg = ("#cfe8d2", "#1f3a23")
+            text_color = ("#1f5a2b", "#a6e3a1")
+            hover = ("#bbdfc0", "#28492c")
+        elif state.is_blocked:
+            fg = ("#f7d9d6", "#3a1c1a")
+            text_color = ("#9a2620", "#f7a39e")
+            hover = ("#f0c4c0", "#4b2521")
+        elif state.should_warn:
+            fg = ("#f7e7c4", "#3a2e16")
+            text_color = ("#8a5a10", "#f3c876")
+            hover = ("#efd8a3", "#4a3a1c")
+        else:
+            fg = ("gray80", "gray25")
+            text_color = ("gray10", "gray90")
+            hover = ("gray70", "gray35")
+
+        try:
+            self.license_badge.configure(
+                text=text,
+                fg_color=fg,
+                text_color=text_color,
+                hover_color=hover,
+            )
+        except tk.TclError as exc:
+            logger.debug(f"refresh_license_badge: configure failed : {exc}")
+
+    def _on_license_badge_click(self):
+        """Action sur clic du badge.
+
+        - Si pas de licence : ouvre le panneau d'activation dans
+          l'onglet Organisation.
+        - Si licence active : affiche un récap dans la status bar.
+        """
+        try:
+            state = licensing.get_state()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"_on_license_badge_click: {exc}")
+            return
+
+        if state.has_valid_license:
+            email = state.license_email or "(inconnu)"
+            self._update_status(
+                f"Licence activée · {email} · {state.machine_id_short}"
+            )
+            return
+
+        # Sinon, redirige vers l'onglet Organisation et ouvre le panneau
+        # d'activation.
+        try:
+            self.tabview.set("📁 Organisation")
+            self.organize_frame._show_unlock_panel()
+        except (tk.TclError, AttributeError) as exc:
+            logger.warning(f"_on_license_badge_click: cannot open panel: {exc}")
+
     def _toggle_theme(self):
         """Bascule entre thème clair et sombre."""
         current = ctk.get_appearance_mode()
@@ -319,8 +419,8 @@ Formats supportés:
 • Images: JPG, PNG, HEIC, RAW, etc.
 • Vidéos: MP4, MOV, AVI, etc.
 
-© 2024-2026 PhotoOrganizer Team
-Licence MIT
+© 2024-2026 Kiriiaq (Emmanuel Grolleau)
+Licence Apache-2.0 (code) — Édition activable 10 € (binaire).
 """
         messagebox.showinfo("À propos", about_text)
 

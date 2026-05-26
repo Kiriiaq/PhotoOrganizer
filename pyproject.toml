@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photoorganizer"
-version = "2.2.0"
+version = "2.3.0.dev0"
 description = "Automatic photo organizer by EXIF metadata (Windows desktop, CustomTkinter)"
 readme = "README.md"
 license = "Apache-2.0"
@@ -50,7 +50,9 @@ toast = [
     "plyer>=2.1",
 ]
 pro = [
-    # Pour le module watch-folder (sinon fallback polling 10s)
+    # Extra conservé pour la future v3.0+ (watch-folder).
+    # Inutile en v2.x — peut être ignoré tant que les entry points Pro
+    # restent commentés dans [project.scripts] ci-dessous.
     "watchdog>=3.0",
 ]
 
@@ -63,11 +65,26 @@ Funding = "https://ko-fi.com/kiriiaq"
 [project.scripts]
 photo-organizer = "src.main:main"
 photo-organizer-dedup = "src.cli.duplicate_cli:main"
-# Pro edition entry points (modules absent in this open-source repo,
-# fully functional only when LICENSE-PRO has been validated locally
-# and the `pro` extras are installed)
-photo-organizer-pro-batch = "src.photoorganizer_pro.cli.batch_organize:main"
-photo-organizer-pro-watch = "src.photoorganizer_pro.scheduler.watch_folder:main"
+#
+# --- Pro CLI entry points DEFERRED v3.0+ (pivot 2026-05-26) ---
+#
+# Following the shift to a single-edition trial+unlock model (10 trials free,
+# then 10€ lifetime per machine), the standalone Pro modules below are gated
+# until/unless the v2.x baseline proves traction. They remain on disk in
+# src/photoorganizer_pro/ and stay test-skipped (see pytest markers).
+#
+# Re-enable here when reactivating in v3.0+ (and remove the @pytest.mark.skip
+# decorators in tests/functional/test_pro_*.py).
+#
+# photo-organizer-pro-batch = "src.photoorganizer_pro.cli.batch_organize:main"
+# photo-organizer-pro-watch = "src.photoorganizer_pro.scheduler.watch_folder:main"
+
+# Third-party plugins are also deferred to v3.0+. The discovery mechanism stays
+# in src/photoorganizer_pro/plugins/manager.py for future reactivation. Sample
+# declaration when re-enabled:
+#
+#   [project.entry-points."photoorganizer_pro.plugins"]
+#   geotag_renamer = "myplugin.geotag:GeotagRenamerPlugin"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -79,10 +96,16 @@ include = ["src*"]
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+# Exclut les scripts utilitaires (générateurs de fixtures de qualification)
+# où le style condensé est intentionnel et améliore la densité de lecture.
+extend-exclude = ["test_data/scripts/generate_matrix.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+# E501 : ligne trop longue — line-length=120 suffit comme limite, on n'exige pas le wrap.
+# E402 : imports tardifs — justifiés pour les scripts qui modifient sys.path AVANT
+#        d'importer (pattern src layout + tests sans installation pip).
+ignore = ["E501", "E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

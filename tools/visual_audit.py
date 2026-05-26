@@ -89,7 +89,7 @@ def fmt_geom(w):
     except Exception:
         return "  ERREUR géométrie"
     if not mapped:
-        return f"  [×] non mappé (créé mais caché)"
+        return "  [×] non mappé (créé mais caché)"
     x, y = w.winfo_x(), w.winfo_y()
     width, height = w.winfo_width(), w.winfo_height()
     return f"  [✓]  pos ({x:>4},{y:>4})  size {width:>4}×{height:<4}"
@@ -143,7 +143,7 @@ def audit_layout_consistency(app):
     """Vérifie quelques invariants critiques de la refonte v3."""
     print()
     print(f"{'═' * LINE_W}")
-    print(f"  ✅ INVARIANTS UI v3")
+    print("  ✅ INVARIANTS UI v3")
     print(f"{'═' * LINE_W}")
 
     # Important : forcer le retour sur l'onglet Organisation pour que

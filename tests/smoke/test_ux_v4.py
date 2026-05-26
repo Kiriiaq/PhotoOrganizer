@@ -438,6 +438,7 @@ class TestBrandExamplesPanelBehavior:
                 app.update()
 
             import customtkinter as ctk_local
+
             from ui.frames.organize_frame import OrganizeFrame
             # Trouver le bouton « Sony » (présent dans COMMON_CAMERA_MAKES).
             # Filtrer sur CTkButton car le panneau contient aussi des Labels
@@ -502,6 +503,7 @@ class TestFilterExamplesPanelBehavior:
     def _open_panel_and_get_buttons(app):
         """Ouvre le panneau filtres et retourne ses boutons cliquables."""
         import customtkinter as ctk_local
+
         from ui.frames.organize_frame import OrganizeFrame
         of = app.organize_frame
         of._show_filter_examples_panel()
@@ -641,3 +643,104 @@ class TestFilterExamplesPanelBehavior:
         finally:
             self._close_panel(of)
             of.filter_rating_min.set(prev)
+
+
+# =============================================================================
+# Pivot 2026-05-26 — Badge licence + panneau d'activation inline
+# =============================================================================
+
+class TestLicenseBadge:
+    """Vérifie l'intégration UI du système trial+unlock (cf. pivot 2026-05)."""
+
+    def test_license_badge_attribute_present(self, app):
+        """L'app expose ``license_badge`` dans son header (header v3+)."""
+        assert hasattr(app, "license_badge"), (
+            "PhotoOrganizerApp doit exposer un attribut license_badge "
+            "(badge cliquable d'état essai/licence dans le header)"
+        )
+        # Et il a bien un texte non vide après initialisation
+        text = app.license_badge.cget("text")
+        assert isinstance(text, str) and len(text) > 0
+
+    def test_refresh_license_badge_method_callable(self, app):
+        """``refresh_license_badge()`` est appelable et idempotent."""
+        assert hasattr(app, "refresh_license_badge")
+        # Doit pouvoir être appelée plusieurs fois sans crash
+        app.refresh_license_badge()
+        app.refresh_license_badge()
+        app.update_idletasks()
+
+    def test_badge_text_matches_state(self, app):
+        """Le texte du badge reflète l'état renvoyé par licensing.get_state()."""
+        from utils import licensing
+        state = licensing.get_state()
+        expected = state.status_badge_text
+        # On force un refresh pour synchroniser
+        app.refresh_license_badge()
+        app.update_idletasks()
+        actual = app.license_badge.cget("text")
+        assert actual == expected, f"Badge='{actual}' mais get_state()='{expected}'"
+
+
+class TestUnlockPanel:
+    """Vérifie le panneau d'activation inline dans OrganizeFrame."""
+
+    @staticmethod
+    def _close_panel(of):
+        if of._inline_panel is not None:
+            try:
+                of._inline_panel.destroy()
+            except Exception:
+                pass
+            of._inline_panel = None
+        try:
+            of._main_tabview.grid()
+        except Exception:
+            pass
+
+    def test_show_unlock_panel_method_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, "_show_unlock_panel")
+        assert callable(of._show_unlock_panel)
+
+    def test_show_unlock_panel_creates_inline_panel(self, app):
+        """L'appel à _show_unlock_panel ne lève pas et crée un panneau inline."""
+        import tkinter as tk
+        of = app.organize_frame
+
+        # État avant
+        toplevels_before = [
+            w for w in app.winfo_children() if isinstance(w, tk.Toplevel)
+        ]
+
+        try:
+            of._show_unlock_panel()
+            for _ in range(3):
+                app.update_idletasks()
+                app.update()
+
+            # Le panneau inline est bien créé
+            assert of._inline_panel is not None, "Inline panel doit être créé"
+
+            # Aucun Toplevel n'a été spawned (préférence projet stricte)
+            toplevels_after = [
+                w for w in app.winfo_children() if isinstance(w, tk.Toplevel)
+            ]
+            assert len(toplevels_after) == len(toplevels_before), (
+                "Le panneau d'activation NE DOIT PAS créer de Toplevel "
+                "(cf. préférence durable : OrganizeFrame._show_inline_panel)"
+            )
+        finally:
+            self._close_panel(of)
+
+    def test_open_purchase_page_method_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, "_open_purchase_page")
+        assert callable(of._open_purchase_page)
+
+    def test_refresh_license_badge_proxy(self, app):
+        """OrganizeFrame doit pouvoir déclencher le refresh du badge global."""
+        of = app.organize_frame
+        # La méthode existe et ne lève pas même si l'app parent change
+        assert callable(of._refresh_license_badge)
+        of._refresh_license_badge()  # doit être no-op si l'app n'expose pas la méthode

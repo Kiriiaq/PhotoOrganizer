@@ -12,12 +12,10 @@ Usage :
 import argparse
 import os
 import shutil
-import sys
 from datetime import datetime, timedelta
 
-from PIL import Image
 import piexif
-
+from PIL import Image
 
 HERE     = os.path.dirname(os.path.abspath(__file__))
 ROOT_OUT = os.path.abspath(os.path.join(HERE, "..", "inputs"))
@@ -113,7 +111,7 @@ def gen_nominal():
         path = os.path.join(out, f"IMG_{i:04d}.jpg")
         make_jpeg(path, color=(50 + i*3 % 200, 100, 200 - i*2 % 100),
                   date_taken=d, make=make, model=model)
-    print(f"  input_nominal : 50 photos")
+    print("  input_nominal : 50 photos")
 
 
 def gen_vide():
@@ -121,7 +119,7 @@ def gen_vide():
     out = os.path.join(ROOT_OUT, "input_vide")
     safe_mkdir(out)
     # Garde le dossier vide (pas de .gitkeep pour rester strict)
-    print(f"  input_vide : dossier vide")
+    print("  input_vide : dossier vide")
 
 
 def gen_volumineux(count: int = 1000):
@@ -153,7 +151,7 @@ def gen_mauvais_format():
     # Une photo correcte pour valider que le filtre n'élimine pas tout
     make_jpeg(os.path.join(out, "valid_photo.jpg"),
               date_taken=datetime(2024, 6, 1))
-    print(f"  input_mauvais_format : 4 fichiers (3 invalides + 1 jpg valide)")
+    print("  input_mauvais_format : 4 fichiers (3 invalides + 1 jpg valide)")
 
 
 def gen_caracteres_speciaux():
@@ -197,7 +195,7 @@ def gen_corrompu():
     # Photo valide pour comparaison
     make_jpeg(os.path.join(out, "intacte.jpg"),
               date_taken=datetime(2024, 1, 2))
-    print(f"  input_corrompu : 3 fichiers (1 tronqué + 1 vide + 1 intact)")
+    print("  input_corrompu : 3 fichiers (1 tronqué + 1 vide + 1 intact)")
 
 
 def gen_gps_piexif():
@@ -234,7 +232,7 @@ def gen_pairs():
         cr2_path = os.path.join(out, f"DSC_{i:04d}.cr2")
         with open(cr2_path, "wb") as f:
             f.write(b"II*\x00\x10\x00\x00\x00CR" + b"\x00" * 1000)
-    print(f"  input_pairs : 20 fichiers (10 paires CR2+JPEG)")
+    print("  input_pairs : 20 fichiers (10 paires CR2+JPEG)")
 
 
 def gen_bursts():
@@ -250,7 +248,7 @@ def gen_bursts():
     make_jpeg(os.path.join(out, "BURST_isolee.jpg"),
               date_taken=base + timedelta(minutes=10),
               make="Sony", model="ILCE-7M3")
-    print(f"  input_bursts : 6 fichiers (5 en rafale + 1 isolée)")
+    print("  input_bursts : 6 fichiers (5 en rafale + 1 isolée)")
 
 
 def gen_pas_exif():
@@ -260,7 +258,7 @@ def gen_pas_exif():
     for i in range(3):
         img = Image.new("RGB", (200, 150), (50 + i*30, 100, 200))
         img.save(os.path.join(out, f"sans_exif_{i:02d}.jpg"), "jpeg", quality=85)
-    print(f"  input_pas_exif : 3 photos sans EXIF")
+    print("  input_pas_exif : 3 photos sans EXIF")
 
 
 def gen_doublons():
@@ -278,7 +276,7 @@ def gen_doublons():
         # Copie exacte pour faire le doublon
         shutil.copy(original_path,
                     os.path.join(out, f"dup_{i:02d}_copy.jpg"))
-    print(f"  input_doublons : 20 fichiers (10 originaux + 10 doublons exacts)")
+    print("  input_doublons : 20 fichiers (10 originaux + 10 doublons exacts)")
 
 
 def gen_keywords():
@@ -330,7 +328,7 @@ def main():
     if not args.skip_large:
         gen_volumineux(args.large)
     else:
-        print(f"  input_volumineux : SKIPPED (--skip-large)")
+        print("  input_volumineux : SKIPPED (--skip-large)")
 
     print(f"\n=== Inputs générés sous {ROOT_OUT} ===")
 

@@ -9,7 +9,7 @@ Status :
   * CRASHED rc : il est mort avant la fin du hold → check log tail
   * MISSING    : le fichier n'existe pas
 
-Usage : ``python audit/smoke_exe.py``
+Usage : ``python tools/smoke_exe.py``
 """
 
 from __future__ import annotations

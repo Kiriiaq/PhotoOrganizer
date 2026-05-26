@@ -39,6 +39,7 @@ from ui.theme import (
 )
 from ui.tooltip import attach_tooltip
 from ui.tooltips_fr import ORGANIZE as TIPS
+from utils import licensing
 from utils.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -2729,6 +2730,188 @@ class OrganizeFrame(ctk.CTkFrame):
 
         return _close
 
+    # ------------------------------------------------------------------
+    # Trial + unlock — panneau d'activation inline (pivot 2026-05-26)
+    # ------------------------------------------------------------------
+    def _show_unlock_panel(self):
+        """Affiche le panneau d'activation (limite atteinte OU activation libre).
+
+        Utilise ``_show_inline_panel`` pour respecter la préférence projet
+        "pas de Toplevel dans l'onglet Organisation".
+
+        Composants :
+        - Bandeau d'explication (limite + ID machine)
+        - Entry pour coller la clé
+        - Bouton "Acheter une licence (10 €)" (ouvre le navigateur)
+        - Footer : boutons "Activer" et "Fermer"
+
+        L'activation appelle ``licensing.activate_key(...)``.
+        """
+        try:
+            state = licensing.get_state()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"licensing.get_state a échoué : {exc}")
+            state = None
+
+        # Conteneurs externes pour partager l'entry + le label de feedback
+        # entre le builder (qui crée les widgets) et le footer (qui les lit).
+        ui_refs = {"entry": None, "feedback": None}
+
+        def build(body):
+            body.columnconfigure(0, weight=1)
+
+            # Message principal
+            if state is not None and state.is_blocked:
+                main_text = (
+                    "Tu as utilisé tes 10 tris gratuits.\n"
+                    "Active une licence pour continuer en illimité (10 € à vie, 1 PC)."
+                )
+            else:
+                main_text = (
+                    "Active ta licence PhotoOrganizer pour débloquer l'usage illimité."
+                )
+            ctk.CTkLabel(
+                body,
+                text=main_text,
+                font=font_label(),
+                anchor="w",
+                justify="left",
+                wraplength=720,
+            ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_M))
+
+            # ID machine (utile pour le support)
+            mid_short = state.machine_id_short if state else "MAC-????-????"
+            ctk.CTkLabel(
+                body,
+                text=f"🖥️  Ton ordinateur : {mid_short}",
+                font=font_hint(),
+                text_color=LABEL_MUTED,
+                anchor="w",
+            ).grid(row=1, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+
+            # Champ pour coller la clé
+            ctk.CTkLabel(
+                body,
+                text="Clé de licence :",
+                font=font_label(),
+                anchor="w",
+            ).grid(row=2, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, 0))
+
+            entry = ctk.CTkEntry(
+                body,
+                placeholder_text="PROG-LIFE-...-...",
+                height=BTN_H_STD,
+                font=font_hint(),
+            )
+            entry.grid(row=3, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
+            ui_refs["entry"] = entry
+
+            # Zone de feedback (succès/erreur)
+            feedback = ctk.CTkLabel(
+                body,
+                text="",
+                font=font_hint(),
+                anchor="w",
+                justify="left",
+                wraplength=720,
+            )
+            feedback.grid(row=4, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            ui_refs["feedback"] = feedback
+
+            # Bouton "Acheter" (séparé du footer)
+            buy_row = ctk.CTkFrame(body, fg_color="transparent")
+            buy_row.grid(row=5, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
+            ctk.CTkLabel(
+                buy_row,
+                text="Pas encore de clé ?",
+                font=font_hint(),
+                text_color=LABEL_MUTED,
+            ).pack(side="left", padx=(0, PAD_S))
+            neutral_button(
+                buy_row,
+                text="🛒 Acheter une licence (10 €)",
+                command=self._open_purchase_page,
+            ).pack(side="left")
+
+        def do_activate():
+            entry = ui_refs["entry"]
+            feedback = ui_refs["feedback"]
+            if entry is None or feedback is None:
+                return
+            key = entry.get().strip()
+            if not key:
+                feedback.configure(text="❌ Colle la clé reçue par email.", text_color=("red", "red"))
+                return
+            try:
+                new_state = licensing.activate_key(key)
+            except licensing.LicenseInvalidError if False else Exception as exc:  # noqa: BLE001
+                # On capture toutes les exceptions de validator pour afficher
+                # un message localisé. Imports paresseux pour distinguer les cas.
+                from src.photoorganizer_pro.license.validator import (
+                    LicenseExpiredError,
+                    LicenseInvalidError,
+                )
+                if isinstance(exc, LicenseExpiredError):
+                    msg = "❌ Cette clé a expiré."
+                elif isinstance(exc, LicenseInvalidError):
+                    if "bound" in str(exc).lower() or "another machine" in str(exc).lower():
+                        msg = "❌ Cette clé est déjà liée à un autre ordinateur."
+                    else:
+                        msg = "❌ Clé invalide. Vérifie qu'aucun caractère ne manque."
+                else:
+                    msg = f"❌ Erreur d'activation : {exc}"
+                feedback.configure(text=msg, text_color=("red", "red"))
+                logger.info(f"Activation refusée : {exc}")
+                return
+
+            # Succès
+            feedback.configure(
+                text=f"✅ Activée pour cet ordinateur ({new_state.machine_id_short}). Merci !",
+                text_color=("green", "lightgreen"),
+            )
+            # Rafraîchir le badge global
+            self._refresh_license_badge()
+
+        self._show_inline_panel(
+            title="🔓 Activer PhotoOrganizer",
+            builder=build,
+            footer_buttons=[
+                ("Activer", do_activate),
+                ("Fermer", "__close__"),
+            ],
+        )
+
+    def _open_purchase_page(self):
+        """Ouvre la page d'achat Lemon Squeezy dans le navigateur."""
+        import webbrowser
+
+        url = "https://photoorganizer.lemonsqueezy.com"
+        try:
+            webbrowser.open(url)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Impossible d'ouvrir le navigateur : {exc}")
+            messagebox.showinfo(
+                "Acheter une licence",
+                f"Va sur :\n{url}\n\nPour 10 € à vie sur un PC.",
+            )
+
+    def _refresh_license_badge(self):
+        """Demande à l'app parent de rafraîchir le badge d'état licence.
+
+        Méthode tolérante : si l'app n'expose pas ``refresh_license_badge()``
+        (ex. dans un contexte de test), on log et on continue.
+        """
+        try:
+            top = self.winfo_toplevel()
+        except tk.TclError:
+            return
+        refresher = getattr(top, "refresh_license_badge", None)
+        if callable(refresher):
+            try:
+                refresher()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"refresh_license_badge: {exc}")
+
     def _show_files_list(self):
         """Liste les fichiers détectés (T-030..T-033) — panneau inline.
 
@@ -3435,9 +3618,39 @@ class OrganizeFrame(ctk.CTkFrame):
             messagebox.showerror("Erreur", "Le dossier source n'existe pas.")
             return
 
+        # ----------------------------------------------------------------
+        # Hook trial + unlock (pivot 2026-05-26)
+        # ----------------------------------------------------------------
+        # Si l'utilisateur a consommé ses 10 tris gratuits et n'a pas de
+        # licence active sur ce PC, on ouvre le modal d'activation au lieu
+        # de lancer le tri. Sinon, on continue normalement (et on affiche
+        # un warning dans la confirmation aux seuils 8/9).
+        try:
+            allowed, lic_state = licensing.can_organize_now()
+        except Exception as exc:  # noqa: BLE001 — un crash crypto ne doit jamais bloquer le tri en dev
+            logger.warning(f"licensing.can_organize_now a échoué : {exc} — on autorise par défaut")
+            allowed, lic_state = True, None
+
+        if not allowed:
+            self._show_unlock_panel()
+            return
+
         # Confirmation
         action = "copier" if self.copy_not_move.get() else "déplacer"
-        if not messagebox.askyesno("Confirmation", f"Voulez-vous {action} les fichiers de:\n{source}\nvers:\n{dest}?"):
+        confirm_msg = f"Voulez-vous {action} les fichiers de:\n{source}\nvers:\n{dest}?"
+        if lic_state is not None and lic_state.should_warn:
+            if lic_state.trial_count == licensing.TRIAL_LIMIT - 1:
+                confirm_msg = (
+                    "⚠️ Dernier tri gratuit avant blocage.\n"
+                    "Une fois ce tri terminé, une licence sera nécessaire pour continuer.\n\n"
+                    + confirm_msg
+                )
+            else:  # seuil 8 = TRIAL_LIMIT - 2
+                confirm_msg = (
+                    f"⚠️ Avant-dernier tri gratuit (il en restera {lic_state.trial_remaining - 1} après).\n\n"
+                    + confirm_msg
+                )
+        if not messagebox.askyesno("Confirmation", confirm_msg):
             return
 
         def organize():
@@ -3475,6 +3688,19 @@ class OrganizeFrame(ctk.CTkFrame):
                 self._current_organizer = None
                 self._operation_running = False
                 self._set_buttons_state(True)
+
+            # ------------------------------------------------------------
+            # Hook trial : incrémenter UNIQUEMENT après succès, pas après
+            # annulation. Le compteur ne sert à rien si une licence est
+            # active (licensing.record_successful_organize gère ce cas).
+            # ------------------------------------------------------------
+            if not self._cancel_requested and result.success > 0:
+                try:
+                    licensing.record_successful_organize()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"Impossible d'enregistrer l'usage : {exc}")
+                # Rafraîchit le badge global si l'app expose cette méthode.
+                self._safe_after(0, self._refresh_license_badge)
 
             # Afficher les résultats
             self._safe_after(0, lambda: self._show_organization_results(result))

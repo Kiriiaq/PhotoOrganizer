@@ -15,7 +15,6 @@ Usage :
 
 import argparse
 import hashlib
-import json
 import os
 import sys
 from pathlib import Path
@@ -144,9 +143,9 @@ def main():
     REAL_DIR.mkdir(parents=True, exist_ok=True)
     report_path = REAL_DIR / "_diff_report.md"
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write(f"# Diff réel vs référence\n\n")
+        f.write("# Diff réel vs référence\n\n")
         f.write(f"Tests comparés : {len(results)}\n\n")
-        f.write(f"| ID | Statut | Manquants | En trop | Diffs |\n|---|---|---|---|---|\n")
+        f.write("| ID | Statut | Manquants | En trop | Diffs |\n|---|---|---|---|---|\n")
         for r in results:
             f.write(f"| {r['test_id']} | {r['status']} | "
                     f"{len(r.get('missing', []))} | {len(r.get('extra', []))} | "

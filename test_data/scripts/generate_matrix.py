@@ -31,11 +31,9 @@ Usage :
 from __future__ import annotations
 
 import os
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 # ---------------------------------------------------------------------------
 # Définition des 150 tests
@@ -738,7 +736,7 @@ def main():
     wb.save(out)
     print(f"OK : {out}")
     print(f"  - {len(tests)} tests générés (T-001 à T-{len(tests):03d})")
-    print(f"  - 4 feuilles : Tests, Synthèse, Exigences, Légende")
+    print("  - 4 feuilles : Tests, Synthèse, Exigences, Légende")
     print(f"  - 8 catégories : {', '.join(categories)}")
     print(f"  - {len(set(t[2] for t in tests))} exigences référencées")
 

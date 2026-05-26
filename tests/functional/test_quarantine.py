@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -28,11 +27,9 @@ for p in (str(ROOT), str(SRC)):
 
 from core.operations.file_manager import FileManager  # noqa: E402
 from core.operations.quarantine import (  # noqa: E402
-    QuarantineEntry,
-    QuarantineManager,
     MANIFEST_FILENAME,
+    QuarantineManager,
 )
-
 
 # =============================================================================
 # Fixtures

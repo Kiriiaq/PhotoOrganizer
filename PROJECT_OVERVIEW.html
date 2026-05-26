@@ -168,14 +168,15 @@
     <h1>PhotoOrganizer</h1>
     <p class="pitch">Organiseur automatique de photos par métadonnées EXIF — application Windows GUI gratuite, sans installation.</p>
     <div class="meta">
-      <span class="badge">v2.0.0</span>
+      <span class="badge">v2.2.0</span>
       <span class="badge wip">branche feat/v2.3-organize-tabview</span>
       <span class="badge">Python 3.11+</span>
       <span class="badge">Windows 10/11</span>
       <span class="badge ok">Apache-2.0</span>
-      <span class="badge ok">170 tests OK</span>
-      <span class="badge wip">1 P0 + 4 P1 (audit Phase 4)</span>
-      <span class="badge">Freemium · Pro 19 €</span>
+      <span class="badge ok">170 tests core OK</span>
+      <span class="badge wip">Pivot 2026-05-26 — trial + unlock</span>
+      <span class="badge">10 tris gratuits · 10 € lifetime</span>
+      <span class="badge wip">Modules Pro gelés v3.0+</span>
     </div>
   </header>
 
@@ -201,7 +202,7 @@
       <div class="metric-grid">
         <div class="metric"><b>16 021</b><span>LOC src/</span></div>
         <div class="metric"><b>3 351</b><span>LOC tests/</span></div>
-        <div class="metric"><b>170</b><span>Tests passing</span></div>
+        <div class="metric"><b>231</b><span>Tests passing</span></div>
         <div class="metric"><b>37 MB</b><span>EXE actuel</span></div>
         <div class="metric"><b>22 MB</b><span>EXE cible audit</span></div>
         <div class="metric"><b>0</b><span>Bandit High</span></div>
@@ -285,10 +286,10 @@
           <tr><td>Raccourcis Ctrl+1..4</td><td><span class="status ok">OK</span></td></tr>
           <tr><td>Refonte panneau Organisation v2.3</td><td><span class="status wip">WIP</span></td></tr>
           <tr><td>Optimisation taille EXE (−40 %)</td><td><span class="status todo">À FAIRE</span></td></tr>
-          <tr><td>Batch CLI organisation (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
-          <tr><td>Plugin API (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
-          <tr><td>Watch-folder scheduler (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
-          <tr><td>Synchronisation cloud (Pro, étude)</td><td><span class="status todo">À FAIRE</span></td></tr>
+          <tr><td>Batch CLI organisation (Pro)</td><td><span class="status ok">OK · 10 tests</span></td></tr>
+          <tr><td>Plugin API (Pro)</td><td><span class="status ok">OK · 25 tests</span></td></tr>
+          <tr><td>Watch-folder scheduler (Pro)</td><td><span class="status ok">OK · 12 tests</span></td></tr>
+          <tr><td>Synchronisation cloud (Pro, étude)</td><td><span class="status wip">ÉTUDE FAITE — décision T+3 mois</span></td></tr>
         </tbody>
       </table>
       <p style="font-size: 11px; color: var(--muted); margin: 8px 0 0 0;">État synchronisé avec <a href="AUDIT.md">AUDIT.md §5</a>.</p>
@@ -314,53 +315,53 @@
           <div class="desc">Application de l'audit taille → 22 MB cible (−40 %).</div>
         </div>
         <div class="step todo">
-          <h4>v3.0 — Édition Pro</h4>
-          <div class="desc">Premier module Pro : batch CLI d'organisation + watch-folder scheduler.</div>
+          <h4>v2.3 — Trial + Unlock</h4>
+          <div class="desc">Compteur 10 tris HMAC + modal d'activation + machine binding. Monétisation activée.</div>
         </div>
         <div class="step todo">
-          <h4>Futur</h4>
-          <div class="desc">Plugin API, rapports HTML/PDF avancés, synchro cloud post-organisation.</div>
+          <h4>v3.0 (conditionnel) — Pro add-on</h4>
+          <div class="desc">Réactivation batch CLI / watch-folder / plugins comme add-on séparé, si traction v2.x confirmée.</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ROW 3.4 : MODELE ECONOMIQUE -->
+  <!-- ROW 3.4 : MODELE ECONOMIQUE (pivot 2026-05-26) -->
   <div class="card" style="margin-bottom: 18px;">
-    <h2>Modèle économique (Phase 5)</h2>
+    <h2>Modèle économique — pivot 2026-05-26</h2>
     <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 0;">
       <div>
-        <h4 style="margin: 0 0 6px 0; font-size: 13px; color: var(--accent);">Voie principale — Freemium</h4>
+        <h4 style="margin: 0 0 6px 0; font-size: 13px; color: var(--accent);">Voie principale — Trial + Unlock</h4>
         <table>
           <tbody>
-            <tr><td>Core (Apache-2.0)</td><td><b>Gratuit</b></td></tr>
-            <tr><td>Pro Personnelle (1 PC)</td><td><b>19 €</b></td></tr>
-            <tr><td>Pro Studio (3 PC)</td><td><b>49 €</b></td></tr>
-            <tr><td>Lifetime (lancement)</td><td><b>99 €</b></td></tr>
+            <tr><td>Essai gratuit</td><td><b>10 tris</b></td></tr>
+            <tr><td>Unlock lifetime, 1 PC</td><td><b>10 €</b></td></tr>
+            <tr><td>Mises à jour futures</td><td><b>Incluses à vie</b></td></tr>
+            <tr><td>Réémission après changement PC</td><td><b>Non (rachat)</b></td></tr>
           </tbody>
         </table>
         <p style="font-size: 11px; color: var(--muted); margin: 6px 0 0 0;">
-          Plateforme : Lemon Squeezy (TVA EU gérée). Modules Pro V1 : batch CLI + watch-folder.<br>
-          Effort 5-8 j-h · Revenu cible 12 mois : <b>200-2 000 €</b>.
+          Modèle "shareware" type Sublime Text / WinRAR. Plateforme : Lemon Squeezy.<br>
+          Effort 2-3 j-h · Revenu cible 12 mois : <b>100-1 500 €</b>.
         </p>
       </div>
       <div>
         <h4 style="margin: 0 0 6px 0; font-size: 13px; color: var(--ok);">Voie complémentaire — Lead magnet</h4>
-        <p style="font-size: 12px; margin: 0 0 8px 0;">Le projet sert de démonstrateur de compétences (Python desktop · packaging Windows · tests · CI · archi en couches).</p>
+        <p style="font-size: 12px; margin: 0 0 8px 0;">Le projet sert de démonstrateur de compétences (Python desktop · packaging Windows · HMAC anti-tampering · machine binding · pragmatisme business).</p>
         <table>
           <tbody>
             <tr><td>Revenu direct</td><td>0 €</td></tr>
             <tr><td>Valeur indirecte (missions freelance)</td><td><b>5-30 k€</b></td></tr>
-            <tr><td>Effort</td><td>2-3 j (posts LinkedIn)</td></tr>
+            <tr><td>Effort</td><td>1-2 j (post pivot + portfolio)</td></tr>
           </tbody>
         </table>
         <p style="font-size: 11px; color: var(--muted); margin: 6px 0 0 0;">
-          À cumuler systématiquement avec le freemium.
+          À cumuler systématiquement avec le modèle trial+unlock.
         </p>
       </div>
     </div>
     <p style="font-size: 12px; color: var(--muted); margin: 12px 0 0 0;">
-      <b>Pré-requis avant lancement :</b> retirer ExifTool bundlé (GPL, cf. <a href="docs/exe-optimization.md">exe-optimization F-01</a>), auto-entreprise, page Privacy Policy minimale, S-01 + G-01 (assets). Plan détaillé : <a href="docs/MONETIZATION.md">docs/MONETIZATION.md</a>.
+      <b>Pré-requis avant lancement :</b> implémenter `src/utils/licensing.py` + modal d'activation, retirer ExifTool bundlé (GPL, cf. <a href="docs/exe-optimization.md">exe-optimization F-01</a>), auto-entreprise, Privacy Policy publiée, S-01 + G-01 + S-02 (assets). Procédure pas-à-pas : <a href="NEXT_STEPS.html">NEXT_STEPS.html</a>. Stratégie détaillée : <a href="docs/MONETIZATION.md">docs/MONETIZATION.md</a>.
     </p>
   </div>
 
@@ -428,6 +429,8 @@
       <a href="docs/MONETIZATION.md">Monétisation</a>
       <a href="docs/DISTRIBUTION.md">Distribution &amp; lancement</a>
       <a href="LINKEDIN_DRAFTS.md">Drafts LinkedIn / X / Show HN</a>
+      <a href="NEXT_STEPS.html">Next Steps (HTML)</a>
+      <a href="docs/CLOUD_SYNC_DESIGN.md">Étude Cloud Sync (design)</a>
       <a href="CHANGELOG.md">Changelog</a>
       <a href="CONTRIBUTING.md">Contributing</a>
       <a href="SECURITY.md">Security</a>

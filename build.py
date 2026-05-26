@@ -7,11 +7,11 @@ Usage:
     python build.py --light        # Release light (assumes Python + deps on host)
 """
 
-import subprocess
-import sys
+import argparse
 import os
 import shutil
-import argparse
+import subprocess
+import sys
 from pathlib import Path
 
 APP_NAME = "PhotoOrganizer"

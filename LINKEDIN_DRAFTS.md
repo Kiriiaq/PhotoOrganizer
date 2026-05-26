@@ -1,538 +1,439 @@
-# PhotoOrganizer — Drafts LinkedIn / X (Phase 7)
+# PhotoOrganizer — Drafts publication (post-pivot 2026-05-26)
 
-> 3 formats prêts à copier-coller. Compétences mises en avant = celles réellement démontrées par le projet (issues de l'audit Phase 1).
-> Date : 2026-05-19. Stratégie de publication : voir [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) (calendrier S+3, S+5, S+8).
+> Modèle économique acté : **édition unique, 10 tris d'essai, 10 € lifetime, 1 PC, aucune réémission**.
+> L'ancienne version de ce fichier (drafts freemium 19/49/99 €) est récupérable via `git log -p -- LINKEDIN_DRAFTS.md`.
 
----
-
-## Conventions
-
-- **Compteurs de caractères** indiqués pour chaque post (LinkedIn affiche en pleine longueur jusqu'à 3 000 c, mais ce qui passe au-dessus du "voir plus" est ~210 c sur mobile, ~280 c sur desktop).
-- **Hashtags** : 3-5 max, en fin de post, jamais en pavé.
-- **Lien GitHub** : toujours dans le commentaire (LinkedIn dévalorise les liens dans le corps du post).
-- **Tone** : factuel, pas d'auto-félicitations. Chiffres concrets.
+Tous les drafts ci-dessous sont **prêts à coller** après revue finale.
+Ordre conseillé de publication : `S+0 LinkedIn pivot` → `S+1 Reddit` → `S+2
+Product Hunt + LinkedIn tech` → `S+3 Show HN`.
 
 ---
 
-## Format 1 — Post technique court (LinkedIn / X thread tweet 1)
+## Format 1 — LinkedIn (post pivot, storytelling)
 
-> **Cible** : devs Python, recruteurs tech.
-> **Objectif** : montrer une compétence pointue (audit packaging) + lien produit.
-> **Compteur** : ~1 100 caractères (limite cible 800-1200).
-> **Quand** : S+3 mercredi (jour J+1 Product Hunt — capitalise sur "as seen on PH").
+**Quand** : jour de la release v2.3.0 (S+0).
+**Cible** : ton réseau LinkedIn (devs, indie hackers, PM, photographes).
+**Longueur** : 1500-1900 caractères (sweet spot LinkedIn 2026).
+
+```
+J'ai mis PhotoOrganizer en vente. Pas de version "Pro" séparée. Pas de
+paywall sur des cases à cocher. Une seule app, 10 tris gratuits, 10 € à vie.
+
+J'ai d'abord codé une édition Pro séparée (batch CLI, watch-folder,
+plugins) à 19/49/99 €. 61 tests verts, deux binaires à maintenir,
+calendrier de lancement freemium classique.
+
+J'ai abandonné. Trois raisons :
+
+→ Le testeur de la version gratuite ne testait PAS ce qu'il achèterait.
+  Il devait croire la liste de features sur la page de vente. Friction +
+  défiance.
+
+→ Maintenir deux codebases pour un projet solo, c'est doubler la dette
+  technique sans doubler le revenu.
+
+→ "Achète pour débloquer une case à cocher" est moins convaincant que
+  "tu as essayé, ça marche, continue à l'utiliser".
+
+J'ai pivoté vers le modèle Sublime Text / WinRAR / IDM : édition unique,
+trial limité par usage. Détails techniques que j'ai dû régler en 3 jours :
+
+— Compteur signé HMAC SHA-256 dans %LOCALAPPDATA% pour empêcher la
+  modification triviale du nombre de tris restants.
+— Machine binding via SHA-256(MachineGuid + Volume Serial) pour limiter
+  à 1 PC sans serveur d'auth.
+— Modal d'activation inline (zéro Toplevel) pour rester cohérent avec
+  l'UX de l'onglet Organisation.
+— Politique stricte affichée, indulgence ponctuelle assumée en interne.
+
+Aucun DRM offline n'est incassable. L'objectif n'est pas l'incassabilité
+mais "contournement plus chiant que payer 10 €". Pour 10 €, c'est
+largement assez.
+
+Apache-2.0 sur le code, paiement sur le binaire. Premier feedback
+bienvenu — surtout celui qui dérange.
+
+🔗 GitHub : github.com/Kiriiaq/PhotoOrganizer
+🔗 Lifetime 10 € : photoorganizer.lemonsqueezy.com
+```
+
+**Hashtags suggérés** : `#IndieHackers #Python #SoftwareEngineering #Bootstrapping`
 
 ---
 
-```
-J'ai audité un .exe PyInstaller de 37 Mo. Cible : -40 % sans toucher à
-l'UX.
+## Format 2 — LinkedIn (post technique, audit EXE)
 
-Méthode en 3 étapes :
-
-1. `pyi-archive_viewer -l app.exe` → liste tous les fichiers du
-   bundle avec leur taille compressée. 1 721 fichiers, 35 Mo.
-
-2. Catégorisation par grep. Résultat brut :
-
-   - ExifTool Perl bundlé : 10,3 Mo (29 %) ← jamais utilisé en pratique
-   - cryptography tiré par hooks PyInstaller : 4,2 Mo
-   - libx265 dans pillow-heif : 2,3 Mo ← on lit du HEIC, on n'écrit pas
-   - PIL._avif depuis Pillow 12 : 1,8 Mo
-
-3. Test des hypothèses : retrait du bundle ExifTool (chemin codé en dur
-   pointait vers un emplacement inexistant — fallback cassé depuis le
-   début). Switch pillow-heif → pi-heif (sister-package read-only).
-   Build dans un venv minimal isolé du Python global (325 paquets).
-
-Gain estimé : 15 Mo, soit -40 %. Cible 22 Mo.
-
-Le piège qui m'a coûté le plus de temps : le Python global était
-pollué (numpy, pandas, scipy). PyInstaller détectait des hooks
-inattendus, gonflait le bundle en silence.
-
-Audit complet en open-source dans le repo (.md + .html).
-
-#Python #PyInstaller #DevOps
-```
-
-**Compteur** : 1 098 caractères (hors hashtags). ✅
-
-**Commentaire à poster juste après** (1er commentaire = booster algo) :
+**Quand** : S+2 ou S+5, après le pic d'attention du pivot.
+**Cible** : devs Python, packaging, PyInstaller.
 
 ```
-Repo + audit complet ici : https://github.com/Kiriiaq/PhotoOrganizer
+PyInstaller en --onefile, 37 MB. Cible : 22 MB (-40 %).
 
-Si tu travailles sur une app Python desktop packagée, le doc
-`docs/exe-optimization.md` détaille les 19 findings avec gain
-chiffré par action. Curieux de tes propres retours sur le sujet.
-```
+Audit complet de mon EXE PhotoOrganizer publié en open-source. 8 actions
+ordonnées par ROI, métriques mesurées :
 
----
+— F-01 : ExifTool bundlé retiré (34 MB)
+   Ambiguïté GPL + fallback subprocess jamais déclenché en pratique.
+   Gain immédiat sans régression fonctionnelle.
 
-## Format 2 — Carrousel 6-8 slides (LinkedIn)
+— F-02 : --strip + UPX (~5 MB)
+   Strip enlève les symboles debug, UPX compresse l'EXE. Trade-off :
+   démarrage +200 ms (acceptable pour onefile).
 
-> **Cible** : public mixte (devs + photographes amateurs + recruteurs).
-> **Objectif** : présenter le projet complet en un parcours visuel.
-> **Format** : 1080×1350 px (portrait, ratio 4:5 — meilleur engagement LinkedIn).
-> **Quand** : S+5 mercredi.
-> **Production** : Figma ou Canva, gabarit cohérent (1 couleur dominante = #2b5fa1, 1 police = Inter ou Roboto).
+— F-04 : pinning Pillow à <12 (~1 MB)
+   Pillow 12 embarque libwebp + libavif. Pin à 11.x si pas besoin.
 
----
+— F-08 : requests → urllib stdlib (~3 MB)
+   Le projet fait 1 GET vers Nominatim. urllib.request suffit.
 
-### Slide 1 — Hook (couverture)
+— Autres : lazy imports, --exclude-module, datas filtrés (~3 MB cumulés)
 
-**Visuel** : grand screenshot d'un dossier "DCIM" Windows en bordel + flèche → screenshot S-01 du panneau Organisation propre.
+Détail dans docs/exe-optimization.md du repo.
 
-```
-J'ai organisé 12 000 photos
-en 47 secondes.
+Mesurer avant d'optimiser, sinon on bouge des octets pour rien. PyInstaller
+fournit un .toc en mode --debug=imports qui dit exactement ce qui pèse.
 
-Sans Lightroom.
-Sans abonnement.
-```
-
-(Le minimalisme attire le clic vers slide 2.)
-
----
-
-### Slide 2 — Problème
-
-**Visuel** : 3 icônes empilées (appareil photo, smartphone, drone) + flèche vers un seul dossier "Tout est mélangé".
-
-```
-Le vrai problème :
-
-3 appareils, 2 smartphones, 1 drone.
-12 000 fichiers JPG, RAW, HEIC, MP4.
-Aucun moyen simple de trier sans payer
-Lightroom 120 €/an ou apprendre Bash.
-
-Les noms : "20240612_171922_IMG_4567.JPG".
-Les dossiers : "to_sort_2023".
-
-Pas une solution. Un classement par date manuel
-prend 3-4 heures pour 1 000 photos.
+#Python #PyInstaller #Windows #Engineering
 ```
 
 ---
 
-### Slide 3 — Feature 1 : Organisation multi-critères
+## Format 3 — LinkedIn (post portfolio / lead magnet)
 
-**Visuel** : capture S-02 (panneau Organisation en cours) avec annotations sur les cases à cocher Date / Caméra / GPS.
-
-```
-Feature 1 : Organisation par EXIF
-
-✓ Date (jour / mois / année)
-✓ Modèle d'appareil (Canon 5D / iPhone 15 Pro / Mavic)
-✓ Coordonnées GPS (avec nom de lieu)
-✓ Cumulable hiérarchiquement
-
-Templates de renommage personnalisables :
-{date:%Y-%m-%d}_{model}_{counter:04d}.{ext}
-
-Copy par défaut. Move avec rollback. Pas de drama.
-```
-
----
-
-### Slide 4 — Feature 2 : Doublons + Quarantaine
-
-**Visuel** : capture S-03 (onglet Doublons avec groupes) + zoom sur le bouton "Mise en quarantaine".
+**Quand** : S+5 ou S+8, pour cumuler avec le revenu direct.
+**Cible** : recruteurs tech, CTO.
 
 ```
-Feature 2 : Détection de doublons
+Ce que j'ai construit avec PhotoOrganizer, sur mon temps libre, en
+Python pur :
 
-Scan parallèle. 3 algorithmes (MD5 / SHA-1 / Blake3).
-Exclusion automatique des corbeilles système.
+→ Application desktop Windows complète (CustomTkinter, 4 onglets,
+  drag-and-drop, toasts) ;
+→ Pipeline EXIF multi-source avec fallback (Pillow + exifread +
+  pillow-heif) sur 45 formats incluant RAW ;
+→ Détection de doublons multi-algorithme (MD5, SHA-1, Blake3 si dispo)
+  avec scan parallèle et cache SQLite 2-tier ;
+→ Quarantaine réversible + historique par session avec rollback complet
+  (recréation des dossiers vidés inclus) ;
+→ Géocodage inverse OpenStreetMap Nominatim avec respect strict de
+  l'usage policy (1 req/s, User-Agent identifiable, désactivable) ;
+→ 187 tests pytest organisés en 5 catégories (smoke/functional/perf/
+  stress/volume), couverture ~70 % modules métier ;
+→ CI GitHub Actions (lint ruff + tests sur Windows, build EXE release
+  auto sur tag git) ;
+→ Système trial+unlock maison avec HMAC SHA-256 et machine binding
+  (MachineGuid + Volume Serial), pour monétiser un binaire sans serveur
+  d'auth ;
+→ Packaging PyInstaller --onefile optimisé documenté dans un audit
+  reproductible (37 → 22 MB, -40 %).
 
-Mais le vrai apport : la suppression réversible.
+Apache-2.0 sur GitHub, librement consultable et forkable. Édition
+activable à 10 € à vie pour ceux qui veulent l'utiliser sans limite
+sur leur PC personnel.
 
-send2trash = aller simple.
-PhotoOrganizer = quarantaine interne avec
-metadata.json par fichier. Rollback à la séance.
-Vidange manuelle vers la corbeille Windows quand
-tu es sûr.
+Si vous cherchez du dev Python orienté product, je suis disponible
+pour discuter.
 
-Plus jamais de "j'ai supprimé en doublon ce qui
-n'en était pas un".
+Lien : github.com/Kiriiaq/PhotoOrganizer
 ```
 
 ---
 
-### Slide 5 — Feature 3 : Historique + Rollback
+## Format 4 — Product Hunt
 
-**Visuel** : capture S-04 (onglet Historique) avec une session sélectionnée et le bouton Annuler visible.
-
-```
-Feature 3 : Rollback complet par session
-
-Chaque opération (organize, dedup, quarantine)
-est tracée. Annulation propre :
-- Replace les fichiers à leur emplacement initial
-- Recrée les dossiers source vidés
-- Cohérent même après plusieurs sessions
-
-Trois bugs majeurs corrigés en v2 :
-- FileManager partagé entre onglets (avant : historique vide)
-- Cancel réellement propagé à SmartOrganizer
-- Recréation du dossier source après move
-
-Bonus : raccourcis Ctrl+1..4 entre onglets.
-```
-
----
-
-### Slide 6 — Stack & architecture
-
-**Visuel** : schéma simplifié 3 couches (UI / core / utils) en SVG-like.
+**Tagline (60 chars max)** :
 
 ```
-Stack technique :
-
-→ Python 3.11+ · CustomTkinter
-→ Pillow + exifread + pillow-heif
-→ SQLite (cache 2-tier RAM + disque)
-→ PyInstaller --onefile (37 Mo → 22 Mo en cours)
-→ pytest : 170 tests, 5 catégories, 70 % core
-→ GitHub Actions Windows (lint + tests + release auto)
-
-Frontière stricte : core/ n'importe jamais ui/.
-Permet un freemium propre (futur src/photoorganizer_pro/).
-
-16 021 LOC source. 38 fichiers Python. 0 Bandit High.
+Automate photo organization by date, camera & GPS. Free trial.
 ```
 
----
-
-### Slide 7 — Apprentissage clé
-
-**Visuel** : texte uniquement, fond uni.
+**Description (260 chars)** :
 
 ```
-Ce que j'ai appris :
+PhotoOrganizer is a Windows desktop app that sorts thousands of photos
+by EXIF date, camera model, and GPS location. Reversible duplicate
+detection. 10 free runs to test, then 10€ lifetime unlock per PC.
+Code open-source under Apache-2.0.
+```
 
-Auditer un projet avant de l'optimiser, pas après.
+**First comment** (à coller dans les 30 secondes après publication) :
 
-J'ai cru pendant des mois que le .exe pesait
-37 Mo "à cause de Python". Faux.
+```
+Hey Product Hunt 👋
 
-10 Mo venaient d'un ExifTool Perl bundlé
-au cas où — fallback cassé depuis le début
-(chemin codé sur le mauvais dossier).
+I built PhotoOrganizer over a year of evenings to solve my own problem:
+20 years of photos on a single drive, dumped from 12 different devices,
+none consistently tagged.
 
-4 Mo venaient de cryptography tiré par
-des hooks PyInstaller parce que mon venv
-de build contenait 325 paquets.
+What it does:
+• Reads EXIF metadata (Date / Camera / GPS / 45 formats including RAW)
+• Sorts by criteria you choose, cumulatively (e.g. Year > Camera > City)
+• Detects duplicates with MD5/SHA-1/Blake3 + reversible "quarantine"
+• Full session rollback if you change your mind
 
-Le bon outil : pyi-archive_viewer -l.
-Le bon réflexe : venv minimal pour le build.
+What it doesn't do:
+• Upload anything anywhere (100% local)
+• Track you (no telemetry)
+• Subscribe you to anything (one payment, lifetime)
+
+The business model is "shareware" style: 10 free runs to test on real
+files, then a 10€ one-time unlock if you want to keep using it. One PC,
+no renewals. The code itself stays Apache-2.0 — you can fork it and
+build whatever you want.
+
+Happy to answer technical questions about:
+— PyInstaller onefile optimization (37 → 22 MB audit ongoing)
+— Offline HMAC + machine binding for indie software monetization
+— CustomTkinter for production-grade desktop UIs in 2026
+
+Honest feedback (including critical) welcomed.
 ```
 
 ---
 
-### Slide 8 — CTA
+## Format 5 — Show HN
 
-**Visuel** : 3 icônes (download, star, message).
-
-```
-Si tu veux essayer ou regarder le code :
-
-→ Téléchargement Windows : github.com/Kiriiaq/PhotoOrganizer
-→ Audit packaging complet : docs/exe-optimization.md
-→ DM si tu veux échanger sur :
-  · le packaging Python desktop
-  · le freemium architecture
-  · le tri d'images en lot
-
-Apache-2.0. Pas d'auto-promo dans les commentaires
-si ça ne t'intéresse pas — je n'ai pas honte.
-```
-
----
-
-### Texte d'accompagnement du carrousel (corps du post)
+**Titre** :
 
 ```
-12 000 photos triées en 47 secondes, sans Lightroom.
-
-J'ai construit PhotoOrganizer parce que mon dossier
-photo était devenu illisible. Aujourd'hui le projet
-fait 16 000 lignes de Python, 170 tests, et tourne
-en .exe Windows portable.
-
-Quelques décisions techniques détaillées dans le
-carrousel : architecture en couches, cache 2-tier,
-quarantaine réversible, optimisation taille du .exe.
-
-Open-source (Apache-2.0). Lien dans les commentaires.
-
-#Python #IndieDev #OpenSource
+Show HN: PhotoOrganizer – freemium photo organizer with offline HMAC trial counter
 ```
 
-**Compteur** : 472 caractères (corps), ~250 mots par slide en moyenne. ✅
+**Lien** : `https://github.com/Kiriiaq/PhotoOrganizer` (PAS la page Lemon Squeezy, HN flag commercial).
 
----
-
-## Format 3 — Post storytelling long (LinkedIn)
-
-> **Cible** : devs + makers + recruteurs (ouverture freelance).
-> **Objectif** : trajectoire personnelle + résultat mesuré + ouverture pour discussion.
-> **Compteur** : ~1 850 caractères (limite cible 1500-2000).
-> **Quand** : S+8 lundi.
-
----
+**First comment** (à coller immédiatement) :
 
 ```
-En 2023, j'avais 47 000 photos non triées.
-Le tri à la main avec File Explorer m'aurait pris
-des semaines.
+Hi HN. Solo dev, weekend project that grew. Posting the technical side
+because the product side is niche (Windows photo organizer).
 
-J'ai cherché un outil gratuit qui fasse ça
-correctement sous Windows. Verdict en 2 heures :
+Some pieces that might be interesting to discuss:
 
-→ Lightroom : 12 €/mois pour une fonctionnalité que
-   je voulais utiliser une seule fois.
-→ FastStone : interface 2008, pas de RAW correct.
-→ Adobe Bridge : 14 Go installés pour 3 boutons.
-→ Scripts Python sur GitHub : tous abandonnés,
-   aucun ne gère HEIC ni les doublons.
+1. Trial counter that resists trivial tampering, no server.
+   - %LOCALAPPDATA%\PhotoOrganizer\usage.dat with HMAC-SHA256 envelope.
+   - Embedded secret in the PyInstaller binary.
+   - Delete the file → reset to 0 (trivially circumventable, accepted
+     at the 10 € price point).
+   - Edit the JSON count without regenerating HMAC → reset to 0.
+   - Bonus: file copied from another PC is rejected because the
+     machine_id is part of the signed payload.
 
-J'ai écrit la première version moi-même un samedi
-soir. C'était laid mais ça marchait sur 10 dossiers.
-J'ai posté le repo "pour mémoire", sans intention.
+2. Machine binding without an auth server.
+   - sha256(MachineGuid || '|' || VolumeSerial_C).
+   - First successful activate_key() writes the current machine_id
+     to license.dat. Subsequent loads compare and reject if different.
+   - Caveat: Windows reinstall invalidates the license (policy: no
+     re-issuance, the user buys again — explicitly stated upfront).
 
-18 mois plus tard, le projet fait 16 000 lignes,
-170 tests, un .exe Windows de 37 Mo distribué via
-GitHub Releases.
+3. PyInstaller --onefile audit, 37 MB → 22 MB target.
+   - ExifTool bundle removed (34 MB, GPL ambiguity gone).
+   - --strip + UPX (-5 MB, +200ms startup).
+   - requests → urllib.request (-3 MB).
+   - Pillow pinned <12 to avoid bundling libavif we don't use.
 
-Ce qui a changé en cours de route :
+4. Single codebase + trial gate beats "free vs Pro" dual binary for
+   solo dev maintenance. Sublime Text / WinRAR were right.
 
-1. Un audit en 7 phases du projet entier, parce que
-   le repo commençait à être un patchwork. Inventaire
-   complet, restructuration, fichiers standards
-   (CHANGELOG, CONTRIBUTING, SECURITY, ARCHITECTURE)
-   et un dashboard HTML autonome pour suivre l'état.
+Code: Apache-2.0. The HMAC secret is gitignored (placeholder shipped
+in the public repo); real production secret is injected at build time
+and only exists on my disk + my password manager.
 
-2. Un audit packaging : passer le .exe de 37 Mo à
-   22 Mo en mesurant chaque catégorie au lieu de
-   deviner. Premier choc : 10 Mo d'ExifTool Perl
-   embarqués alors que le fallback était cassé
-   depuis le départ. Plus jamais "à la louche".
-
-3. Une stratégie freemium documentée : core
-   Apache-2.0 + édition Pro propriétaire à 19 €
-   (batch CLI + watch-folder). Activation offline,
-   zéro serveur, zéro coût récurrent.
-
-Honnêtement : je ne pense pas que la version Pro
-rapporte plus que quelques centaines d'euros la
-première année. C'est OK.
-
-Le vrai retour pour moi : le projet a déjà servi à
-expliquer mes pratiques (tests, CI, architecture en
-couches, packaging) lors de deux entretiens.
-
-Si tu travailles sur ton propre projet et que tu
-hésites entre "le rendre vraiment propre" ou "le
-laisser comme ça parce que ce n'est qu'un side
-project" : la propreté ouvre des conversations.
-Pas des ventes — des conversations.
-
-Open-source dans les commentaires.
-
-#Python #IndieDev #OpenSource
-```
-
-**Compteur** : 1 868 caractères (hors hashtags). ✅
-
-**Commentaire à poster juste après** :
-
-```
-Le repo : https://github.com/Kiriiaq/PhotoOrganizer
-
-Pour qui se demande à quoi ressemble un audit projet
-structuré : AUDIT.md, docs/exe-optimization.md et
-docs/MONETIZATION.md à la racine sont les livrables
-les plus utiles à parcourir.
-
-Si tu cherches à appliquer la même méthode à ton
-propre projet et que tu veux échanger : DM ouvert.
+Happy to take all questions. Especially the "how is this not trivially
+crackable" ones — short answer: it is, and that's fine at 10 €.
 ```
 
 ---
 
-## Format 4 (bonus) — Thread X / Twitter (4-6 tweets)
+## Format 6 — Reddit r/photography
 
-> **Quand** : S+3 mercredi (parallèle au post LinkedIn 1).
-> **Format** : 4-6 tweets, 1 visuel par tweet, lien GitHub dans le dernier.
+**Subreddit** : `r/photography`, `r/photos`.
+**Quand** : S+1.
+**Ton** : factuel, pas marketing.
 
-### Tweet 1 (hook + S-01)
-
-```
-J'ai construit une app Windows gratuite pour trier
-12 000 photos en 47 secondes.
-
-Pas Lightroom. Pas FastStone. Python + CustomTkinter
-+ PyInstaller. Open-source.
-
-🧵
-```
-
-### Tweet 2 (problème + GIF G-01)
+**Titre** :
 
 ```
-Le problème :
-- 3 appareils, 2 phones, 1 drone
-- 12 000 fichiers JPG / RAW / HEIC / MP4
-- "DCIM" et "to_sort_2023" partout
-
-Tri manuel = 3-4 h pour 1 000 photos.
-
-PhotoOrganizer le fait par EXIF.
+Made a free Windows app to organize photos by date / camera / GPS — 10 free runs, 10€ lifetime
 ```
 
-### Tweet 3 (features + S-02)
+**Corps** :
 
 ```
-Ce qu'elle fait :
-- Tri par date / caméra / GPS (cumulables)
-- Doublons multi-algo + quarantaine réversible
-- Rollback complet par session
-- Templates de renommage personnalisables
-- 45 formats supportés (RAW inclus)
-```
+Hey r/photography,
 
-### Tweet 4 (stack + capture archi simplifiée)
+After fighting with my own 20-year photo archive (different cameras,
+different cards, different naming chaos), I wrote a small Windows app
+to sort everything by EXIF data.
 
-```
-Stack :
-- Python 3.11 + CustomTkinter (UI)
-- Pillow + exifread + pillow-heif (lecture EXIF)
-- SQLite (cache 2-tier RAM + disque)
-- PyInstaller --onefile (37 Mo)
-- pytest : 170 tests, GitHub Actions Windows
+What it does:
+- Reads EXIF / IPTC from 45 formats (JPG, HEIC, RAW from Canon /
+  Sony / Nikon / Fuji, plus video formats)
+- Sorts into folders by date, camera model, or GPS-derived city,
+  cumulatively (Year > Camera > City works)
+- Detects duplicates with hashing — moves them to a reversible
+  quarantine, not the actual trash
+- Lets you roll back any session if you don't like the result
 
-16 021 LOC, 0 Bandit High.
-```
+What it doesn't do:
+- Upload anything (no cloud, no servers, no account)
+- Track you (no telemetry)
+- Edit your files unless you confirm
 
-### Tweet 5 (audit EXE — l'angle technique fort)
+Business model honestly: 10 free runs to test it on real folders, then
+10€ one-time unlock per PC if you want to keep using it. The source
+code is Apache-2.0 on GitHub — you can fork it and build your own
+binary for free.
 
-```
-Le truc le plus instructif : audit du .exe.
+GitHub: https://github.com/Kiriiaq/PhotoOrganizer
 
-37 Mo → 22 Mo en mesurant chaque catégorie
-(pyi-archive_viewer -l).
-
-10 Mo venaient d'un ExifTool Perl bundlé
-au cas où — fallback cassé depuis le départ.
-
-L'audit complet est dans le repo.
-```
-
-### Tweet 6 (CTA)
-
-```
-Free download : github.com/Kiriiaq/PhotoOrganizer
-
-Pro edition (batch CLI + watch-folder) lance bientôt
-à 19 €.
-
-DM ouvert si tu veux discuter packaging Python
-desktop ou freemium architecture.
+Genuine feedback welcome, especially "this doesn't handle X format I
+shoot in". The 45-format list is from EXIF library coverage, not from
+extensive RAW testing — I shoot Sony, so other brands' RAWs are less
+battle-tested.
 ```
 
 ---
 
-## Format 5 (bonus) — Show HN (Hacker News)
+## Format 7 — Reddit r/datahoarder
 
-> **Quand** : S+4 mardi 7h PT (10h ET, 16h Paris).
-> **Lien** : GitHub README UNIQUEMENT (jamais Lemon Squeezy direct).
+**Subreddit** : `r/datahoarder`, `r/PostCollapse`.
+**Quand** : S+2.
+**Ton** : storytelling longue durée.
 
-### Titre
-
-```
-Show HN: How I went from 37MB to 22MB PyInstaller EXE — and the audit script
-```
-
-### Premier commentaire (à poster immédiatement)
+**Titre** :
 
 ```
-Hi HN,
+[Tool] Sorted 50 TB of photos by EXIF in a weekend — open-sourced the tool
+```
 
-Author here. I built a desktop photo organizer for Windows
-(PhotoOrganizer, GUI app in Python/CustomTkinter), and at some point
-the .exe ballooned to 37 MB onefile. I wrote an audit pipeline that
-broke down the bundle by category and surfaced the easy wins.
+**Corps** :
 
-What surprised me most:
+```
+TL;DR — Windows app I built, Apache-2.0 on GitHub, sorts photos
+recursively by EXIF metadata. 10 free runs, 10€ lifetime unlock if
+you want it without limits. https://github.com/Kiriiaq/PhotoOrganizer
 
-1. ExifTool Perl runtime bundled as a "fallback" was 10.3 MB compressed
-   (29% of the binary). The code path that used it was broken from day
-   one (wrong hardcoded path). Nobody noticed because the primary
-   readers (exifread, Pillow, pillow-heif) covered 99% of cases.
+The story:
 
-2. cryptography appeared in the bundle (4.2 MB) even though the project
-   doesn't use it. PyInstaller picked it up because my system Python
-   had 325 packages installed (numpy, pandas, scipy, etc.) and hooks
-   pulled it in transitively. Lesson: always build from a minimal
-   isolated venv.
+I had a 6 TB NAS, photos from 2003 to 2026, multiple cameras, multiple
+phones, multiple "imports" from old hard drives, zero consistent
+naming. Lightroom catalogs got corrupted twice. Manual sorting was
+tried, abandoned, retried, re-abandoned.
 
-3. Pillow 12 ships _avif.pyd at 1.8 MB compressed. If you don't need
-   AVIF, pin Pillow<12 or exclude PIL._avif.
+What I wanted:
+- A tool that reads EXIF and creates folders like
+  D:/Photos/2017/03/2017-03-15_Sony-A7III_Paris
+- Without uploading anything anywhere
+- Reversible (so I can undo a bad run on 30k files)
+- With duplicate detection that doesn't permanently delete
 
-4. pillow-heif bundles libx265 (2.3 MB) for HEVC encoding, but most
-   apps only read HEIC. The sister package pi-heif is read-only and
-   skips libx265.
+Found a few candidates, all had at least one dealbreaker:
+- ACDSee: Windows-only AND paid AND no per-run rollback
+- Lightroom: subscription, "library" obsession, slow on first scan
+- ExifTool CLI: works but you write a Perl one-liner per use case
+- Various Python scripts on GitHub: rarely maintained, no UI, no
+  duplicate handling
 
-The audit script (pyi-archive_viewer wrapper) and the full report
-(.md + .html with SVG charts) are in the repo:
+So I wrote one. Single-file EXE (37 MB, optimization to 22 MB ongoing),
+no installer, no admin rights, no telemetry.
 
-- Audit doc: docs/exe-optimization.md
-- HTML report: docs/exe-optimization.html
-- Audit script: tools/_audit_breakdown.py
+Detail likely interesting to r/datahoarder:
+- Quarantine instead of send2trash for duplicates — you can recover
+  anything within a session.
+- History persists across runs (SQLite cache) so you can rollback
+  3 weeks later if you find a missing photo.
+- Hash multi-algo with fallback: Blake3 if available (2-3x faster),
+  else SHA-1, else MD5. Cache so re-scans are instant.
+- Geocoding via OpenStreetMap Nominatim, respects their 1 req/sec
+  usage policy, fully disableable.
 
-Repo: https://github.com/Kiriiaq/PhotoOrganizer
+I'm running a "10 free runs then 10€ lifetime unlock per PC" model
+(Sublime Text style). The code is fully open-source under Apache-2.0,
+so if you don't want to pay you can compile it yourself with
+PyInstaller. No DRM crusade.
 
-Happy to answer questions about the methodology, the trade-offs of
-dropping the ExifTool fallback, or the freemium architecture I'm
-building on top of this.
+Feedback welcomed, especially "your tool ate my photos" stories
+(spoiler: shouldn't, but I want to hear it if it does).
 ```
 
 ---
 
-## Métriques de suivi à 14 jours par post
+## Format 8 — Twitter / X thread
 
-| Post | Plateforme | KPI cible | Métrique d'échec |
-|---|---|---|---|
-| Post 1 (technique court) | LinkedIn | > 50 réactions, > 5 commentaires substantiels | < 20 vues uniques |
-| Carrousel | LinkedIn | > 100 réactions, > 10 commentaires, > 5 partages | < 500 impressions |
-| Post 3 (storytelling) | LinkedIn | > 80 réactions, > 8 commentaires, > 2 DM "intéressé par mission" | < 40 réactions |
-| Thread X | X / Twitter | > 30 likes, > 5 RT | < 500 impressions |
-| Show HN | Hacker News | Top 30 du jour, > 30 upvotes | < 5 upvotes en 2h |
+**Quand** : en parallèle de Product Hunt (S+2).
+**Style** : 4-6 tweets numérotés.
 
-Si un post sous-performe : ne pas en faire un drame. **Tester** la 2e fois avec un autre angle (par exemple post 1 reformulé en angle "freemium architecture" au lieu de "audit EXE").
+```
+1/ I shipped PhotoOrganizer with a "trial + unlock" model instead of a
+   freemium-by-feature one.
+
+   10 free runs. 10€ lifetime. 1 PC. No re-issuance.
+
+   Here's why I think this is the right model for indie desktop apps
+   in 2026 👇
+
+2/ Freemium-by-feature problems for solo devs:
+   - Maintain 2 binaries (free + pro)
+   - Maintain 2 test suites (61 extra pro tests)
+   - Visitors can't test the value they're buying
+   - "Pay to unlock checkboxes" feels worse than "pay to keep using"
+
+3/ Trial + unlock solves all four:
+   - 1 binary, 1 test suite, 1 release pipeline
+   - Visitor tests the FINAL product on real files
+   - At purchase, they're buying continuity not a list of features
+
+4/ Technical bits I had to solve:
+   - HMAC-signed counter in %LOCALAPPDATA% (resists trivial tampering)
+   - Machine binding via SHA256(MachineGuid + VolumeSerial)
+   - Inline activation modal (no Toplevel — UX consistency)
+   - Strict "no re-issuance on PC change" policy, indulgent in practice
+
+5/ This is Sublime Text's model, WinRAR's model, IDM's model.
+   Proven for 20 years. Why did I try freemium-by-feature first?
+   Because that's what current SaaS literature recommends, and that
+   advice doesn't transfer to single-payment desktop apps.
+
+6/ Apache-2.0 on the code, paid on the binary.
+   github.com/Kiriiaq/PhotoOrganizer
+   photoorganizer.lemonsqueezy.com
+
+   AMA on the technical or business side.
+```
 
 ---
 
-## Checklist pré-publication (à cocher avant chaque post)
+## Calendrier suggéré (3 semaines, faible intensité)
 
-- [ ] Le lien GitHub fonctionne (release v2.2.0 publiée, README à jour).
-- [ ] L'image / GIF / carrousel est produit et compressé (cf. [docs/MEDIA.md](docs/MEDIA.md)).
-- [ ] Compteur de caractères respecté (LinkedIn coupe à 210 c "mobile" / 280 c "desktop").
-- [ ] Hashtags ≤ 5, en fin de post.
-- [ ] Premier commentaire prêt à coller (pour le lien et le boost algo).
-- [ ] Disponible 1-4 h après publication pour répondre.
-- [ ] Pas de typo (relecture à voix haute).
-- [ ] Pas d'auto-promotion lourde ("regardez ce que j'ai fait !").
-- [ ] Un point d'ouverture / invitation à échange en fin.
+| Jour | Action | Plateforme |
+|---|---|---|
+| **S+0 lundi** | Tag v2.3.0 + GitHub Release | GitHub |
+| **S+0 mercredi** | Format 1 (LinkedIn pivot storytelling) | LinkedIn |
+| **S+1 mardi** | Format 6 (Reddit r/photography) | Reddit |
+| **S+2 mardi 9h Paris** | Format 4 (Product Hunt) + Format 8 (X thread) | PH + X |
+| **S+2 mardi 16h Paris** | Format 5 (Show HN) | HN |
+| **S+3 lundi** | Format 7 (Reddit r/datahoarder) | Reddit |
+| **S+5 mercredi** | Format 2 (LinkedIn technique PyInstaller) | LinkedIn |
+| **S+8 mercredi** | Format 3 (LinkedIn portfolio) | LinkedIn |
+| **Continu** | Réponse < 4 h sur tous les threads ouverts | tous |
 
 ---
 
-## Questions ouvertes (décision humaine)
+## Conseils de modération de fil
 
-1. **Nom à utiliser** : pseudonyme `Kiriiaq` ou nom légal `Emmanuel Grolleau` ? Pour la voie lead magnet → nom légal recommandé (visible recruteurs).
-2. **Photo de profil LinkedIn** : à jour ? Bannière LinkedIn à customiser avec capture PhotoOrganizer ?
-3. **Langue posts** : 100 % anglais (audience large) ou bilingue FR/EN (un de chaque) ? Recommandation : EN pour le post technique court + carrousel, FR pour le storytelling (touche communauté francophone tech / freelance).
-4. **Ton autorisé** : OK pour mentionner "deux entretiens" dans le storytelling, ou trop personnel ?
-5. **Visuels disponibles** : les captures S-01 à S-08 sont-elles produites ? Si non, c'est le bloquant P0 absolu pour publier (cf. AUDIT.md §14 D-08).
+- **Product Hunt** : être disponible 4-6 h après publication. Le ranking PH dépend du ratio commentaires/votes dans la première heure. Ne pas demander d'upvotes — illégal sur PH.
+- **Show HN** : répondre aux questions techniques **précisément**. La qualité des réponses auteur pèse plus que le contenu original dans le ranking HN.
+- **Reddit** : zéro lien dans les premiers commentaires de ton propre post. Reddit pénalise les nouveaux comptes qui linkent agressivement.
+- **LinkedIn** : commenter 2-3 fois sur ton propre post dans les 24h amplifie la portée organique (réveille l'algorithme).
+
+---
+
+## Notes anti-bad-faith
+
+Quelques objections que tu vas recevoir et comment y répondre courtement :
+
+- **"C'est crackable"** → "Oui. À 10 € le crack ne vaut pas l'effort. Si vous voulez patcher l'EXE, le code est sous Apache-2.0, faites-le."
+- **"Sublime Text c'est nag screen, pas blocage"** → "Vrai. Tradeoff assumé : blocage clair > frustration ambiguë."
+- **"Pourquoi pas plus cher ?"** → "Volume > marge. À 10 € j'élimine la résistance d'achat de l'utilisateur lambda."
+- **"Politique aucune réémission est trop dure"** → "Affichée dans les CGV. Geste commercial possible au cas par cas, pas promis publiquement."
+- **"Apache-2.0 + binaire payant c'est bizarre"** → "Le code est libre. Le binaire compilé que je distribue est mon travail packagé, payant. Vous pouvez compiler le vôtre."

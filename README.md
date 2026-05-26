@@ -125,23 +125,22 @@ Une optimisation taille `.exe` (cible 22 MB, −40 %) est documentée dans [docs
 
 | Phase | Sujet | Statut |
 |---|---|---|
-| **v2.3** | Refonte panneau Organisation (tabview interne, exemples intégrés) | 🟦 en cours sur `feat/v2.3-organize-tabview` |
+| **v2.3** | Refonte panneau Organisation + flow trial+unlock (10 tris gratuits / 10 € lifetime) | 🟦 en cours sur `feat/v2.3-organize-tabview` |
 | **v2.4** | Optimisation taille `.exe` (37 → 22 MB) | ⬜ Plan dans [docs/exe-optimization.md](docs/exe-optimization.md) |
-| **v3.0** | Édition Pro : batch CLI d'organisation + watch-folder | ⬜ Voir [src/photoorganizer_pro/README.md](src/photoorganizer_pro/README.md) |
-| futur | Plugin API (hooks Python pour règles personnalisées) | ⬜ |
-| futur | Rapports HTML/PDF avancés | ⬜ |
-| futur | Synchronisation cloud post-organisation | ⬜ |
+| **v3.0** (conditionnel) | Add-on optionnel : batch CLI + watch-folder + plugins (gelé pour l'instant) | ⬜ Réactivation si la v2.3 trouve sa traction |
 
 ---
 
 ## Modèle économique
 
-PhotoOrganizer adopte un modèle **freemium** :
+PhotoOrganizer adopte un modèle **trial + unlock** (type Sublime Text / WinRAR) :
 
-- **Core** (Apache-2.0, gratuit) — toute l'application graphique actuelle reste gratuite et open-source.
-- **Pro** (à venir, licence propriétaire) — extensions pour utilisateurs avancés (batch, scheduler, plugins, support officiel).
+- **Code source** sous **Apache-2.0** — usage libre, modification autorisée, redistribution OK.
+- **Application binaire** distribuée avec **10 tris d'essai gratuits**. Au-delà, déblocage par clé à **10 € lifetime, 1 PC** (clé liée au premier ordinateur qui l'active).
+- **Toutes les mises à jour futures incluses** — pas d'abonnement, pas de version "Pro+", pas de paywall sur des fonctionnalités.
+- **Aucune réémission** en cas de changement de PC, réinstallation Windows, ou disque mort — politique stricte assumée au prix de 10 €.
 
-Voir [docs/MONETIZATION.md](docs/MONETIZATION.md) (produit en Phase 5 de l'audit).
+Stratégie détaillée + flow technique : [docs/MONETIZATION.md](docs/MONETIZATION.md). Procédure pas-à-pas : [NEXT_STEPS.html](NEXT_STEPS.html).
 
 ---
 

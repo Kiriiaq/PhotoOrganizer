@@ -13,7 +13,6 @@ Usage :
 
 import argparse
 import json
-import os
 import shutil
 import sys
 import time
@@ -61,8 +60,7 @@ SCENARIOS = [
 
 def run_one(test_id: str, input_name: str, options_dict: dict, verbose: bool = True) -> dict:
     """Exécute un scénario et retourne un dict résumé."""
-    from core.operations import SmartOrganizer, OrganizationOptions, FileManager
-    from core.operations.file_manager import FileManager
+    from core.operations import FileManager, OrganizationOptions, SmartOrganizer
 
     input_dir  = INPUTS_DIR / input_name
     output_dir = OUTPUTS_DIR / test_id

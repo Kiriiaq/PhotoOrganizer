@@ -162,7 +162,9 @@ class QuarantineManager:
         # Calcule un préfixe unique pour éviter les collisions de noms
         # entre des fichiers identiques placés dans des dossiers différents.
         # On hashe le chemin source absolu, pas le contenu (trop coûteux).
-        prefix = hashlib.sha1(str(src).encode("utf-8")).hexdigest()[:8]
+        # usedforsecurity=False : ce hash sert d'identifiant court, pas de
+        # vérification d'intégrité. Bandit B324 ne s'applique pas ici.
+        prefix = hashlib.sha1(str(src).encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         dest = self.session_dir / f"{prefix}_{src.name}"
 
         # En cas de collision improbable (même hash + même nom = même fichier

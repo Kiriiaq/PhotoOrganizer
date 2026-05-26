@@ -53,8 +53,10 @@ def test_move_then_rollback_restores_source(fm, src_file, tmp_path):
 
 def test_rollback_all_returns_dict(fm, tmp_path):
     """rollback_all renvoie maintenant un dict, total = success+failed+skipped."""
-    a = tmp_path / "a.jpg"; a.write_bytes(b"A")
-    b = tmp_path / "b.jpg"; b.write_bytes(b"B")
+    a = tmp_path / "a.jpg"
+    a.write_bytes(b"A")
+    b = tmp_path / "b.jpg"
+    b.write_bytes(b"B")
     fm.copy_file(str(a), str(tmp_path / "dst" / "a.jpg"))
     fm.copy_file(str(b), str(tmp_path / "dst" / "b.jpg"))
     res = fm.rollback_all()
@@ -83,7 +85,8 @@ def test_list_files_excludes_videos_by_default(fm, tmp_path):
 
 
 def test_list_files_recursive(fm, tmp_path):
-    sub = tmp_path / "sub"; sub.mkdir()
+    sub = tmp_path / "sub"
+    sub.mkdir()
     (tmp_path / "top.jpg").write_bytes(b"")
     (sub / "deep.jpg").write_bytes(b"")
     files = fm.list_files(str(tmp_path), recursive=True)

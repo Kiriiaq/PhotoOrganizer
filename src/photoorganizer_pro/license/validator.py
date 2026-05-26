@@ -1,4 +1,4 @@
-"""Validation offline de licence Pro.
+"""Validation offline de licence + binding machine (v2.3+).
 
 Format de la clé : ``PROG-<édition>-<exp>-<base64payload>-<sig>``
 
@@ -9,13 +9,35 @@ Le payload encode l'email du licencié, l'édition, la date d'expiration.
 La signature est un HMAC SHA-256 calculé avec ``SECRET_KEY`` côté auteur.
 
 La clé secrète est stockée dans ``photoorganizer_pro/license/_secret.py``
-(absent du repo public, ajoutée au .gitignore). En attendant cette
-release, ce module utilise une clé placeholder pour permettre les tests.
+(absent du repo public, ajouté au .gitignore). Le placeholder par défaut
+permet aux tests de tourner mais ne valide rien en production.
 
-Activation utilisateur : la clé est écrite dans
-``%LOCALAPPDATA%\\PhotoOrganizer\\license.dat`` après validation. Au
-lancement, l'app cherche ce fichier et déverrouille les modules Pro si
-la signature et la date sont valides.
+Persistance et machine binding (pivot 2026-05)
+----------------------------------------------
+
+Depuis le pivot vers le modèle "trial + unlock", ``license.dat`` ne
+contient plus la clé brute. À la place :
+
+.. code-block:: json
+
+    {
+      "payload": {
+        "key": "PROG-...-...",
+        "machine_id_bound": "ab12cd34...",
+        "bound_at": "2026-05-27T10:00:00Z"
+      },
+      "sig": "<hmac SHA-256 du payload>"
+    }
+
+* La clé est universelle (générée sans machine_id, flow Lemon Squeezy
+  standard) ;
+* Le ``machine_id_bound`` est calculé et persisté à la **première**
+  activation sur le PC (``save_license_key()``) ;
+* À chaque ``load_active_license()`` on recalcule le ``machine_id`` du PC
+  courant et on refuse la licence si le binding ne matche pas.
+
+Effet net : une clé peut être copiée sur un autre PC, mais elle sera
+refusée. **Une licence = un PC à vie.**
 """
 
 from __future__ import annotations
@@ -23,18 +45,22 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
+import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+logger = logging.getLogger(__name__)
+
 # -----------------------------------------------------------------------
 # Clé secrète embarquée.
-# En production : remplacée par PyInstaller au moment du build Pro via
-# une injection de string. Pour ce squelette open-source, on garde un
-# placeholder qui ne valide rien en prod (sécurité par obscurité = nulle
-# si la clé reste celle-ci, donc le build Pro DOIT la changer).
+# En production : remplacée par PyInstaller au moment du build via une
+# injection de string. Pour ce repo, on garde un placeholder qui ne
+# valide rien en prod (sécurité par obscurité = nulle si la clé reste
+# celle-ci, donc le build DOIT la changer).
 # -----------------------------------------------------------------------
 try:
     from ._secret import SECRET_KEY  # type: ignore  # noqa: F401
@@ -49,11 +75,11 @@ VALID_EDITIONS = {EDITION_PERSONAL, EDITION_STUDIO, EDITION_LIFETIME}
 
 
 class LicenseInvalidError(Exception):
-    """La clé est mal formée, falsifiée, ou la signature est incorrecte."""
+    """Clé mal formée, falsifiée, signature incorrecte, OU bound à un autre PC."""
 
 
 class LicenseExpiredError(Exception):
-    """La clé est syntaxiquement valide mais sa date d'expiration est passée."""
+    """Clé syntaxiquement valide mais date d'expiration passée."""
 
 
 @dataclass(frozen=True)
@@ -63,6 +89,7 @@ class LicenseInfo:
     email: str
     edition: str
     expires: date
+    machine_id_bound: Optional[str] = None  # depuis pivot v2.3+
 
     @property
     def is_lifetime(self) -> bool:
@@ -81,6 +108,10 @@ def _sign(payload: str) -> str:
 
 def validate_license_key(key: str) -> LicenseInfo:
     """Valide une clé de licence et retourne les infos décodées.
+
+    Cette fonction valide UNIQUEMENT la clé en elle-même (signature,
+    expiration, format). Le binding machine est géré par
+    :func:`load_active_license` / :func:`save_license_key`.
 
     Raises:
         LicenseInvalidError: clé mal formée ou signature invalide.
@@ -124,8 +155,11 @@ def validate_license_key(key: str) -> LicenseInfo:
     return info
 
 
+# -----------------------------------------------------------------------
+# Persistance avec machine binding
+# -----------------------------------------------------------------------
 def _license_storage_path() -> Path:
-    """Chemin du fichier license.dat dans %LOCALAPPDATA%\\PhotoOrganizer\\."""
+    """Chemin du fichier ``license.dat`` dans ``%LOCALAPPDATA%\\PhotoOrganizer\\``."""
     if os.name == "nt":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     else:
@@ -135,30 +169,119 @@ def _license_storage_path() -> Path:
     return folder / "license.dat"
 
 
-def save_license_key(key: str) -> Path:
-    """Persiste la clé (préalablement validée) sur disque.
+def _get_current_machine_id() -> str:
+    """Indirection pour pouvoir monkeypatcher en tests.
 
-    Le fichier ne contient PAS de secret : juste la clé brute. Sa
-    confidentialité n'est pas critique (la sécurité repose sur la
-    signature HMAC, pas sur l'opacité du fichier).
+    Délègue à :func:`src.utils.licensing._compute_machine_id`.
+    """
+    # Lazy import pour éviter le cycle au démarrage.
+    from src.utils.licensing import _compute_machine_id
+
+    return _compute_machine_id()
+
+
+def _canonicalize(payload: dict) -> str:
+    """JSON canonique pour signature stable (clés triées, séparateurs compacts)."""
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def save_license_key(key: str) -> Path:
+    """Persiste la clé (préalablement validée) + bind au PC courant.
+
+    Format produit :
+
+    .. code-block:: json
+
+        {
+          "payload": {
+            "key": "PROG-...",
+            "machine_id_bound": "ab12cd34...",
+            "bound_at": "2026-05-27T10:00:00Z"
+          },
+          "sig": "<hmac>"
+        }
+
+    Le HMAC est calculé sur le JSON canonique du ``payload``. Toute
+    modification ultérieure du fichier sera rejetée au prochain
+    :func:`load_active_license`.
     """
     path = _license_storage_path()
-    path.write_text(key, encoding="ascii")
+    machine_id = _get_current_machine_id()
+    payload = {
+        "key": key,
+        "machine_id_bound": machine_id,
+        "bound_at": datetime.now(timezone.utc).isoformat(),
+    }
+    sig = _sign(_canonicalize(payload))
+    full = {"payload": payload, "sig": sig}
+
+    # Écriture atomique via fichier temporaire.
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(full, separators=(",", ":")), encoding="utf-8")
+    tmp.replace(path)
     return path
 
 
 def load_active_license() -> Optional[LicenseInfo]:
-    """Charge et valide la licence persistée, si présente.
+    """Charge la licence persistée et vérifie tout (sig + expir + binding).
 
     Returns:
-        LicenseInfo si valide, None si aucune licence n'est trouvée ou si
-        elle est invalide/expirée (le caller décidera quoi afficher).
+        :class:`LicenseInfo` si valide et bound à ce PC, ``None`` sinon
+        (fichier absent, corrompu, expiré, ou bound à un autre PC).
+
+    La fonction ne **lève jamais** : un échec retourne simplement ``None``
+    pour que l'UI puisse afficher l'état "trial" sans gérer d'exception.
     """
     path = _license_storage_path()
     if not path.exists():
         return None
+
     try:
-        key = path.read_text(encoding="ascii").strip()
-        return validate_license_key(key)
+        raw = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        logger.warning("Cannot read license.dat (%s)", exc)
+        return None
+
+    # Tentative format JSON nouveau (post-pivot).
+    payload: Optional[dict] = None
+    try:
+        full = json.loads(raw)
+        payload = full["payload"]
+        sig_provided = full["sig"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        payload = None
+
+    if payload is not None:
+        # Format moderne : vérifie l'enveloppe.
+        if not hmac.compare_digest(_sign(_canonicalize(payload)), sig_provided):
+            logger.warning("license.dat envelope HMAC mismatch — refusing")
+            return None
+
+        # Vérifie le binding machine.
+        bound_machine = payload.get("machine_id_bound")
+        current_machine = _get_current_machine_id()
+        if bound_machine != current_machine:
+            logger.warning("license.dat bound to another machine — refusing")
+            return None
+
+        key = payload.get("key", "")
+    else:
+        # Fallback : ancien format (juste la clé brute). Ne devrait pas
+        # arriver en pratique (pas de migration depuis avant v2.3) mais
+        # on reste tolérant pour les tests historiques.
+        key = raw
+
+    try:
+        info = validate_license_key(key)
     except (LicenseInvalidError, LicenseExpiredError):
         return None
+
+    if payload is not None:
+        # Repackage avec le machine_id_bound (pour que l'UI puisse y accéder).
+        info = LicenseInfo(
+            email=info.email,
+            edition=info.edition,
+            expires=info.expires,
+            machine_id_bound=payload.get("machine_id_bound"),
+        )
+    return info

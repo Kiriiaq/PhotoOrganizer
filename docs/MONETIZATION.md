@@ -1,7 +1,11 @@
 # PhotoOrganizer — Stratégie de monétisation
 
-> Phase 5 de l'audit méta-projet. Évaluation honnête des 8 voies, recommandation d'une voie principale + une voie fallback, chiffrage et plan d'action.
-> Date : 2026-05-19.
+> **Pivot 2026-05-26** : abandon de l'édition Pro séparée à 19/49/99 €. Adoption d'un
+> modèle "trial + unlock" type Sublime Text / WinRAR : une seule app, 10 tris gratuits,
+> 10 € lifetime, clé liée à 1 PC, aucune réémission.
+>
+> L'ancienne stratégie est archivée dans `docs/archives/superseded_2026-05/MONETIZATION_old.md`
+> pour traçabilité.
 
 ---
 
@@ -9,237 +13,222 @@
 
 | | Verdict |
 |---|---|
-| **Voie principale** | **Freemium** : core Apache-2.0 actuel + édition Pro propriétaire (batch CLI, scheduler, plugins) à **19 €** licence personnelle / **49 €** licence "studio". |
-| **Voie complémentaire** | **Lead magnet / portfolio** : le projet est un meilleur démonstrateur de compétences (Python desktop, packaging, tests, CI) qu'un produit à fort revenu. **Cumuler** avec le freemium plutôt que choisir. |
-| **Revenu réaliste 12 mois** | **200 € – 2 000 €** Pro (selon traction Product Hunt + LinkedIn) **+ 50 € – 300 €** Ko-fi dons + **valeur indirecte 5 k€ – 30 k€** si conversion en missions freelance. |
-| **Effort estimé pour démarrer** | **5-8 jours-homme** pour livrer la V1 Pro (batch CLI + watch-folder) et la page de vente. |
-| **Risque principal** | Niche modeste (photo amateur Windows) + concurrence gratuite (Lightroom, ACDSee, FastStone). Marketing > produit pour générer du revenu. |
+| **Modèle** | Édition unique. Essai gratuit limité à **10 tris**. Au-delà : blocage par modal, déblocage par clé. |
+| **Prix** | **10 € lifetime, 1 PC**. Aucun autre tier. |
+| **Plateforme** | Lemon Squeezy (un seul produit). Clé envoyée par email (manuel jusqu'à ~10 ventes/sem, automatique ensuite). |
+| **Politique** | Aucune réémission en cas de changement de PC / réinstall Windows / disque mort. Geste commercial possible au cas par cas, jamais promis. |
+| **Effort de mise en place** | **2-3 jours-homme** (vs 5-8 j de l'ancien modèle). Compteur + modal + setup Lemon Squeezy. |
+| **Revenu réaliste 12 mois** | **100 € – 1 500 €** selon traction. À 10 €/vente, 10 ventes/mois = 100 € (atteignable). 100 ventes/mois = 1 000 € (très bonne traction). |
+| **Risque principal** | Niche modeste + concurrence gratuite (FastStone, IrfanView). Le pivot ne change pas ce constat. |
 
-**Lis honnêtement** : ce projet n'a pas le potentiel d'un SaaS à 6 chiffres. Mais il peut rapporter **un peu d'argent + beaucoup d'opportunités** si bien positionné.
+**À lire honnêtement** : ce projet n'a pas vocation à devenir un SaaS à 6 chiffres. L'objectif est :
+1. **Vente directe** : couvrir les frais d'hébergement + faire un peu de revenu d'appoint.
+2. **Lead magnet** : démontrer des compétences (Python desktop, packaging, tests, freemium maison) pour ouvrir des opportunités freelance ou d'embauche.
 
----
-
-## 2. Évaluation des 8 voies
-
-### 2.1 Synthèse comparative
-
-| # | Voie | Pertinence | Effort 12 mois | Revenu réaliste 12 mois | Risque |
-|---:|---|:---:|---|---|---|
-| 1 | Open-source + dons (Ko-fi/GH Sponsors) | ⭐⭐⭐ | 0-1 j | 50–500 € | Faible (déjà en place) |
-| 2 | **Freemium / dual-license** | ⭐⭐⭐⭐⭐ | 5-8 j | 200–2 000 € | Modéré |
-| 3 | Vente directe one-shot (sans freemium) | ⭐⭐ | 3 j | 100–800 € | Élevé (concurrence gratuit) |
-| 4 | SaaS / abonnement | ❌ | 30+ j | imprévisible | Très élevé — inadapté à app desktop locale |
-| 5 | **Lead magnet / portfolio** | ⭐⭐⭐⭐⭐ | 2-3 j | 0 € direct, **5–30 k€ indirect** (missions) | Faible |
-| 6 | Formation / contenu payant | ⭐⭐ | 10-15 j | 200–1 500 € | Modéré (dépend audience LinkedIn) |
-| 7 | Bounties / sponsoring entreprise | ⭐ | 1-2 j | 0–500 € | Très élevé (projet pas assez utilisé en prod entreprise) |
-| 8 | Marketplace plugins | ❌ | n/a | n/a | PhotoOrganizer n'a pas d'écosystème |
-
-### 2.2 Détail de chaque voie
-
-#### Voie 1 — Open-source + dons ⭐⭐⭐ (déjà partiellement actif)
-
-- **Mécanique** : Ko-fi (déjà configuré : <https://ko-fi.com/kiriiaq>), GitHub Sponsors (déjà dans `.github/FUNDING.yml`), Liberapay (optionnel).
-- **Pré-requis** : audience qui découvre et utilise le projet. **Aujourd'hui, la traction GitHub est probablement faible** (à vérifier : nombre de stars, downloads des releases v1.0.0).
-- **Conversion typique** : ~0,5 % à 2 % des utilisateurs actifs donnent. Pour 100 utilisateurs/mois → 1-2 dons à 3-10 € → 5-20 €/mois.
-- **Revenu 12 mois** : **50–500 €** si la traction reste artisanale, **500-3 000 €** si un coup médiatique (HN front page, LinkedIn viral) attire 10 000+ visiteurs.
-- **Effort** : zéro additionnel — c'est en place. Effort = communication régulière.
-- **Risque** : minimal. Pas d'engagement de support, pas d'obligation.
-- **Recommandation** : **garder activé en complément**. Ne pas en faire la voie principale.
-
-#### Voie 2 — Freemium / dual-license ⭐⭐⭐⭐⭐ (CHOIX RETENU)
-
-- **Mécanique** :
-  - **Core** : Apache-2.0 (déjà actuel), GUI complète gratuite.
-  - **Pro** : modules propriétaires distribués séparément, licence "PhotoOrganizer Pro EULA" basée sur clé de licence (offline activation simple, pas de serveur).
-- **Modules Pro V1 (réalistes pour 5-8 j-h)** :
-  - `cli/batch_organize.py` : CLI complet d'organisation (équivalent GUI mais scriptable, idéal pour cron / Task Scheduler).
-  - `scheduler/watch_folder.py` : surveille un dossier et organise automatiquement les nouveaux fichiers (`watchdog` package).
-- **Modules Pro V2 (futur, 10-15 j-h)** :
-  - `plugins/api.py` : hooks Python pour règles de renommage / filtres / post-actions personnalisés.
-  - `reports/advanced.py` : rapports HTML/PDF avec graphiques (`matplotlib` lazy import).
-- **Pricing recommandé** :
-
-  | Édition | Prix | Cible |
-  |---|---|---|
-  | Personnelle | **19 €** one-shot, 1 PC, mises à jour mineures gratuites 1 an | Particulier, photographe amateur |
-  | Studio | **49 €** one-shot, 3 PC, mises à jour mineures gratuites 2 ans | Petit studio, photographe pro freelance |
-  | Source code | Non vendu — Pro reste fermé. |
-
-  Pricing **délibérément modeste** : la concurrence gratuite (FastStone, IrfanView) est rude. Cible : "celui qui veut vraiment automatiser et qui a déjà essayé le core gratuit".
-
-- **Plateforme** : **Lemon Squeezy** (recommandé, gère TVA EU + factures auto), alternative **Gumroad** (plus simple mais TVA à gérer soi-même).
-- **Activation** :
-  - Génération clé de licence côté Lemon Squeezy.
-  - Validation locale offline (signature RSA d'un payload contenant email + édition + date d'expiration). Pas de serveur d'auth = pas de coût récurrent.
-  - Implémenter dans `src/photoorganizer_pro/license/validator.py` (~150 LOC).
-- **Effort détaillé** :
-
-  | Tâche | Effort |
-  |---|---|
-  | Implémenter `cli/batch_organize.py` (réutilise `core/operations/organizer.py`) | 1-2 j |
-  | Implémenter `scheduler/watch_folder.py` avec `watchdog` | 1 j |
-  | Système de licence offline (RSA signature + UI activation) | 1 j |
-  | EULA propriétaire (LICENSE-PRO) + page de vente | 0,5 j |
-  | Setup Lemon Squeezy + webhook → email de la clé | 0,5 j |
-  | Build dual : `PhotoOrganizer.exe` (core, gratuit) + `PhotoOrganizerPro.exe` (avec modules Pro) | 1 j |
-  | Tests, doc, page web simple | 1-2 j |
-
-  **Total : 5-8 j-h** pour la V1 Pro.
-
-- **Revenu réaliste 12 mois** : 10-100 ventes selon traction → **200-2 000 €**. À 19 €/licence, il faut 11 ventes/mois pour 200 €. Réalisable avec un bon lancement Product Hunt + un post LinkedIn relayé.
-- **Risque** :
-  - **Maintenance de deux binaires** (overhead CI). Mitigé par `build.py --pro`.
-  - **Support utilisateur payant** : engagement implicite. Prévoir un canal email dédié et un SLA "best effort".
-  - **Piratage** : licence offline = crackable. Acceptable pour ce niveau de prix (effort de crack > coût d'achat).
-- **Recommandation** : **voie principale**. Commencer par la V1 Pro (batch + watch-folder), évaluer les premières ventes avant d'investir dans V2.
-
-#### Voie 3 — Vente directe one-shot SANS freemium ⭐⭐
-
-- **Mécanique** : tout est payant, plus de core gratuit.
-- **Verdict** : **mauvaise idée pour ce projet**. Le core est déjà open-source publiquement (v1.0.0 + v2.1.0 sur GitHub). Faire marche arrière serait perçu négativement par la communauté et bloquerait l'adoption.
-- **Recommandation** : ne pas faire. Garder le freemium.
-
-#### Voie 4 — SaaS / abonnement ❌
-
-- **Mécanique** : transformer en service web où l'utilisateur upload ses photos pour les organiser et télécharge le résultat.
-- **Verdict** : **incompatible** avec la nature du produit. Les photos sont des fichiers volumineux (RAW = 30 MB, HEIC = 5 MB). Uploader 10 000 photos = 100+ GB. Coût hébergement + bande passante explosif. UX dégradée vs le local.
-- **Effort de refonte** : 30+ j-h pour réécrire le core en backend FastAPI + frontend React + storage S3 + queue Celery.
-- **Recommandation** : **ne pas faire**. Reste dans le local desktop.
-
-#### Voie 5 — Lead magnet / portfolio ⭐⭐⭐⭐⭐ (CUMULER avec voie 2)
-
-- **Mécanique** : le projet sert de **preuve de compétence** pour décrocher des missions freelance ou des opportunités d'embauche.
-- **Compétences démontrées** (extraites de l'analyse Phase 1) :
-  - **Python desktop** : CustomTkinter, threading, callbacks, drag-and-drop.
-  - **Packaging Windows** : PyInstaller `--onefile`, gestion des hidden imports, optimisation taille EXE (audit documenté).
-  - **Architecture en couches** : UI / core / utils strict, no-cross-import.
-  - **Tests** : suite pytest 5 catégories, 170 tests, couverture 70 % modules métier, benchmarks `pytest-benchmark`.
-  - **CI/CD** : GitHub Actions Windows (lint + tests + release auto sur tag).
-  - **Audit & documentation** : `AUDIT.md`, `ARCHITECTURE.md`, `MONETIZATION.md`, `CLAUDE.md` — preuve de capacité à structurer un projet pro.
-  - **Modélisation de données** : SQLite 2-tier cache, rollback historisé, hash multi-algo.
-- **Effort** : 2-3 j pour produire les assets visuels (cf. [MEDIA.md](MEDIA.md)) + 3 posts LinkedIn structurés (Phase 7).
-- **Revenu direct** : 0 €.
-- **Revenu indirect (12 mois)** : **5 000 – 30 000 €** si 1-2 missions freelance déclenchées par la visibilité. À 400-600 €/jour TJM, une mission de 10 jours rapporte plus que 200 ventes Pro.
-- **Risque** : faible. C'est une conversion d'effort en visibilité.
-- **Recommandation** : **voie complémentaire de la voie 2**. Le projet rapporte peu en direct mais beaucoup en opportunités. Optimiser le README pour "se vendre" implicitement (badge auteur, lien LinkedIn, lien portfolio).
-
-#### Voie 6 — Formation / contenu payant ⭐⭐
-
-- **Mécanique** : ebook ou cours vidéo sur "Comment j'ai construit une app Windows portable en Python avec CustomTkinter et PyInstaller".
-- **Pré-requis** : audience LinkedIn / Twitter / YouTube qui te suit déjà (inconnu, à vérifier). Sans audience, un ebook se vend 0 fois.
-- **Effort** : 10-15 j pour écrire et publier un ebook de 60-100 pages sur Gumroad (~15 €).
-- **Revenu réaliste** : 200-1 500 € sur 12 mois si l'audience existe. Sinon proche de 0.
-- **Recommandation** : **différer**. Pertinent uniquement après avoir construit l'audience via voie 5 (lead magnet). Réévaluer dans 6-12 mois.
-
-#### Voie 7 — Bounties / sponsoring entreprise ⭐
-
-- **Mécanique** : Open Collective ou Tidelift, entreprises sponsorisent les libs qu'elles utilisent en prod.
-- **Verdict** : **non applicable**. PhotoOrganizer est une application desktop end-user, pas une lib utilisée en pipeline entreprise.
-- **Recommandation** : ne pas faire.
-
-#### Voie 8 — Marketplace plugins ❌
-
-- **Mécanique** : publier le projet comme plugin VSCode / Obsidian / Figma…
-- **Verdict** : **non applicable**. PhotoOrganizer n'est pas un plugin d'un autre écosystème, c'est une app standalone.
-- **Recommandation** : ne pas faire.
+Les deux se cumulent sans conflit.
 
 ---
 
-## 3. Plan d'action freemium V1 Pro (recommandation détaillée)
+## 2. Pourquoi ce pivot
 
-### 3.1 Périmètre V1 Pro
+L'ancien modèle (Pro séparée 19/49/99 € avec batch CLI, watch-folder, plugins) avait quatre faiblesses :
 
-| Module | Fichier cible | Effort | Valeur perçue |
-|---|---|---|---|
-| Batch CLI organize | `src/photoorganizer_pro/cli/batch_organize.py` | 1-2 j | Élevée — "scriptable" |
-| Watch-folder scheduler | `src/photoorganizer_pro/scheduler/watch_folder.py` | 1 j | Élevée — "automatique" |
-| Système de licence offline | `src/photoorganizer_pro/license/validator.py` | 1 j | Invisible mais critique |
-| EULA + page de vente | `LICENSE-PRO` + page web simple (GitHub Pages ou Lemon Squeezy storefront) | 0,5 j | Indispensable légal |
-| Build dual `build.py --pro` | `build.py` enrichi avec flag `--pro` | 1 j | Pipeline complet |
-| Doc + tests | `docs/PRO.md` + `tests/functional/test_pro_license.py` | 1-2 j | Confiance utilisateur |
+1. **Codebase double** : maintenir une variante Pro nécessitait `build.py --pro`, des entry points dédiés, et 61 tests spécifiques Pro qui n'apportaient pas de valeur business directe.
+2. **Testeur ≠ acheteur** : le visiteur testait la version gratuite, n'avait aucune idée de ce qu'il achetait, et devait croire la liste de features sur la page de vente.
+3. **Friction d'entrée** : il fallait acheter et installer un autre binaire pour découvrir la Pro. Aucun essai gratuit de la valeur ajoutée.
+4. **Positionnement flou** : 19 € pour 2 features (batch CLI + watch-folder) vs Lightroom à 12 €/mois → comparaison défavorable.
 
-**Total : 5-8 j-h.**
+Le nouveau modèle inverse ces points :
 
-### 3.2 Architecture d'activation
+| Avant | Après |
+|---|---|
+| Le visiteur lit la promesse Pro | Le visiteur **utilise** l'app gratuitement 10 fois et **sait** ce qu'il achète |
+| 2 EXE à maintenir | 1 EXE |
+| 3 tiers de prix (19/49/99) à arbitrer | 1 prix unique : 10 € |
+| Pro = features additionnelles | Pro = **continuer à utiliser** l'outil qu'on connaît déjà |
+
+Ce modèle est éprouvé : **Sublime Text**, **WinRAR**, **IDM**, **Beyond Compare** l'utilisent depuis 10-20 ans avec succès.
+
+---
+
+## 3. Mécanique du modèle (architecture)
+
+### 3.1 Compteur d'usages
+
+- **Stockage** : `%LOCALAPPDATA%\PhotoOrganizer\usage.dat`
+- **Format** : JSON signé HMAC SHA-256 avec une clé embarquée dans l'EXE.
+  ```json
+  {
+    "count": 7,
+    "first_run": "2026-05-26T14:30:00Z",
+    "machine_id": "ab12cd34...",
+    "sig": "<hmac>"
+  }
+  ```
+- **Anti-tampering** : la signature HMAC empêche l'utilisateur de modifier le `count` manuellement. Sans la clé HMAC (embarquée dans le binaire), impossible de regénérer une signature valide.
+- **Anti-suppression** : si le fichier est supprimé, on le recrée avec `count=0`. **C'est la faille assumée**. Pour rendre le contournement plus pénible, on dupliquera le compteur dans le registre Windows `HKCU\Software\PhotoOrganizer` (Phase 1.5 si nécessaire).
+- **Incrément** : uniquement après un tri **réussi** (un crash ou un Ctrl+C n'incrémente pas).
+- **Warnings** : à `count == 8` et `count == 9` → bandeau jaune "Avant-dernier / dernier tri gratuit". À `count == 10` → tri normal puis bascule en état "limite atteinte". À `count == 11` (et au-delà) → blocage hard via modal.
+
+### 3.2 Machine binding
+
+- **Empreinte** : SHA-256 de `MachineGuid (HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid) + Volume Serial Number du disque système`.
+- **Stable** sur un même PC tant que Windows n'est pas réinstallé et que le disque C: n'est pas changé.
+- **Affichée à l'utilisateur** sous forme courte tronquée : `MAC-7A3F-9C2E` (8 chars hex visibles, suffit pour le support).
+- **Stockée** dans `%LOCALAPPDATA%\PhotoOrganizer\license.dat` au format JSON signé HMAC :
+  ```json
+  {
+    "key": "PROG-LIFE-...-...",
+    "machine_id_bound": "ab12cd34...",
+    "bound_at": "2026-05-27T10:00:00Z",
+    "sig": "<hmac>"
+  }
+  ```
+
+### 3.3 Clé de licence
+
+- **Format actuel** (à conserver) : `PROG-LIFE-<YYYYMMDD>-<base64email>-<hmac>` (cf. `src/photoorganizer_pro/license/validator.py`). La date d'expiration reste à 30 ans = lifetime.
+- **Émission** : universelle, sans empreinte machine au moment de la génération → flow Lemon Squeezy standard sans champ custom.
+- **Activation 1er PC** : à la première saisie valide, l'app calcule le `machine_id` du PC courant et l'écrit dans `license.dat`. La clé devient *bound*.
+- **Activation 2e PC** : si la même clé est saisie sur un autre PC, le `machine_id` calculé ne matche pas celui stocké → `LicenseInvalidError`. L'utilisateur voit le message "Cette clé est déjà liée à un autre ordinateur."
+- **Implémentation** : extension du `validator.py` actuel — ajout d'un `LicenseInfo.machine_id_bound: Optional[str]` et d'une fonction `bind_license_to_machine(key, current_machine_id) -> None` qui réécrit `license.dat`.
+
+### 3.4 Flow d'achat
 
 ```
-Utilisateur achète sur Lemon Squeezy
+1. Visiteur télécharge PhotoOrganizer.exe → essai gratuit
        │
        ▼
-Lemon Squeezy webhook → email avec clé (format : XXXX-XXXX-XXXX-XXXX-signature)
+2. Utilise 10 fois → bandeau "limite atteinte"
        │
        ▼
-Utilisateur lance PhotoOrganizer Pro.exe → onglet "Licence"
+3. Clique "Activer une licence" → modal inline (pas Toplevel)
+       │
+       ├── Champ "Coller la clé" + bouton "Activer"
+       └── Bouton "Acheter une licence (10 €)" → https://photoorganizer.lemonsqueezy.com
        │
        ▼
-Colle la clé → src/photoorganizer_pro/license/validator.py
-       │
-       ├── Décode payload base64 (email, édition, expiration)
-       ├── Vérifie signature RSA avec clé publique embedée
-       │   (clé privée garde par l'auteur, jamais distribuée)
-       ├── Si valide : écrit license.dat dans %LOCALAPPDATA%\PhotoOrganizer\
+4. Lemon Squeezy → checkout standard → email confirmation
        │
        ▼
-Modules Pro activés (batch, watch-folder)
+5. Auteur reçoit notification "new order"
+       │
+       ├── Mode manuel (10 premières ventes) :
+       │     python -m src.photoorganizer_pro.license.keygen \
+       │         --email <client> --edition LIFE
+       │     → copie la clé dans une réponse email
+       │
+       └── Mode automatique (à partir de S+30j) :
+             webhook Lemon Squeezy → Cloudflare Worker
+             → génère la clé → envoie via Resend/Brevo
+       │
+       ▼
+6. Client reçoit la clé → la colle dans le modal → débloquée pour toujours sur ce PC
 ```
-
-**Pas de serveur d'authentification = zéro coût récurrent.** Crackable, mais effort de crack > 19 €.
-
-### 3.3 Pricing
-
-| Édition | Prix HT | Inclus | Mises à jour |
-|---|---|---|---|
-| **Core (open-source)** | Gratuit | GUI complète, 4 onglets, 170 tests, Apache-2.0 | Gratuites à vie |
-| **Pro Personnelle** | **19 €** | + Batch CLI + Watch-folder + Activation 1 PC | Mineures gratuites 1 an, majeures 50 % off |
-| **Pro Studio** | **49 €** | + Activation 3 PC + email support prioritaire | Mineures gratuites 2 ans, majeures 50 % off |
-| **Lifetime Pro** | **99 €** (lancement) | Pro Studio + toutes les majeures à vie | À vie |
-
-**Prix volontairement bas** : se positionner comme "outil utile pas cher" vs "outil pro à 200 €". Volume > marge.
-
-**Promotion de lancement** : "early bird" -30 % les 30 premiers jours (`PHOTORG30` code Lemon Squeezy) pour stimuler les premières ventes.
-
-### 3.4 Plateforme : Lemon Squeezy
-
-**Pourquoi Lemon Squeezy plutôt que Gumroad ou Paddle** :
-
-| | Lemon Squeezy | Gumroad | Paddle | Stripe Payment Links |
-|---|---|---|---|---|
-| TVA EU gérée (Merchant of Record) | ✅ | ❌ | ✅ | ❌ |
-| Facturation auto | ✅ | ✅ | ✅ | ⚠️ Stripe Tax payant |
-| Webhooks (auto-envoi clé) | ✅ | ✅ | ✅ | ✅ |
-| Frais | 5 % + 0,50 $ | 10 % | 5 % + 0,50 $ | 1,5 % + 0,25 $ |
-| Setup | Très simple | Très simple | Complexe | Manuel |
-| **Verdict pour PhotoOrganizer** | ✅ choix par défaut | OK fallback | Overkill | Trop technique |
-
-### 3.5 Calendrier de lancement (proposition)
-
-| Semaine | Tâche | Livrable |
-|---|---|---|
-| S+0 | Implémenter Pro V1 (modules + licence) | Code |
-| S+1 | Build dual, tests, doc | Pipeline CI |
-| S+2 | Page de vente Lemon Squeezy + assets visuels (cf. MEDIA.md) | Page en ligne |
-| S+3 | Lancement soft : LinkedIn personnel + Twitter | 50-200 visiteurs |
-| S+4 | Lancement hard : Product Hunt (mardi 9h PT recommandé) + Show HN | 500-5 000 visiteurs |
-| S+5 → S+12 | Marketing organique : 1 post LinkedIn / 2 semaines + réponse aux issues GitHub | Construction audience |
 
 ---
 
-## 4. Vérifications avant monétisation (juridique + IP)
+## 4. Pricing et politiques
 
-### 4.1 Droits sur le code ⚠️ À CONFIRMER
+### 4.1 Prix unique
 
-- **Auteur unique** : Kiriiaq (Emmanuel Grolleau) selon `pyproject.toml` et `git log --pretty=%an | sort -u`. À vérifier qu'aucun contributeur externe n'a poussé du code sans cession explicite (la `CONTRIBUTING.md` créée en Phase 3 demande l'accord Apache-2.0 mais c'est pour le futur).
-- **Clauses employeur** : si le développement a été fait pendant des heures de travail ou avec du matériel employeur, certaines juridictions (France notamment) attribuent les droits à l'employeur. **À auto-vérifier** :
-  - Contrat de travail actuel inclut-il une clause de cession des "œuvres créées" ?
-  - Le code a-t-il été commit depuis un poste/réseau employeur ?
-  - Si oui, demander une autorisation écrite avant de monétiser.
-- **Pseudonyme Kiriiaq** : la monétisation va exiger un nom légal pour les factures (auto-entreprise, EURL, etc. en France). Lemon Squeezy/Gumroad demandent un identifiant fiscal.
+| Édition | Prix | Inclus | Mises à jour |
+|---|---|---|---|
+| **Essai gratuit** | 0 € | App complète, 10 tris max | — |
+| **PhotoOrganizer Unlimited** | **10 €** one-shot | App complète, 1 PC, illimité | **Toutes les versions futures gratuites, à vie** |
 
-### 4.2 Licences des dépendances ✅ COMPATIBLES
+**Promo de lancement** : `EARLY30` = -30 % les 30 premiers jours (7 €). À évaluer selon traction.
 
-| Dépendance | Licence | Compatible Pro propriétaire ? |
+### 4.2 Politique de réémission
+
+| Cas | Politique officielle | Geste commercial possible |
 |---|---|---|
-| customtkinter | CC0 (domaine public) | ✅ |
+| Changement de PC | Nouvelle clé à racheter | Possible 1× par client si fidèle, jamais promis publiquement |
+| Réinstall Windows (MachineGuid change) | Nouvelle clé à racheter | Idem |
+| Disque dur mort | Nouvelle clé à racheter | Idem |
+| Disque dur restauré (image complète) | Marche probablement (machine_id préservé) | Pas besoin de re-acheter |
+| Bug applicatif côté éditeur | Réémission gratuite | Garantie |
+
+**Stratégie** : politique stricte affichée dans les CGV pour décourager le partage, indulgence ponctuelle pour préserver la satisfaction client. À 10 €, une mauvaise review coûte plus cher qu'une clé réémise gratuitement.
+
+### 4.3 Remboursement
+
+- **Loi consommateur EU** : 14 jours de droit de rétractation **sauf** pour les "contenus numériques fournis sur un support immatériel dont l'exécution a commencé avec l'accord du consommateur" (CGV à inclure : case à cocher au checkout).
+- **Politique éditeur** : remboursement sans question dans les 14 jours via Lemon Squeezy. Au-delà : refus sauf cas exceptionnel.
+
+---
+
+## 5. Plan d'implémentation V1
+
+### 5.1 Périmètre
+
+| Étape | Livrable | Effort |
+|---|---|---|
+| 5.1.1 | `src/utils/licensing.py` — compteur + binding (signature HMAC, fonction `record_successful_organize()`, fonction `check_can_organize() -> (allowed, count, locked)`) | 3-4 h |
+| 5.1.2 | Adaptation `src/photoorganizer_pro/license/validator.py` — ajout `machine_id_bound`, fonction `bind_license_to_machine()` | 1-2 h |
+| 5.1.3 | Tests pytest `tests/functional/test_licensing.py` — 10 tris OK / 11e bloqué / clé bound = OK / clé bound ailleurs = refus / compteur signé tampering = reset | 2-3 h |
+| 5.1.4 | Hook dans `src/ui/frames/organize_frame.py` avant `_do_organize()` (warning 8/9, blocage 11) | 1-2 h |
+| 5.1.5 | Modal inline d'activation/blocage (pas Toplevel, cf. préférence projet) — champ clé + bouton activer + bouton acheter | 2-3 h |
+| 5.1.6 | Badge global dans l'app (titre ou sidebar) : "Essai 7/10" / "Licence active · MAC-7A3F" | 30 min |
+| 5.1.7 | Setup Lemon Squeezy : 1 produit, 1 page, lien copié dans le modal | 1 h |
+| 5.1.8 | Mode manuel : procédure d'envoi de clé documentée dans `NEXT_STEPS.html` | 30 min |
+
+**Total : 2-3 jours-homme.**
+
+### 5.2 Flow d'envoi clé — Option A (manuel) vs Option B (automatique)
+
+#### Option A — Manuel (10 premières ventes)
+
+1. Lemon Squeezy notifie l'auteur par email à chaque vente.
+2. L'auteur exécute en local :
+   ```powershell
+   python -m src.photoorganizer_pro.license.keygen `
+       --email client@example.com --edition LIFE
+   ```
+3. Copie la clé dans la réponse au client (template email préparé).
+4. **Avantage** : 0 infra, 0 dev backend.
+5. **Limite** : tenable jusqu'à ~10 ventes/semaine. Au-delà, le temps de traitement devient pénible.
+
+#### Option B — Automatique (au-delà de 10 ventes/semaine)
+
+1. Webhook Lemon Squeezy → Cloudflare Worker (free tier) ou Vercel Function.
+2. Le Worker :
+   - Vérifie la signature du webhook
+   - Extrait email
+   - Génère la clé via un mini-portage JS de `keygen.py` (~30 lignes de code crypto)
+   - Envoie un email via Resend (free tier 100 emails/jour) ou Brevo
+3. **Effort** : 3-4 h pour quelqu'un qui a déjà déployé sur Cloudflare/Vercel.
+4. **Coût** : 0 € jusqu'à des volumes significatifs.
+
+**Recommandation** : commencer en mode A, basculer en B après confirmation du volume.
+
+### 5.3 Setup Lemon Squeezy minimal
+
+1. Créer le store `photoorganizer.lemonsqueezy.com` (cf. NEXT_STEPS §C).
+2. Créer **un seul produit** :
+   - Nom : *PhotoOrganizer — Lifetime Unlock*
+   - Prix : **10 €** one-time
+   - Description : reprendre le pitch du README
+   - Image : `docs/media/screenshot-organize.png` (à produire)
+   - Thank you page : "Tu vas recevoir ta clé par email d'ici 1 minute (mode manuel : sous 24 h). Si rien après 5 min/1 jour, écris à manugrolleau48@gmail.com avec ton numéro de commande."
+3. CGV à inclure : politique de rétractation 14 jours, politique de réémission stricte.
+4. Webhook : on_order_created → URL Worker (option B) ou requestbin (option A).
+
+---
+
+## 6. Vérifications juridiques (héritées, toujours valides)
+
+### 6.1 Droits sur le code
+
+- **Auteur unique** : Kiriiaq (Emmanuel Grolleau) selon `pyproject.toml` et `git log --pretty=%an | sort -u`.
+- **Clauses employeur** : à auto-vérifier. Si une clause de cession des "œuvres créées" s'applique aux projets perso, demander une autorisation écrite avant de monétiser.
+- **Pseudonyme Kiriiaq** : la monétisation exige un nom légal pour les factures. Lemon Squeezy demande nom + adresse + SIRET.
+
+### 6.2 Licences des dépendances
+
+| Dépendance | Licence | Compatible monétisation ? |
+|---|---|---|
+| customtkinter | CC0 | ✅ |
 | Pillow | MIT-CMU | ✅ |
 | exifread | BSD-3-Clause | ✅ |
 | pillow-heif | BSD-3-Clause | ✅ (avec attribution) |
@@ -249,67 +238,89 @@ Modules Pro activés (batch, watch-folder)
 | tkinterdnd2 | MIT | ✅ |
 | plyer | MIT | ✅ |
 | send2trash | BSD | ✅ |
-| **ExifTool** (bundled) | **Perl Artistic OR GPL 1** | ⚠️ **À retirer** (cf. AUDIT_EXE F-01 : déjà prévu) |
+| **ExifTool** (bundled) | **Perl Artistic OR GPL 1** | ⚠️ **À retirer** (cf. AUDIT_EXE F-01) |
 | Python stdlib | PSF | ✅ |
 
-**Action requise** : exécuter [AUDIT_EXE F-01](exe-optimization.md#f-01) (retrait du bundle ExifTool) **avant** de lancer la version Pro. Tant qu'ExifTool est bundlé, la GPL peut être invoquée (même si subprocess, c'est ambigu). Une fois retiré, plus aucun frein juridique.
+**Action** : retrait ExifTool prévu (déjà tracké dans AUDIT_EXE F-01).
 
-### 4.3 Données et logos tiers
+### 6.3 RGPD
 
-- **Logos** : aucun logo tiers utilisé visuellement (sauf badges shields.io du README, qui sont publics et libres).
-- **Données** : aucune base de données tierce embarquée (le Geolocation.dat d'ExifTool sortira avec lui).
-- **API tierce** : Nominatim (OpenStreetMap) — usage limité par leur [usage policy](https://operations.osmfoundation.org/policies/nominatim/) : max 1 req/sec, User-Agent identifiable (déjà conforme : `User-Agent: PhotoOrganizer/2.0`).
+- **App locale** : 0 collecte, 0 télémétrie.
+- **Géocodage Nominatim** : envoie `(lat, lon)`, désactivable.
+- **Lemon Squeezy** : Merchant of Record, gère RGPD côté checkout.
+- **Privacy Policy** : `docs/PRIVACY.md` déjà rédigée, à publier sur GitHub Pages ou lien direct.
 
-### 4.4 RGPD et données personnelles
+### 6.4 Fiscal France
 
-- **Pas de collecte** : l'app est 100 % locale. Aucune télémétrie, aucun tracking.
-- **Géocodage** : envoie `(lat, lon)` à Nominatim. **Désactivable** dans Paramètres (déjà le cas).
-- **Photos utilisateur** : restent sur le PC de l'utilisateur. Jamais transmises.
-- **Pas de DPO requis**, pas de mention CNIL.
-- **Pour la version Pro** : le formulaire de licence collecte `email` (via Lemon Squeezy). Lemon Squeezy est responsable de traitement, conforme RGPD. **Action** : ajouter une page Privacy Policy minimale (1 page) avant le lancement.
-
-### 4.5 Conformité fiscale (France, hypothèse)
-
-- **Statut requis** : minimum **auto-entreprise** (micro-entreprise) pour facturer légalement.
-- **Plafond CA** : 188 700 € pour vente de biens (jamais atteint au volume prévu). 77 700 € pour services. **Vente de licence logicielle = vente de bien si livraison numérique sans intervention humaine récurrente**.
-- **TVA** : sous le plafond de franchise (36 800 € pour services, 91 900 € pour biens), pas de TVA à facturer. **Lemon Squeezy fait office de Merchant of Record** → ils facturent la TVA aux clients pour toi et te reversent le net. Tu déclares juste tes revenus.
-- **Action** : si pas déjà fait, créer une auto-entreprise (5 min en ligne, gratuit) avant le premier euro encaissé. Activité = "édition de logiciels".
+- **Auto-entreprise (micro-entreprise)** suffit. Activité : "Édition de logiciels" (APE 5829C).
+- **Franchise en base de TVA** : sous 36 800 €/an, pas de TVA à facturer.
+- **Lemon Squeezy = Merchant of Record** : il facture la TVA aux clients et te reverse le net hors TVA.
+- **Action** : créer l'auto-entreprise si pas déjà fait (gratuit, 5 min en ligne).
 
 ---
 
-## 5. Risques et mitigations
+## 7. Risques et mitigations
 
 | Risque | Probabilité | Impact | Mitigation |
 |---|---|---|---|
-| Pas de traction (0-10 ventes) | Moyenne | Modéré (effort 5-8 j) | Voie 5 (lead magnet) reste payante en compétence |
-| Support utilisateur chronophage | Moyenne | Élevé (peut consumer 1 j/semaine) | Doc FAQ visible, SLA "best effort" explicite dans EULA, pas de support téléphonique |
-| Piratage clés Pro | Élevée | Faible (prix bas) | Tolérer. Itérer rapidement = moins de valeur du crack |
-| Bug critique en Pro → remboursements | Faible | Modéré | Politique remboursement 14 j (légal EU), CI stricte, beta test 30 j auprès de 5-10 users |
-| Concurrence sort une fonction équivalente gratuite | Moyenne | Modéré | Pivot vers spécialisation (ex : focus photographe pro) |
-| Changement de loi (TVA, RGPD) | Faible | Faible | Lemon Squeezy gère, à suivre via leurs alertes |
+| Pas de traction (< 10 ventes/mois) | Moyenne | Modéré (effort 2-3 j) | Reste utilisable comme lead magnet portfolio |
+| Contournement compteur (suppression fichier) | Élevée | Faible | Acceptable à 10 €. Duplication registre si nécessaire en v2.3.1 |
+| Crack binaire (patch de la check) | Faible | Faible | Effort de crack > 10 €. Acceptable. |
+| Support utilisateur sur réémissions | Moyenne | Modéré | CGV strictes affichées + gestes ponctuels |
+| Client se plaint du binding 1 PC après réinstall | Moyenne | Modéré | FAQ claire dès la page de vente, réémission ponctuelle gratuite |
+| Bug critique en production | Faible | Élevé | CI stricte + beta test 5-10 users avant lancement public |
+| Concurrent gratuit ajoute notre feature | Moyenne | Modéré | Itération produit > marketing. Continuer à améliorer. |
 
 ---
 
-## 6. Recommandation finale en 3 puces
+## 8. Modules Pro reportés v3.0+
 
-1. **Voie principale = Freemium V1 Pro** : core OSS + batch CLI + watch-folder à 19 €/49 € sur Lemon Squeezy. Effort 5-8 j-h. Revenu cible 12 mois : 200-2 000 €.
-2. **Cumuler systématiquement avec voie 5 (lead magnet)** : optimiser le README et les posts LinkedIn pour démontrer les compétences. Valeur indirecte potentielle 5-30 k€ en missions freelance, bien supérieure aux ventes Pro.
+L'ancien projet "Pro" (`src/photoorganizer_pro/`) contient du code fonctionnel et testé qui est **gelé** mais conservé pour une éventuelle v3.0+ conditionnelle à la traction de la v2.x :
+
+- **Batch CLI** (`cli/batch_organize.py`) — 335 LOC, 10 tests
+- **Watch-folder** (`scheduler/watch_folder.py`) — 279 LOC, 12 tests
+- **Plugin API** (`plugins/`) — 401 LOC, 25 tests
+- **Système de licence** (`license/`) — base qui sera **adaptée**, pas jetée, pour gérer le compteur + binding v2.x
+
+**Critères de réactivation v3.0+** :
+- > 200 ventes de la v2.x sur 6 mois (= demande validée)
+- > 5 demandes explicites de batch / watch / plugins par mois (= besoin identifié)
+- Disponibilité de 2-3 semaines pour livrer une v3.0 propre
+
+Tant que ces critères ne sont pas réunis, ces modules restent en sourdine :
+- Entry points pip commentés dans `pyproject.toml`
+- Tests skippés avec `@pytest.mark.skip(reason="Deferred to v3.0+")`
+- Fichiers gardés intacts pour réactivation rapide
+
+---
+
+## 9. Recommandation finale en 3 puces
+
+1. **Implémenter le flow trial+unlock en 2-3 j** : compteur + modal + badge + Lemon Squeezy en mode manuel. Lancement v2.3.0.
+2. **Cumuler avec la voie "lead magnet portfolio"** : un post LinkedIn structuré expliquant le pivot et la mécanique trial+unlock est en soi un démonstrateur de compétences (architecture, pragmatisme business, dev solo).
 3. **Pré-requis non négociables AVANT lancement** :
    - Confirmer droits IP (clause employeur, pseudonyme → nom légal).
    - Retirer ExifTool bundlé (AUDIT_EXE F-01) → élimine ambiguïté GPL.
    - Créer auto-entreprise si pas déjà fait.
-   - Produire au minimum S-01 + G-01 (assets visuels Phase 4 / MEDIA.md).
-   - Page Privacy Policy minimale pour le checkout Lemon Squeezy.
-
-**Si l'un de ces pré-requis bloque, lancer d'abord la voie 5 seule** (lead magnet via posts LinkedIn structurés — Phase 7 du méta-audit) — elle ne nécessite aucun pré-requis juridique.
+   - Produire S-01 + G-01 (screenshot + GIF démo).
+   - Publier `docs/PRIVACY.md` accessible publiquement.
 
 ---
 
-## 7. Questions ouvertes (décision humaine)
+## 10. Questions ouvertes (décision humaine)
 
-1. **Statut juridique** : auto-entreprise déjà créée, ou à faire ? Activité déclarée compatible ?
-2. **Audience LinkedIn / Twitter** : combien de followers actuellement ? (calibre la voie 6 formation).
-3. **Temps disponible** : 5-8 j-h sur les 4 prochaines semaines, c'est tenable ?
-4. **Tolérance au support utilisateur** : prêt à répondre 30-60 min/semaine à des emails utilisateurs ?
-5. **Modules Pro V1** : batch CLI + watch-folder = bons choix ? Ou un autre module a plus de valeur perçue (ex : rapports HTML avancés, plugin API) ?
-6. **Lancement Product Hunt** : oui/non ? Si oui, prévoir un "Hunter" influent qui submit pour toi → +3-5x visibilité.
+1. **Statut juridique** : auto-entreprise déjà créée ?
+2. **Promo de lancement** : on tente `EARLY30` (-30 % les 30 premiers jours) ou prix plein direct ?
+3. **Option A vs B** : on démarre tout de suite avec l'automatisation (Cloudflare Worker) ou on attend de valider le volume avec le mode manuel ?
+4. **Faut-il un mode "essai prolongé"** sur demande explicite (ex : un photographe pro qui veut tester sur 50 photos avant d'acheter) ? Ou on tient strictement les 10 ?
+5. **Communication du pivot** : faut-il un post public expliquant le changement de modèle (transparent et différenciant) ou silencieux ?
+
+---
+
+## Annexe — Historique des décisions
+
+| Date | Décision | Source |
+|---|---|---|
+| 2026-05-19 | Voie freemium 19/49/99 € validée comme stratégie initiale | AUDIT.md Phase 5 |
+| 2026-05-19 | Livraison modules Pro V1.1 (batch + watch + plugins) | Commit `5730f099` |
+| **2026-05-26** | **Pivot vers édition unique 10 € / 10 tris / 1 PC** | **Session de cadrage Claude Code 2026-05-26** |

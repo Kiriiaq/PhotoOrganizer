@@ -1,16 +1,17 @@
 # Contexte projet pour Claude Code
 
-> Fichier vivant. À mettre à jour à chaque phase de l'audit (4 → 7) et à chaque
-> décision structurante prise dans une session future.
-> Dernière mise à jour : 2026-05-19 (Phase 7 du méta-audit — drafts LinkedIn / X / Show HN).
+> Fichier vivant. À mettre à jour à chaque décision structurante prise dans une
+> session future.
+> Dernière mise à jour : 2026-05-26 (**pivot économique** — abandon de l'édition
+> Pro séparée, adoption du modèle *trial + unlock* à 10 € lifetime).
 
 ## Identité du projet
 
 - **Nom** : PhotoOrganizer
 - **Pitch** : Organiseur automatique de photos par métadonnées EXIF, application Windows GUI.
-- **Version actuelle** : 2.0.0 (sur branche `feat/v2.3-organize-tabview`), 1.0.0 = dernière release publique.
-- **Statut** : WIP — refonte UI v2.3 active, audit méta-projet en cours (Phase 3/7).
-- **Modèle économique** : Freemium (core Apache-2.0 + future édition Pro propriétaire dans `src/photoorganizer_pro/`).
+- **Version actuelle** : 2.2.0 (sur branche `feat/v2.3-organize-tabview`).
+- **Statut** : WIP — pivot économique en cours d'implémentation (compteur d'usages + modal de déblocage + machine binding).
+- **Modèle économique** : **édition unique** Apache-2.0. Essai gratuit limité à **10 tris**, puis déblocage par clé HMAC à **10 € lifetime, 1 PC** (cf. [docs/MONETIZATION.md](docs/MONETIZATION.md)).
 
 ## Stack & contraintes techniques
 
@@ -29,7 +30,7 @@
   ```bash
   pip install -e ".[dev,dnd,toast]"   # install complet
   python main.py                       # lancer GUI depuis sources
-  make test                            # 170 tests, ~25 s
+  make test                            # 170 tests core, ~25 s (Pro skippé par défaut)
   make lint                            # ruff + bandit
   python build.py                      # build EXE release
   python build.py --debug              # build EXE debug (console)
@@ -57,13 +58,15 @@ src/ui/app.py  PhotoOrganizerApp(ctk.CTk)
 src/core/{operations, metadata}    (logique métier — jamais d'import ui/)
    │
    ▼
-src/utils/{cache, hash_cache, config, logger}    (infrastructure)
+src/utils/{cache, hash_cache, config, logger, licensing*}    (infrastructure)
 ```
+
+`*` : `licensing` est le futur module à créer en v2.3.0 pour gérer le compteur + clé + binding 1 PC. Détails dans [docs/MONETIZATION.md](docs/MONETIZATION.md) §3.
 
 **Frontières strictes** :
 - `core/` n'importe jamais `ui/`.
 - `utils/` n'importe ni `core/` ni `ui/`.
-- `photoorganizer_pro/` (vide pour l'instant) peut importer `core/` et `utils/`, jamais l'inverse.
+- `src/photoorganizer_pro/` (**gelé pour v3.0+**) peut importer `core/` et `utils/`, jamais l'inverse. **N'est plus appelé par l'app v2.x** — les entry points pip sont commentés et les tests sont skippés.
 
 **Points d'entrée** :
 - GUI : `python main.py` ou `photo-organizer` (entry point pip) ou EXE.
@@ -82,7 +85,8 @@ src/utils/{cache, hash_cache, config, logger}    (infrastructure)
 | Champ de configuration | `src/utils/config.py` (dataclass `AppConfig`) |
 | Fixture de test | `test_data/inputs/<scenario>/` + scénario dans `test_data/scripts/run_tests.py` |
 | Test pytest | `tests/{smoke,functional,perf,stress,volume}/test_<name>.py` |
-| Module Pro | `src/photoorganizer_pro/<area>/` (jamais d'import depuis core) |
+| Logique licence/compteur/machine binding | `src/utils/licensing.py` (à créer en v2.3.0) |
+| **Code "futur v3.0+"** | `src/photoorganizer_pro/<area>/` — **mais ne pas l'activer en v2.x** |
 
 ### Patterns à respecter
 
@@ -109,48 +113,50 @@ Le projet bundle en `--onefile` PyInstaller. **Chaque dépendance ajoute 0.5 à 
 
 **Dépendances actuelles** (voir `pyproject.toml`) :
 `customtkinter`, `darkdetect`, `Pillow`, `exifread`, `pillow-heif`, `requests`, `PyYAML`.
-Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
+Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (extra `pro`, gelé v3.0+).
 
 ## État actuel & priorités
 
-- **Branche active** : `feat/v2.3-organize-tabview` — refonte du panneau Organisation (tabview interne, exemples intégrés).
-- **Audit méta-projet** : Phase 4/7 terminée (audit de complétude + gaps documentés). Phases restantes : 5 (monétisation), 6 (distribution), 7 (communication). Voir [AUDIT.md](AUDIT.md) §14 pour le plan d'action P0/P1.
-- **Tests** : 170 / 170 verts (smoke 80, functional, perf, stress, volume).
-- **Version code vs tag** : ⚠️ incohérence — `pyproject.toml` indique `2.0.0`, dernier tag publié est `v2.1.0`. À aligner (cf. AUDIT §14.2 D-09).
+- **Branche active** : `feat/v2.3-organize-tabview` — refonte du panneau Organisation + intégration imminente du flow trial/unlock.
+- **Tests** : **170/170 core verts**. Les 61 tests Pro (batch CLI 10 + watch 12 + plugins 25 + license 14) sont skippés (reason: `Deferred to v3.0+`) sauf `test_pro_license.py` qui sera adapté à la nouvelle logique trial+unlock.
+- **Pivot économique 2026-05** : 19/49/99 € freemium-par-fonctionnalité → **édition unique 10 € lifetime, 10 tris d'essai**. Cf. AUDIT.md §15.
 
-### Gaps prioritaires (issus de Phase 4)
+### Priorités immédiates (post-pivot)
 
 | # | Action | Effort | Bloque |
 |---:|---|---|---|
-| 1 | **P0** Produire screenshot + GIF démo (au moins S-01 + G-01 dans `docs/media/`) | 4-6 h | Communication publique |
-| 2 | **P1** Aligner version `2.0.0 → 2.2.0-dev` dans `pyproject.toml` et `src/ui/app.py` | 5 min | Cohérence releases |
-| 3 | **P1** Ajouter `pip-audit` + `bandit` au workflow CI | 30 min | Confiance contributeurs |
-| 4 | **P1** Remplacer le `bare except` `src/core/metadata/exif_extractor.py:193` par `except UnicodeDecodeError` | 5 min | Lint propre |
-| 5 | **P1** Compléter `CHANGELOG.md` avec rétro v2.1.0 (entrée manquante entre v1.0.0 et v2.0.0) | 15 min | Cohérence |
+| 1 | **P0** Créer `src/utils/licensing.py` : compteur HMAC + binding machine | 3-4 h | Toute la monétisation |
+| 2 | **P0** Modal inline d'activation/blocage dans `organize_frame` (warnings 8/9, blocage 11) | 3-4 h | Visibilité de la limite |
+| 3 | **P0** Badge "Essai X/10" ou "Activée" dans la barre de l'app | 30 min | UX du modèle |
+| 4 | **P0** Setup Lemon Squeezy avec un seul produit à 10 € + flow d'envoi clé (manuel d'abord) | 2 h | Revenue |
+| 5 | **P1** Produire screenshot + GIF démo (S-01 + G-01 dans `docs/media/`) | 4-6 h | Communication publique |
+| 6 | **P1** Réécrire LINKEDIN_DRAFTS.md sur la base du nouveau modèle | 1 h | Cohérence com |
 
-### Roadmap courte (cf. README)
+### Roadmap courte
 
-1. Fermer les gaps P0/P1 ci-dessus (~6-8 h).
-2. Finir refonte v2.3 panneau Organisation.
-3. Appliquer audit `.exe` (37 MB → 22 MB).
-4. Lancer v2.4 avec EXE optimisé.
-5. Démarrer v3.0 = premier module Pro (batch CLI d'organisation).
+1. **v2.3.0** : intégrer le flow trial+unlock complet (Tâches 1-3 ci-dessus). **+ tests dédiés**.
+2. **v2.3.1** : setup Lemon Squeezy + premières ventes manuelles, ajustements UX selon retours.
+3. **v2.4.0** : appliquer audit `.exe` (37 MB → 22 MB).
+4. **v3.0.0** *(conditionnel — uniquement si traction confirmée)* : réactiver les modules Pro reportés (batch CLI, watch-folder, plugins) sous forme d'add-on payant séparé.
 
 ### Bugs connus (à inspecter avant toute modif)
 
 - ExifTool fallback **désactivé en pratique** (chemin corrigé dans Phase 2 mais utilité douteuse, prévu pour retrait — cf. AUDIT_EXE F-01).
-- `core/scheduler.py` : présent mais usage à vérifier (semi-dead code, candidat à confirmer ou retirer).
+- `core/scheduler.py` : **utilisé** par `ui/frames/organize_frame.py` pour `JobScheduler` (planif quotidienne in-app). Pas mort, à garder.
 - `src/core/metadata/exif_extractor.py:193` : `bare except` à durcir en `except UnicodeDecodeError`.
 
 ## Décisions techniques actées
 
 | Décision | Pourquoi |
 |---|---|
-| **License Apache-2.0** (depuis Phase 2 de l'audit, ex-MIT+Commons Clause) | Maximum adoption + protection brevet + compatibilité usage entreprise. Le freemium passe par une frontière de package, pas par la license. |
-| **Modèle freemium core/Pro** (cf. [docs/MONETIZATION.md](docs/MONETIZATION.md)) | Core OSS pour visibilité et contributions, Pro propriétaire pour batch/scheduler/plugins/support payant. Voie principale **+** lead magnet portfolio cumulé. |
-| **Pricing Pro** : 19 € personnelle / 49 € studio / 99 € lifetime sur Lemon Squeezy | Prix bas vs concurrence gratuite, volume > marge. Lemon Squeezy gère TVA EU. |
-| **Activation Pro offline** (signature RSA, pas de serveur) | Zéro coût récurrent, crackable mais acceptable au prix. |
-| **ExifTool bundlé à retirer avant lancement Pro** | Élimine ambiguïté GPL (cf. AUDIT_EXE F-01). |
+| **License Apache-2.0** | Maximum adoption + protection brevet + compatibilité usage entreprise. Le freemium passe par le compteur d'usages, pas par la license du code. |
+| **Édition unique (pas Pro séparée)** ✦ *2026-05* | Le testeur teste exactement l'app qu'il achète. Maintenance d'une seule codebase. Modèle "shareware" Sublime Text / WinRAR universellement compris. |
+| **Trial = 10 tris gratuits, illimité après unlock** ✦ *2026-05* | Compteur d'actions plus lisible qu'un trial temporel. Warning à 8/10 et 9/10 pour ne pas surprendre. Incrément seulement à la réussite (un crash ne consomme pas). |
+| **Pricing : 10 € lifetime, 1 PC, aucune réémission** ✦ *2026-05* | Prix bas grand public, volume > marge. Politique stricte assumée : changement de PC = nouvelle clé. Geste commercial possible au cas par cas (non promis publiquement). |
+| **Clé universelle HMAC SHA-256 qui se bound au 1er PC** ✦ *2026-05* | Pas besoin de demander l'ID machine avant achat → flow Lemon Squeezy standard. Au premier `validate + save`, on enregistre `MachineGuid + volume serial` comme empreinte ; les validations suivantes refusent un autre fingerprint. |
+| **Modules Pro existants (batch CLI, watch, plugins) reportés v3.0+** ✦ *2026-05* | Conservés intacts dans `src/photoorganizer_pro/` pour réactivation conditionnelle si traction. Entry points pip commentés, tests skippés. |
+| **Activation offline (pas de serveur)** | Zéro coût récurrent. Crackable mais acceptable au prix de 10 €. Aucun DRM offline n'est incassable — l'objectif est "plus chiant à contourner que payer". |
+| **ExifTool bundlé à retirer avant lancement public** | Élimine ambiguïté GPL (cf. AUDIT_EXE F-01). |
 | **CustomTkinter et pas Qt** | Toolkit plus léger (2 MB vs 50+), démarrage rapide, look moderne suffisant pour app desktop. |
 | **PyInstaller `--onefile`** | Distribution mono-fichier, pas d'installation. Trade-off : démarrage 1-3s à cause de la décompression `%TEMP%`. |
 | **`src/` layout (pas `photoorganizer/` à la racine)** | Évite des pièges avec `--add-data src;src` PyInstaller. Renommage en `src/photoorganizer/` réservé si publication PyPI. |
@@ -178,6 +184,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
 - **Modifier le `.github/workflows/release.yml`** ou la signature du build.
 - **Toucher à `LICENSE`, `pyproject.toml` `[project]`, ou aux URLs publiques**.
 - **Renommer un fichier ou un module** (refs croisées).
+- **Modifier le SECRET HMAC** (`src/photoorganizer_pro/license/_secret.py`) — invaliderait toutes les clés émises.
 - **Lancer un commit, un push, une PR** — interdit par défaut, voir préférence durable ci-dessous.
 
 ### Tests à lancer après modification
@@ -187,7 +194,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
 | `src/ui/**` | `make test` (smoke contient `test_ui_v3.py` et `test_ux_v4.py`) |
 | `src/core/operations/**` | `make test` + `tests/functional/test_file_manager.py`, `test_organizer.py`, `test_duplicates.py`, `test_quarantine.py` |
 | `src/core/metadata/**` | `make test` + `tests/functional/test_exif_cache.py` |
-| `src/utils/**` | `make test` + `tests/functional/test_config.py` |
+| `src/utils/**` (notamment futur `licensing.py`) | `make test` + tests fonctionnels licensing dédiés |
 | `build.py` | `python build.py --light` pour un build rapide, vérifier la taille du EXE produit |
 | `pyproject.toml` ou `requirements.txt` | `pip install -e ".[dev]"` puis `make test` |
 
@@ -195,14 +202,15 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
 
 - **`assets/tools/`** — c'est ExifTool importé de upstream, modifier serait perdre la trace.
 - **`.git/`**, **`dist/`**, **`build/`** — générés ou versionnés à part.
-- **`%LOCALAPPDATA%\PhotoOrganizer\`** — config et caches utilisateur. Si la session est sur le poste de l'auteur, ne pas effacer.
+- **`%LOCALAPPDATA%\PhotoOrganizer\`** — config, caches utilisateur, **futur `usage.dat` et `license.dat`**. Si la session est sur le poste de l'auteur, ne pas effacer.
 - **`test_data/inputs/` et `test_data/outputs_reference/`** — fixtures versionnées pour la non-régression, ne pas régénérer sans validation.
 - **`LICENSE`** sans demande explicite de l'utilisateur (décision impactante).
+- **`src/photoorganizer_pro/license/_secret.py`** — gitignored, contient la clé HMAC qui signe les licences. La perdre = invalider toutes les clés émises.
 
 ### Préférences durables de l'utilisateur (rappel mémoire)
 
 - **Pas de commit, push, ou PR sans demande explicite**. Modifier les fichiers et faire un `git status` récap.
-- **Pas de fenêtres `Toplevel` dans l'onglet Organisation** — utiliser `OrganizeFrame._show_inline_panel` à la place.
+- **Pas de fenêtres `Toplevel` dans l'onglet Organisation** — utiliser `OrganizeFrame._show_inline_panel` à la place. Le modal de blocage trial DOIT respecter cette règle.
 
 ## Glossaire rapide
 
@@ -215,6 +223,9 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
 | Rollback | Annulation propre d'une opération avec recréation des dossiers vidés |
 | Light build | Variante PyInstaller sans les libs lourdes (Pillow, etc.) — suppose qu'elles sont déjà sur la machine cible |
 | Geocoding | Conversion lat/lon → nom de lieu via Nominatim (OpenStreetMap) |
+| Trial | Période d'essai = 10 tris réussis. Compteur dans `%LOCALAPPDATA%\PhotoOrganizer\usage.dat` (signé HMAC). |
+| Unlock | Saisie d'une clé valide → bascule l'app en mode illimité, bound au PC courant. |
+| Machine binding | Hash du `MachineGuid` Windows + volume serial du disque système, stocké dans `license.dat` signé. |
 
 ## Liens rapides
 
@@ -223,7 +234,9 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`).
 - Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Médias à produire : [docs/MEDIA.md](docs/MEDIA.md)
 - Changelog : [CHANGELOG.md](CHANGELOG.md)
-- Stratégie monétisation : [docs/MONETIZATION.md](docs/MONETIZATION.md)
+- **Stratégie monétisation (nouveau modèle)** : [docs/MONETIZATION.md](docs/MONETIZATION.md)
 - Plateformes & calendrier de lancement : [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
 - Drafts LinkedIn / X / Show HN : [LINKEDIN_DRAFTS.md](LINKEDIN_DRAFTS.md)
+- **Procédure de rentabilisation pas-à-pas** : [NEXT_STEPS.html](NEXT_STEPS.html)
 - Dashboard projet : [PROJECT_OVERVIEW.html](PROJECT_OVERVIEW.html)
+- Docs archivées (pivot 2026-05) : `docs/archives/superseded_2026-05/` — anciens modules Pro, design cloud, checklist freemium

@@ -1,33 +1,32 @@
-"""Batch CLI d'organisation — feature Pro.
+"""Batch CLI Pro — organisation et détection de doublons depuis le terminal.
 
-Réutilise les modules core ``FileManager`` + ``SmartOrganizer`` sans
-duplication. Le seul code propre à cette feature est la couche
-argparse + le check de licence.
+Réutilise les modules ``core/operations`` sans duplication. Le seul code
+propre à cette feature est la couche argparse, la vérification de
+licence, et un mode dry-run qui n'invoque pas l'organiseur.
 
-Usage typique
--------------
+Sous-commandes
+--------------
 
+``organize`` — trier un dossier (équivalent du clic GUI)
 ::
 
-    # Organiser une fois (équivalent du clic "Organiser" dans la GUI)
     photo-organizer-pro-batch organize \\
-        --source "D:/Photos/import" \\
-        --dest "D:/Photos/library" \\
+        --source D:/Photos/import --dest D:/Photos/library \\
         --by-date --by-camera --copy
 
-    # Avec un template de renommage
-    photo-organizer-pro-batch organize \\
-        --source "D:/Photos/import" \\
-        --dest "D:/Photos/library" \\
-        --by-date \\
-        --rename "{date:%Y-%m-%d}_{model}_{counter:04d}"
+``dedup`` — détecter et gérer les doublons d'un dossier
+::
 
-    # Mode dry-run (n'écrit rien, montre ce qui serait fait)
-    photo-organizer-pro-batch organize -s "D:/Photos" -d "D:/Sorted" --by-date --dry-run
+    photo-organizer-pro-batch dedup \\
+        D:/Photos --recursive --algorithm blake3 --report json
 
-Pré-requis : licence Pro active. Le binaire libère cette CLI uniquement
-si ``%LOCALAPPDATA%\\PhotoOrganizer\\license.dat`` contient une clé
-valide (cf. ``src/photoorganizer_pro/license/validator.py``).
+``info`` — afficher l'état de la licence Pro
+::
+
+    photo-organizer-pro-batch info
+
+Pré-requis : licence Pro active dans
+``%LOCALAPPDATA%\\PhotoOrganizer\\license.dat``.
 """
 
 from __future__ import annotations
@@ -36,140 +35,298 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def _require_license() -> None:
-    """Vérifie la licence Pro. Sort proprement si absente / expirée."""
+# ---------------------------------------------------------------------
+# Licence
+# ---------------------------------------------------------------------
+def _require_license() -> "LicenseInfo":  # noqa: F821 — forward ref
+    """Vérifie la licence Pro et la retourne. Sort en code 2 si invalide."""
     from src.photoorganizer_pro.license import load_active_license
 
     info = load_active_license()
     if info is None:
         print(
             "ERREUR : aucune licence Pro valide trouvée.\n"
-            "  Vérifiez %LOCALAPPDATA%\\PhotoOrganizer\\license.dat\n"
-            "  Achetez ou réactivez votre licence sur :\n"
-            "    https://photoorganizer.lemonsqueezy.com",
+            "  Vérifie %LOCALAPPDATA%\\PhotoOrganizer\\license.dat\n"
+            "  Achète ou réactive ta licence : https://photoorganizer.lemonsqueezy.com",
             file=sys.stderr,
         )
         sys.exit(2)
     days = info.days_remaining()
     if 0 <= days <= 30:
         print(f"AVERTISSEMENT : licence Pro expire dans {days} jour(s).", file=sys.stderr)
+    return info
 
 
-def _organize_command(args: argparse.Namespace) -> int:
-    """Exécute l'organisation. Délègue au core."""
-    # Import différé pour éviter de charger Pillow tant que --help suffit.
-    from src.core.operations import FileManager, OrganizationOptions, SmartOrganizer
+# ---------------------------------------------------------------------
+# Helpers communs
+# ---------------------------------------------------------------------
+def _resolve_dir(path_str: str, must_exist: bool = True, create: bool = False) -> Path:
+    p = Path(path_str).expanduser().resolve()
+    if create and not p.exists():
+        p.mkdir(parents=True, exist_ok=True)
+    elif must_exist and not p.exists():
+        print(f"ERREUR : dossier introuvable : {p}", file=sys.stderr)
+        sys.exit(1)
+    return p
 
-    source = Path(args.source).resolve()
-    dest = Path(args.dest).resolve()
-    if not source.exists():
-        print(f"ERREUR : source introuvable : {source}", file=sys.stderr)
-        return 1
-    if not dest.exists():
-        if args.create_dest:
-            dest.mkdir(parents=True, exist_ok=True)
-        else:
-            print(
-                f"ERREUR : destination introuvable : {dest}. Utiliser --create-dest pour la créer.",
-                file=sys.stderr,
-            )
-            return 1
 
-    fm = FileManager()
-    files = fm.list_files(str(source), recursive=args.recursive)
-    if not files:
-        print(f"Aucun fichier trouvé sous {source}.", file=sys.stderr)
-        return 0
-    print(f"{len(files)} fichier(s) à traiter.")
+def _make_progress_callback(prefix: str = "") -> Callable[[int, int, str], None]:
+    """Callback de progression qui imprime tous les N fichiers."""
 
-    opts = OrganizationOptions(
+    def cb(current: int, total: int, message: str) -> None:
+        if total <= 0:
+            return
+        # Toutes les 50 unités OU pile à la fin OU au début
+        if current == 1 or current % 50 == 0 or current >= total:
+            pct = int(current * 100 / max(total, 1))
+            short = Path(message).name if message else ""
+            print(f"  {prefix}[{current}/{total}] {pct}%  {short}", flush=True)
+
+    return cb
+
+
+# ---------------------------------------------------------------------
+# organize
+# ---------------------------------------------------------------------
+def _build_organize_options(args: argparse.Namespace) -> Any:
+    from src.core.operations import OrganizationOptions
+
+    return OrganizationOptions(
         organize_by_date=args.by_date,
         organize_by_camera=args.by_camera,
         organize_by_location=args.by_gps,
         date_format=args.date_format,
-        copy_instead_of_move=args.copy,
-        rename_template=args.rename or "",
+        copy_not_move=args.copy,
+        auto_rename=True,
+        skip_existing=args.skip_existing,
     )
 
+
+def _cmd_organize(args: argparse.Namespace) -> int:
+    from src.core.operations import FileManager, SmartOrganizer
+
+    source = _resolve_dir(args.source, must_exist=True)
+    dest = _resolve_dir(args.dest, must_exist=False, create=args.create_dest)
+    if not dest.exists():
+        print(
+            f"ERREUR : destination introuvable : {dest}. Ajoute --create-dest pour la créer.",
+            file=sys.stderr,
+        )
+        return 1
+
+    fm = FileManager()
+    files = fm.list_files(str(source), recursive=args.recursive)
+    if not files:
+        print(f"Aucun fichier média trouvé sous {source}.")
+        return 0
+
+    print(f"Source : {source}")
+    print(f"Dest   : {dest}")
+    print(f"Fichiers détectés : {len(files)}")
+
+    opts = _build_organize_options(args)
+
+    # ----------------------------------------------------------------
+    # Mode dry-run : on n'invoque PAS l'organiseur (qui copie / déplace).
+    # À la place on construit la liste des destinations prévues via
+    # ``SmartOrganizer._compute_destination`` (méthode interne stable
+    # depuis v2.0). Pour rester robuste si l'API privée change, on log
+    # juste les fichiers + options et un échantillon.
+    # ----------------------------------------------------------------
     if args.dry_run:
-        print("[DRY-RUN] aucun fichier ne sera modifié.")
-        # Le core n'a pas (encore) de vrai mode dry-run sur l'organisation
-        # complète. En attendant, on affiche les options et le nombre de
-        # fichiers. TODO PRO-V1.1 : exposer ``SmartOrganizer.plan_only()``.
-        print(f"Options : {opts}")
+        print("[DRY-RUN] Aucun fichier ne sera modifié.")
+        print(f"Options : by-date={opts.organize_by_date} by-camera={opts.organize_by_camera} "
+              f"by-gps={opts.organize_by_location} date-format={opts.date_format} "
+              f"copy={opts.copy_not_move}")
+        # Affiche les 10 premiers fichiers détectés à titre indicatif.
+        sample = files[:10]
+        print(f"Échantillon de {len(sample)} fichier(s) :")
+        for f in sample:
+            print(f"  - {Path(f).relative_to(source) if Path(f).is_relative_to(source) else f}")
+        if len(files) > 10:
+            print(f"  ... +{len(files) - 10} autres")
         return 0
 
     organizer = SmartOrganizer(file_manager=fm)
+    progress = _make_progress_callback() if args.verbose else None
 
-    def _progress(current: int, total: int, file_path: str) -> bool:
-        if current % 50 == 0 or current == total:
-            print(f"  [{current}/{total}] {Path(file_path).name}")
-        return True  # ne pas annuler
+    try:
+        result = organizer.organize(
+            file_paths=files,
+            target_dir=str(dest),
+            options=opts,
+            progress_callback=progress,
+        )
+    except KeyboardInterrupt:
+        print("\nAnnulation utilisateur (Ctrl+C).", file=sys.stderr)
+        organizer.cancel()
+        return 130
 
-    result = organizer.organize(
-        files=files,
-        source_dir=str(source),
-        dest_dir=str(dest),
-        options=opts,
-        progress_callback=_progress,
-    )
     print(
-        f"Terminé : {result.success} succès · {result.failed} échecs · {result.skipped} ignorés "
-        f"(sur {result.total})."
+        f"Terminé : {result.success} succès · {result.failed} échecs · "
+        f"{result.skipped} ignorés (total {result.total})."
     )
     return 0 if result.failed == 0 else 1
 
 
+# ---------------------------------------------------------------------
+# dedup
+# ---------------------------------------------------------------------
+def _cmd_dedup(args: argparse.Namespace) -> int:
+    from src.core.operations import FileManager
+    from src.core.operations.duplicate_finder import get_finder
+
+    source = _resolve_dir(args.source, must_exist=True)
+
+    fm = FileManager()
+    files = fm.list_files(str(source), recursive=args.recursive)
+    if not files:
+        print(f"Aucun fichier trouvé sous {source}.")
+        return 0
+
+    print(f"Scan : {len(files)} fichier(s) avec algo {args.algorithm}…")
+
+    finder = get_finder(algorithm=args.algorithm, quick_mode=True, use_cache=True)
+    progress = _make_progress_callback("hash ") if args.verbose else None
+    result = finder.find_duplicates(files, progress_callback=progress)
+
+    # Métriques
+    total = result.total_files
+    unique = result.unique_files
+    dups = result.duplicate_count
+    waste = result.total_wasted_space
+    waste_h = finder.format_size(waste) if hasattr(finder, "format_size") else f"{waste} B"
+
+    print()
+    print(f"Total fichiers   : {total}")
+    print(f"Fichiers uniques : {unique}")
+    print(f"Doublons         : {dups}  (espace gaspillé : {waste_h})")
+    print(f"Temps de scan    : {result.scan_time:.2f}s")
+
+    # Export rapport si demandé
+    if args.report:
+        from src.reports.duplicate_reporter import DuplicateReporter
+
+        reporter = DuplicateReporter()
+        out_path = Path(args.report_out) if args.report_out else source / f"duplicates_report.{args.report}"
+        fmt = args.report.lower()
+        if fmt == "csv":
+            reporter.export_csv(result, str(out_path))
+        elif fmt == "json":
+            reporter.export_json(result, str(out_path))
+        elif fmt == "html":
+            reporter.export_html(result, str(out_path))
+        elif fmt == "markdown":
+            reporter.export_markdown(result, str(out_path))
+        else:
+            print(f"AVERTISSEMENT : format de rapport inconnu '{args.report}'.", file=sys.stderr)
+        print(f"Rapport écrit : {out_path}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------
+# info
+# ---------------------------------------------------------------------
+def _cmd_info(_args: argparse.Namespace) -> int:
+    from src.photoorganizer_pro.license import load_active_license
+
+    info = load_active_license()
+    if info is None:
+        print("Aucune licence Pro active.")
+        print("  Achète : https://photoorganizer.lemonsqueezy.com")
+        return 2
+    print("Licence PhotoOrganizer Pro active :")
+    print(f"  Email       : {info.email}")
+    print(f"  Édition     : {info.edition}")
+    print(f"  Expire le   : {info.expires.isoformat()}")
+    days = info.days_remaining()
+    print(f"  Jours restants : {days}")
+    return 0
+
+
+# ---------------------------------------------------------------------
+# Entrée principale
+# ---------------------------------------------------------------------
 def main(argv: Optional[List[str]] = None) -> int:
-    """Point d'entrée CLI. Retourne le code de sortie shell."""
     parser = argparse.ArgumentParser(
         prog="photo-organizer-pro-batch",
-        description="CLI batch d'organisation de photos par EXIF (édition Pro).",
+        description="CLI batch d'organisation et de détection de doublons (édition Pro).",
     )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Logs détaillés (progress par 50)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    org = sub.add_parser("organize", help="Organiser un dossier")
+    # organize
+    org = sub.add_parser("organize", help="Organiser un dossier par EXIF")
     org.add_argument("--source", "-s", required=True, help="Dossier source à scanner")
     org.add_argument("--dest", "-d", required=True, help="Dossier destination")
     org.add_argument("--create-dest", action="store_true", help="Créer la destination si absente")
     org.add_argument("--recursive", "-r", action="store_true", default=True, help="Scan récursif (défaut)")
     org.add_argument("--no-recursive", dest="recursive", action="store_false", help="Désactiver récursif")
-    org.add_argument("--by-date", action="store_true", help="Organiser par date EXIF")
+    org.add_argument("--by-date", action="store_true", default=True, help="Organiser par date EXIF (défaut)")
+    org.add_argument("--no-by-date", dest="by_date", action="store_false")
     org.add_argument("--by-camera", action="store_true", help="Organiser par modèle d'appareil")
     org.add_argument("--by-gps", action="store_true", help="Organiser par coordonnées GPS")
     org.add_argument(
         "--date-format",
         default="year/month",
-        help='Format date. Ex: "year/month/day" → 2024/03/15. Défaut : "year/month".',
+        help='Format date. Ex : year/month/day → 2024/03/15. Défaut : year/month',
     )
-    org.add_argument(
-        "--copy",
-        action="store_true",
-        default=True,
-        help="Copier au lieu de déplacer (défaut). Utiliser --move pour déplacer.",
-    )
+    org.add_argument("--copy", action="store_true", default=True, help="Copier (défaut)")
     org.add_argument("--move", dest="copy", action="store_false", help="Déplacer au lieu de copier")
     org.add_argument(
-        "--rename",
-        help='Template renommage. Variables : {date:%%Y-%%m-%%d}, {counter:04d}, {model}, {ext}',
+        "--skip-existing",
+        action="store_true",
+        help="Si la destination existe déjà, ne pas re-organiser",
     )
-    org.add_argument("--dry-run", action="store_true", help="Simulation sans modifier les fichiers")
+    org.add_argument("--dry-run", action="store_true", help="Simulation : aucun fichier modifié")
+
+    # dedup
+    dd = sub.add_parser("dedup", help="Détecter les doublons d'un dossier")
+    dd.add_argument("--source", "-s", required=True, help="Dossier à analyser")
+    dd.add_argument("--recursive", "-r", action="store_true", default=True)
+    dd.add_argument("--no-recursive", dest="recursive", action="store_false")
+    dd.add_argument(
+        "--algorithm",
+        "-a",
+        default="md5",
+        choices=["md5", "sha1", "blake3"],
+        help="Algorithme de hashing. blake3 est 2-3× plus rapide si disponible.",
+    )
+    dd.add_argument(
+        "--report",
+        choices=["csv", "json", "html", "markdown"],
+        help="Exporter le rapport dans le format choisi.",
+    )
+    dd.add_argument("--report-out", help="Chemin du rapport (défaut : <source>/duplicates_report.<fmt>)")
+
+    # info
+    sub.add_parser("info", help="Afficher l'état de la licence Pro")
 
     args = parser.parse_args(argv)
 
-    # Configuration logging minimal.
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING,
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
 
-    # Vérification licence avant toute opération.
+    # info ne nécessite pas une licence valide (au contraire, c'est le diagnostic).
+    if args.command == "info":
+        return _cmd_info(args)
+
+    # Toutes les autres commandes nécessitent une licence valide.
     _require_license()
 
     if args.command == "organize":
-        return _organize_command(args)
+        return _cmd_organize(args)
+    if args.command == "dedup":
+        return _cmd_dedup(args)
+
     parser.error(f"Commande inconnue : {args.command}")
     return 2
 
