@@ -1,5 +1,6 @@
-# PhotoOrganizer v2.0.0 — runtime dependencies
+# PhotoOrganizer — runtime dependencies
 # Source of truth: pyproject.toml. This file is the synchronised mirror.
+# Effective version: see src/__init__.__version__
 # Python 3.11+
 #
 # Install: pip install -r requirements.txt

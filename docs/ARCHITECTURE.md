@@ -37,13 +37,21 @@
 │   │ EXIF 2-tier  │  │ SQLite TTL   │  │ JSON     │  │ rotation │    │
 │   │ RAM+SQLite   │  │ file hashes  │  │ AppConfig│  │ filehnd  │    │
 │   └──────────────┘  └──────────────┘  └──────────┘  └──────────┘    │
+│   ┌──────────────────────────────────────────────────────────────┐   │
+│   │ licensing.py  (v2.3+, pivot 2026-05-26)                      │   │
+│   │   - Compteur HMAC dans %LOCALAPPDATA%\PhotoOrganizer\usage.dat│   │
+│   │   - Machine binding SHA-256(MachineGuid + VolumeSerial)      │   │
+│   │   - API : get_state / can_organize_now /                     │   │
+│   │           record_successful_organize / activate_key          │   │
+│   │   - Réutilise src/photoorganizer_pro/license/ (validator HMAC)│  │
+│   └──────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
                        Système : %LOCALAPPDATA%, FS, HTTPS
 ```
 
-**Règle d'or** : `core/` ne dépend jamais de `ui/`. `utils/` ne dépend ni de `core/` ni de `ui/`. `photoorganizer_pro/` (futur) peut importer `core/` et `utils/`, jamais l'inverse.
+**Règle d'or** : `core/` ne dépend jamais de `ui/`. `utils/` ne dépend ni de `core/` ni de `ui/`. `photoorganizer_pro/` peut importer `core/` et `utils/`, jamais l'inverse. **Note pivot 2026-05** : `photoorganizer_pro/cli/`, `scheduler/`, `plugins/` sont *gelés v3.0+* (entry points pip commentés, tests skippés). Seul `photoorganizer_pro/license/` est actif, réutilisé par `utils/licensing.py`.
 
 ---
 
@@ -196,9 +204,16 @@ DuplicatesFrame.start_search()
 |---|---|
 | `duplicate_reporter.py` | Génération de rapports CSV / JSON / HTML / Markdown pour les résultats doublons |
 
-### `src/photoorganizer_pro/` (réservé)
+### `src/photoorganizer_pro/` (partiellement actif post-pivot 2026-05-26)
 
-Voir [`../src/photoorganizer_pro/README.md`](../src/photoorganizer_pro/README.md). Pas de code livré.
+| Sous-module | Statut v2.x | Rôle |
+|---|---|---|
+| `license/` | **ACTIF** | Validation HMAC SHA-256 + machine binding. Importé par `src/utils/licensing.py`. |
+| `cli/batch_organize.py` | DEFERRED v3.0+ | Batch CLI scriptable. Entry point pip commenté dans `pyproject.toml`. Tests skip. |
+| `scheduler/watch_folder.py` | DEFERRED v3.0+ | Surveillance auto de dossier. Idem. |
+| `plugins/` | DEFERRED v3.0+ | Plugin API (5 hooks). Idem. |
+
+Critères de réactivation v3.0+ : cf. [`MONETIZATION.md`](MONETIZATION.md) §8.
 
 ---
 
@@ -212,6 +227,8 @@ Voir [`../src/photoorganizer_pro/README.md`](../src/photoorganizer_pro/README.md
 | Logs application | `%LOCALAPPDATA%\PhotoOrganizer\logs\photoorganizer.log` | `utils/logger.py` |
 | Quarantaine doublons | `%LOCALAPPDATA%\PhotoOrganizer\quarantine\<session>\` | `core/operations/quarantine.py` |
 | Historique opérations | en mémoire dans `FileManager`, persisté via session JSON | `core/operations/file_manager.py` |
+| Compteur trial (HMAC) | `%LOCALAPPDATA%\PhotoOrganizer\usage.dat` (JSON signé) | `utils/licensing.py` |
+| Licence activée (HMAC + machine binding) | `%LOCALAPPDATA%\PhotoOrganizer\license.dat` (JSON signé) | `photoorganizer_pro/license/validator.py` |
 
 Aucun secret, aucun token, aucune donnée personnelle utilisateur n'est envoyée à l'extérieur — sauf le couple `(lat, lon)` à Nominatim si le géocodage est activé (par défaut ON, désactivable dans Paramètres).
 
