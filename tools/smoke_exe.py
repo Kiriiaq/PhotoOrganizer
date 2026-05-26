@@ -83,14 +83,34 @@ def _smoke(label: str, exe: Path, hold_seconds: float = 6.0) -> dict:
     }
 
 
+def _read_version() -> str:
+    """Lit ``__version__`` depuis ``src/__init__.py`` (source de vérité unique)."""
+    import re
+
+    init_path = Path(__file__).resolve().parent.parent / "src" / "__init__.py"
+    try:
+        text = init_path.read_text(encoding="utf-8")
+    except OSError:
+        return "0.0.0-unknown"
+    match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+    return match.group(1) if match else "0.0.0-unknown"
+
+
 def main() -> int:
     repo = Path(__file__).resolve().parent.parent
+    version = _read_version()
     cases = [
-        ("debug", repo / "dist" / "PhotoOrganizer-2.0.0-debug.exe"),
-        ("light", repo / "dist" / "PhotoOrganizer-2.0.0-light.exe"),
+        ("release", repo / "dist" / f"PhotoOrganizer-{version}.exe"),
+        ("debug", repo / "dist" / f"PhotoOrganizer-{version}-debug.exe"),
+        ("light", repo / "dist" / f"PhotoOrganizer-{version}-light.exe"),
     ]
     any_failed = False
+    found_any = False
     for label, exe in cases:
+        if not exe.exists():
+            # On ne traite que les variantes effectivement buildées.
+            continue
+        found_any = True
         r = _smoke(label, exe)
         ok = r["status"] == "ALIVE"
         any_failed = any_failed or not ok
@@ -102,8 +122,17 @@ def main() -> int:
         if r["tail"]:
             print("  log tail  :")
             for line in r["tail"].splitlines()[-6:]:
-                print(f"    {line}")
+                # Le log peut contenir des chars non-cp1252 (chemins Unicode).
+                # On force un encodage tolérant avant l'affichage console.
+                safe = line.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+                safe = safe.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
+                    sys.stdout.encoding or "utf-8", errors="replace"
+                )
+                print(f"    {safe}")
         print()
+    if not found_any:
+        print(f"Aucun binaire trouvé pour version {version}. Lance d'abord `python build.py`.")
+        return 2
     return 1 if any_failed else 0
 
 

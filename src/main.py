@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PhotoOrganizer v2.0.0
-Organiseur intelligent de photos et vidéos.
+PhotoOrganizer — Organiseur intelligent de photos et vidéos.
 
-Point d'entrée principal de l'application.
+Point d'entrée principal de l'application. La version effective est lue
+depuis ``src/__init__.__version__`` (source de vérité unique).
 """
 
 import os
@@ -55,7 +55,14 @@ def main():
 
     # Configurer le logging
     logger = setup_logging(level="INFO")
-    logger.info("Démarrage de PhotoOrganizer v2.0.0")
+    # Version lue depuis src/__init__.py (source de vérité unique)
+    try:
+        from src import __version__ as _app_version
+    except ImportError:
+        # Fallback si on tourne sans le préfixe ``src.`` (cas de l'EXE
+        # PyInstaller où ``src`` n'est pas un package importable).
+        from __init__ import __version__ as _app_version  # type: ignore
+    logger.info(f"Démarrage de PhotoOrganizer v{_app_version}")
 
     try:
         # Créer et lancer l'application

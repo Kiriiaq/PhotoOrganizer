@@ -9,13 +9,31 @@ Usage:
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 APP_NAME = "PhotoOrganizer"
-VERSION = "2.2.0"
+
+
+def _read_version() -> str:
+    """Lit ``__version__`` depuis ``src/__init__.py`` (source de vérité unique).
+
+    Évite le risque de désynchro entre ``build.py``, ``pyproject.toml`` et
+    ``src/__init__.py`` qui a déjà été un bug historique (cf. AUDIT D-09).
+    """
+    init_path = Path(__file__).parent / "src" / "__init__.py"
+    try:
+        text = init_path.read_text(encoding="utf-8")
+    except OSError:
+        return "0.0.0-unknown"
+    match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+    return match.group(1) if match else "0.0.0-unknown"
+
+
+VERSION = _read_version()
 # L'icône réelle est dans resources/icons (cf. _install_icon dans ui/app.py)
 ICON_CANDIDATES = [
     "resources/icons/icon.ico",
