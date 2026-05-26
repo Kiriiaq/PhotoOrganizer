@@ -144,6 +144,12 @@ class DuplicatesFrame(ctk.CTkFrame):
         attach_tooltip(self.search_button,  TIPS["btn_search"])
         attach_tooltip(self.execute_button, TIPS["btn_execute"])
         attach_tooltip(self.cancel_button,  TIPS["btn_cancel"])
+        # Refonte 2026-05-19 — bouton 🗑 Vider quarantaine
+        if hasattr(self, "empty_quarantine_button"):
+            attach_tooltip(
+                self.empty_quarantine_button,
+                TIPS["btn_empty_quarantine"],
+            )
 
         # Le reste des widgets locaux : on parcourt l'arbre et matche par
         # textvariable / text. Approche simple suffisante pour les widgets
@@ -224,11 +230,15 @@ class DuplicatesFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(mode_frame, text="Mode:", width=100).pack(side="left")
 
+        # Libellés refonte 2026-05-19 : « Corbeille (récupérable) » pour
+        # rendre explicite que le mode TRASH passe désormais par une
+        # quarantaine interne réversible (cf. quarantine.py), à l'inverse
+        # de « Supprimer » qui reste définitif.
         modes = [
-            ("Simulation", "DRY_RUN"),
-            ("Supprimer", "DELETE"),
-            ("Deplacer", "MOVE"),
-            ("Corbeille", "TRASH"),
+            ("Simulation",                "DRY_RUN"),
+            ("Supprimer (définitif)",     "DELETE"),
+            ("Déplacer",                  "MOVE"),
+            ("Corbeille (récupérable)",   "TRASH"),
         ]
         for text, value in modes:
             _make_radio(
@@ -614,7 +624,7 @@ class DuplicatesFrame(ctk.CTkFrame):
         # Rangée de boutons : annuler à gauche, principales à droite
         buttons = ctk.CTkFrame(actions_frame, fg_color="transparent")
         buttons.grid(row=2, column=0, sticky="ew")
-        buttons.columnconfigure(1, weight=1)  # spacer entre gauche et droite
+        buttons.columnconfigure(2, weight=1)  # spacer entre gauche et droite
 
         # Bouton annuler à gauche (destructif rouge)
         self.cancel_button = danger_button(
@@ -623,13 +633,25 @@ class DuplicatesFrame(ctk.CTkFrame):
         )
         self.cancel_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
 
+        # Bouton « 🗑 Vider quarantaine » (refonte 2026-05-19)
+        # Apparaît à côté du bouton annuler. Action sérieuse → couleur
+        # warning. Le compteur de fichiers et la taille sont mis à jour
+        # dynamiquement (cf. _refresh_quarantine_status).
+        from src.ui.theme import warning_button as _warn_btn
+        self.empty_quarantine_button = _warn_btn(
+            buttons, text="🗑 Vider quarantaine (0)",
+            command=self._empty_quarantine_clicked,
+            state="disabled",
+        )
+        self.empty_quarantine_button.grid(row=0, column=1, padx=(0, PAD_S), sticky="w")
+
         # Action recherche (neutre/info) — toujours active
         self.search_button = neutral_button(
             buttons, text="🔍 Rechercher les doublons",
             command=self._start_scan,
         )
         self.search_button.configure(font=font_label(weight="bold"))
-        self.search_button.grid(row=0, column=2, padx=(0, PAD_S), sticky="e")
+        self.search_button.grid(row=0, column=3, padx=(0, PAD_S), sticky="e")
 
         # Action principale exécution (vert primary, height 40)
         # NB : la couleur change selon le mode via _on_mode_change
@@ -637,7 +659,7 @@ class DuplicatesFrame(ctk.CTkFrame):
             buttons, text="Simuler les actions",
             command=self._execute_actions, state="disabled",
         )
-        self.execute_button.grid(row=0, column=3, sticky="e")
+        self.execute_button.grid(row=0, column=4, sticky="e")
 
     # =========================================================================
     # EVENT HANDLERS
@@ -1267,15 +1289,31 @@ class DuplicatesFrame(ctk.CTkFrame):
         """Affiche le résultat de l'exécution."""
         mode = self.execution_mode.get()
 
+        # Refonte 2026-05-19 : « Fichiers en corbeille » devient
+        # « Fichiers en quarantaine (récupérable) » pour bien signaler
+        # que ces fichiers ne sont PAS encore dans la corbeille système.
+        # Voir _empty_quarantine_clicked + quarantine.py.
+        trash_label = (
+            "Fichiers en quarantaine (récupérable):"
+            if mode == "TRASH" else "Fichiers en corbeille:"
+        )
         message = (
             f"Execution terminee ({mode})\n\n"
-            f"Fichiers gardes:       {result.files_kept}\n"
-            f"Fichiers supprimes:    {result.files_deleted}\n"
-            f"Fichiers deplaces:     {result.files_moved}\n"
-            f"Fichiers en corbeille: {result.files_trashed}\n"
-            f"Erreurs:               {result.files_errored}\n\n"
+            f"Fichiers gardes:                 {result.files_kept}\n"
+            f"Fichiers supprimes definitivement: {result.files_deleted}\n"
+            f"Fichiers deplaces:               {result.files_moved}\n"
+            f"{trash_label} {result.files_trashed}\n"
+            f"Erreurs:                         {result.files_errored}\n\n"
             f"Espace recupere: {self._format_size(result.space_recovered)}"
         )
+        if mode == "TRASH" and result.files_trashed > 0:
+            message += (
+                "\n\n💡 Astuce : ces fichiers peuvent être restaurés "
+                "individuellement via le bouton « ↩️ Annuler dernière » "
+                "de l'onglet Historique, ou tous en une fois via "
+                "« ↩️ Annuler tout ». Pour vider définitivement, utilisez "
+                "« 🗑 Vider quarantaine » en bas de cet onglet."
+            )
 
         if result.errors:
             message += f"\n\n{len(result.errors)} erreur(s) survenue(s)."
@@ -1285,6 +1323,8 @@ class DuplicatesFrame(ctk.CTkFrame):
             report_note = "\n\nLes rapports ont ete generes."
 
         messagebox.showinfo("Execution terminee", message + report_note)
+        # Mise à jour du compteur de quarantaine après chaque exécution.
+        self._refresh_quarantine_status()
 
         # Mettre à jour l'affichage
         self.summary_label.configure(text=message.split('\n\n')[0])
@@ -1380,6 +1420,88 @@ class DuplicatesFrame(ctk.CTkFrame):
             self.cancel_button.configure(state="disabled")
         except Exception as exc:
             logger.debug(f"_cancel_operation buttons reset: {exc}")
+
+    # ------------------------------------------------------------------
+    # Quarantaine (refonte 2026-05-19)
+    # ------------------------------------------------------------------
+    def _refresh_quarantine_status(self):
+        """Met à jour le texte/état du bouton 🗑 Vider quarantaine.
+
+        Appelée après chaque exécution d'actions Doublons. Affiche le
+        nombre de fichiers actuellement en quarantaine et active/désactive
+        le bouton en conséquence.
+        """
+        if not hasattr(self, "empty_quarantine_button"):
+            return
+        try:
+            count = self._manager.quarantine_count() if self._manager else 0
+            size = self._manager.quarantine_size_bytes() if self._manager else 0
+        except Exception as exc:
+            logger.debug(f"_refresh_quarantine_status: {exc}")
+            count, size = 0, 0
+        if count > 0:
+            self.empty_quarantine_button.configure(
+                text=f"🗑 Vider quarantaine ({count} — {self._format_size(size)})",
+                state="normal",
+            )
+        else:
+            self.empty_quarantine_button.configure(
+                text="🗑 Vider quarantaine (0)",
+                state="disabled",
+            )
+
+    def _empty_quarantine_clicked(self):
+        """Action du bouton 🗑 Vider quarantaine.
+
+        Demande confirmation puis envoie tous les fichiers en quarantaine
+        vers la corbeille système (irréversible côté app — l'utilisateur
+        peut encore les récupérer via l'Explorateur Windows jusqu'au
+        vidage manuel de la corbeille).
+        """
+        if not self._manager:
+            return
+        try:
+            count = self._manager.quarantine_count()
+            size = self._manager.quarantine_size_bytes()
+        except Exception:
+            count, size = 0, 0
+        if count == 0:
+            messagebox.showinfo(
+                "Quarantaine vide",
+                "Aucun fichier en quarantaine à vider."
+            )
+            return
+        if not messagebox.askyesno(
+            "Confirmation — vider la quarantaine",
+            f"Envoyer définitivement {count} fichier(s) ({self._format_size(size)}) "
+            "vers la corbeille du système ?\n\n"
+            "Après cette action, les fichiers ne seront plus récupérables "
+            "depuis le bouton « ↩️ Annuler dernière » de l'historique. "
+            "Vous pourrez encore les restaurer via l'Explorateur Windows "
+            "jusqu'à ce que vous vidiez manuellement la corbeille système."
+        ):
+            return
+        try:
+            result = self._manager.empty_quarantine()
+        except Exception as exc:
+            logger.error(f"empty_quarantine echec: {exc}")
+            messagebox.showerror(
+                "Erreur",
+                f"Impossible de vider la quarantaine :\n{exc}"
+            )
+            return
+        summary = (
+            f"Quarantaine vidée :\n\n"
+            f"  ✅ En corbeille système : {result.get('trashed', 0)}\n"
+            f"  🔥 Supprimés définitivement : {result.get('deleted', 0)}\n"
+            f"  ❌ Échecs : {result.get('failed', 0)}\n"
+            f"  Total : {result.get('total', 0)}"
+        )
+        if result.get('failed', 0):
+            messagebox.showwarning("Vidage partiel", summary)
+        else:
+            messagebox.showinfo("Quarantaine vidée", summary)
+        self._refresh_quarantine_status()
 
     @staticmethod
     def _format_size(size_bytes: int) -> str:

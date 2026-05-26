@@ -1,0 +1,218 @@
+PHOTOORGANIZER PRO — END USER LICENSE AGREEMENT
+=================================================
+
+Version 1.0 — effective 2026-05-19
+Copyright (c) 2025-2026 Kiriiaq (Emmanuel Grolleau)
+Contact : manugrolleau48@gmail.com
+
+
+IMPORTANT — READ BEFORE INSTALLING OR USING.
+
+This End User License Agreement ("Agreement") is a legal contract
+between you ("Licensee", "You") and Kiriiaq (Emmanuel Grolleau)
+("Licensor", "We"), governing your use of the software product known
+as "PhotoOrganizer Pro" ("Software").
+
+By installing, activating, or using the Software, You agree to be
+bound by the terms of this Agreement. If You do not agree, do not
+install, activate, or use the Software, and request a refund within
+14 days of purchase.
+
+
+1. SCOPE
+--------
+
+This Agreement covers ONLY the proprietary modules distributed as part
+of "PhotoOrganizer Pro", located in the source tree under
+``src/photoorganizer_pro/`` (when distributed in source form) or
+bundled in the "PhotoOrganizer Pro" executable (when distributed as
+binary).
+
+The free open-source GUI ("PhotoOrganizer Core"), distributed under
+the Apache License 2.0 (see LICENSE), is NOT covered by this
+Agreement and remains governed by its own terms.
+
+
+2. LICENSE GRANT
+-----------------
+
+Subject to Your compliance with this Agreement and full payment of
+the applicable license fee, Licensor grants You a limited,
+non-exclusive, non-transferable, non-sublicensable license to install
+and use the Software according to the edition You purchased:
+
+  - PERSONAL edition : install and use on up to one (1) personal
+    computer simultaneously, for personal or single-user professional
+    purposes.
+
+  - STUDIO edition : install and use on up to three (3) personal
+    computers simultaneously, within a single small business, freelance
+    studio, or household.
+
+  - LIFETIME edition : same scope as STUDIO, with perpetual right to
+    receive all minor AND major updates of the Software at no
+    additional cost.
+
+
+3. RESTRICTIONS
+----------------
+
+You may NOT:
+
+  (a) copy, distribute, sublicense, rent, lease, sell, or otherwise
+      transfer the Software to any third party;
+  (b) remove, alter, or obscure any copyright, trademark, license
+      key, or other proprietary notice contained in the Software;
+  (c) reverse-engineer, decompile, disassemble, or otherwise attempt
+      to derive the source code of the Software, except to the extent
+      such activity is expressly permitted by applicable law
+      notwithstanding this limitation;
+  (d) circumvent or attempt to circumvent the license validation
+      mechanism;
+  (e) use the Software to provide commercial photo-organization
+      services to third parties as a primary business activity
+      (consultancy, agency offering) without obtaining a separate
+      commercial agreement from Licensor.
+
+You MAY:
+
+  (a) install on a backup machine and a working machine within the
+      seat limit of Your edition;
+  (b) use the Software for Your own client deliverables (e.g. a
+      photographer organizing a client wedding shoot);
+  (c) re-download the Software from Licensor's official channels at
+      any time during Your license term.
+
+
+4. UPDATES
+-----------
+
+  - PERSONAL : minor updates (2.x.y → 2.x.z) free for 12 months from
+    purchase date. Major updates (2.x → 3.x) at 50% off.
+  - STUDIO : minor updates free for 24 months. Major updates at 50%
+    off.
+  - LIFETIME : all minor AND major updates free, perpetually.
+
+Updates are delivered via Licensor's official channels (initially
+github.com/Kiriiaq/PhotoOrganizer/releases and the email associated
+with Your license key).
+
+
+5. SUPPORT
+-----------
+
+Email support is provided on a best-effort basis at
+manugrolleau48@gmail.com. Response time target : 5 business days. No
+phone support. No on-site support. STUDIO edition receives priority
+queueing for support tickets.
+
+
+6. INTELLECTUAL PROPERTY
+-------------------------
+
+The Software is licensed, not sold. Licensor retains all right, title,
+and interest in and to the Software, including all intellectual
+property rights. This Agreement does not transfer ownership of any
+portion of the Software to You.
+
+The license key You receive is personal to You and tied to the email
+address provided at purchase.
+
+
+7. PRIVACY
+-----------
+
+The Software operates entirely offline. Licensor does NOT collect any
+telemetry, usage data, or personal data from Your use of the Software
+beyond what is required for license validation (which is local to Your
+machine).
+
+License validation is performed offline by signature verification
+against a key embedded in the Software. No license server is
+contacted.
+
+The email address used to generate Your license key is processed by
+the payment platform (currently Lemon Squeezy, acting as Merchant of
+Record) and by Licensor solely for the purposes of:
+  - generating Your license key;
+  - communicating updates and security notices.
+
+You may request deletion of Your email from Licensor's records at any
+time by emailing manugrolleau48@gmail.com (this revokes Your right to
+receive update notices).
+
+
+8. WARRANTY DISCLAIMER
+-----------------------
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
+OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, NON-INFRINGEMENT, OR THAT THE SOFTWARE WILL BE ERROR-FREE OR
+UNINTERRUPTED.
+
+You assume the entire risk arising out of the use or performance of
+the Software, including the risk of data loss. You are strongly
+encouraged to keep backups of Your photo collection before using ANY
+file-management software, including this one.
+
+
+9. LIMITATION OF LIABILITY
+---------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, WITHOUT LIMITATION,
+LOSS OF DATA, LOSS OF PROFITS, OR BUSINESS INTERRUPTION) ARISING OUT
+OF OR IN CONNECTION WITH THE USE OF, OR INABILITY TO USE, THE
+SOFTWARE, EVEN IF LICENSOR HAS BEEN ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGES.
+
+LICENSOR'S TOTAL CUMULATIVE LIABILITY UNDER OR IN CONNECTION WITH
+THIS AGREEMENT SHALL NOT EXCEED THE AMOUNT YOU PAID FOR THE
+SOFTWARE LICENSE.
+
+
+10. REFUND
+-----------
+
+In accordance with European consumer law and Licensor's policy, You
+may request a full refund within FOURTEEN (14) DAYS of Your purchase
+date, for any reason, by contacting manugrolleau48@gmail.com.
+
+Upon refund, Your license is terminated and You must cease using the
+Software and destroy all copies in Your possession.
+
+
+11. TERMINATION
+----------------
+
+This Agreement is effective until terminated. Your rights under this
+Agreement terminate automatically and immediately if You fail to
+comply with any term of this Agreement. Upon termination, You must
+cease all use of the Software and destroy all copies.
+
+
+12. GOVERNING LAW
+------------------
+
+This Agreement is governed by the laws of France. Any dispute arising
+from or related to this Agreement shall be subject to the exclusive
+jurisdiction of the courts of Licensor's place of residence, unless
+otherwise required by applicable consumer protection law.
+
+
+13. ENTIRE AGREEMENT
+---------------------
+
+This Agreement constitutes the entire agreement between You and
+Licensor concerning the Software and supersedes all prior or
+contemporaneous communications, proposals, and representations.
+
+If any provision of this Agreement is held invalid or unenforceable,
+the remaining provisions shall remain in full force and effect.
+
+
+For questions about this Agreement, contact :
+  manugrolleau48@gmail.com
+  https://github.com/Kiriiaq/PhotoOrganizer

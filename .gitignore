@@ -123,4 +123,14 @@ site/
 tmpclaude-*
 
 # Dossier de qualification — sorties d'exécution
-test/outputs_reels/
+test_data/outputs_reels/
+
+# Scripts d'audit générés (analyse interne)
+tools/_*.txt
+tools/_*.json
+
+# Pro edition — clé secrète de signature des licences (NE JAMAIS COMMIT)
+src/photoorganizer_pro/license/_secret.py
+
+# Pro edition — fichier d'activation utilisateur (jamais distribué dans le repo)
+license.dat

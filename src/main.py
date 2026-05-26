@@ -22,13 +22,13 @@ def check_dependencies():
 
     # CustomTkinter (interface)
     try:
-        import customtkinter
+        import customtkinter  # noqa: F401  (availability sentinel)
     except ImportError:
         missing.append("customtkinter")
 
     # Pillow (images)
     try:
-        from PIL import Image
+        from PIL import Image  # noqa: F401  (availability sentinel)
     except ImportError:
         missing.append("Pillow")
 

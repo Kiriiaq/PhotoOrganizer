@@ -68,7 +68,8 @@ class ExifExtractor:
             os.environ.get('EXIFTOOL_PATH', ''),
             'exiftool',
             'exiftool.exe',
-            os.path.join(os.path.dirname(__file__), '..', '..', 'assets', 'exiftool.exe'),
+            os.path.join(os.path.dirname(__file__), '..', '..', '..',
+                         'assets', 'tools', 'exiftool.exe'),
         ]
 
         for path in possible_paths:
@@ -189,7 +190,7 @@ class ExifExtractor:
                             if isinstance(value, bytes):
                                 try:
                                     value = value.decode('utf-8')
-                                except:
+                                except UnicodeDecodeError:
                                     continue
                             metadata[tag_name] = value
 

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>PhotoOrganizer — Project Overview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --fg: #1a1f2c;
+    --muted: #5e6878;
+    --border: #d6dbe3;
+    --accent: #2b5fa1;
+    --accent-soft: #e8eef6;
+    --ok: #2f6a37;
+    --wip: #b07418;
+    --todo: #6e6e6e;
+    --bad: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+  header {
+    background: linear-gradient(135deg, #2b5fa1 0%, #1d4174 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+  header h1 { margin: 0 0 6px 0; font-size: 28px; letter-spacing: -0.3px; }
+  header .pitch { margin: 0; opacity: 0.92; font-size: 16px; }
+  header .meta { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .badge.ok { background: rgba(47,106,55,0.85); }
+  .badge.wip { background: rgba(176,116,24,0.85); }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+  .card h2 {
+    margin: 0 0 14px 0;
+    font-size: 15px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .stack-item {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    background: #fafbfc;
+  }
+  .stack-item b { display: block; font-size: 14px; color: var(--accent); margin-bottom: 2px; }
+  .stack-item span { color: var(--muted); font-size: 11px; }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 600px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+  .metric {
+    text-align: center;
+    padding: 14px 10px;
+    background: var(--accent-soft);
+    border-radius: 8px;
+  }
+  .metric b { display: block; font-size: 22px; color: var(--accent); }
+  .metric span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:last-child td { border-bottom: none; }
+  .status { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .status.ok   { background: #e0f0e2; color: var(--ok); }
+  .status.wip  { background: #f5e9d4; color: var(--wip); }
+  .status.todo { background: #ebebeb; color: var(--todo); }
+  .status.bad  { background: #f7dad7; color: var(--bad); }
+  .timeline {
+    position: relative;
+    padding-left: 28px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .step {
+    position: relative;
+    margin-bottom: 16px;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: -23px; top: 6px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+  .step.done::before { background: var(--ok); }
+  .step.wip::before  { background: var(--wip); }
+  .step.todo::before { background: var(--todo); }
+  .step h4 { margin: 0 0 3px 0; font-size: 14px; }
+  .step .desc { font-size: 12px; color: var(--muted); }
+  .arch { overflow-x: auto; }
+  .arch svg { display: block; min-width: 600px; }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .links a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+  }
+  .links a:hover { background: var(--accent); color: #fff; }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <h1>PhotoOrganizer</h1>
+    <p class="pitch">Organiseur automatique de photos par métadonnées EXIF — application Windows GUI gratuite, sans installation.</p>
+    <div class="meta">
+      <span class="badge">v2.0.0</span>
+      <span class="badge wip">branche feat/v2.3-organize-tabview</span>
+      <span class="badge">Python 3.11+</span>
+      <span class="badge">Windows 10/11</span>
+      <span class="badge ok">Apache-2.0</span>
+      <span class="badge ok">170 tests OK</span>
+      <span class="badge wip">1 P0 + 4 P1 (audit Phase 4)</span>
+      <span class="badge">Freemium · Pro 19 €</span>
+    </div>
+  </header>
+
+  <!-- ROW 1 : STACK + METRICS -->
+  <div class="grid">
+    <div class="card">
+      <h2>Stack technique</h2>
+      <div class="stack-grid">
+        <div class="stack-item"><b>Python</b><span>3.11+</span></div>
+        <div class="stack-item"><b>CustomTkinter</b><span>5.2.x</span></div>
+        <div class="stack-item"><b>Pillow</b><span>10–11.x</span></div>
+        <div class="stack-item"><b>exifread</b><span>3.x</span></div>
+        <div class="stack-item"><b>pillow-heif</b><span>0.13+</span></div>
+        <div class="stack-item"><b>PyYAML</b><span>6.x</span></div>
+        <div class="stack-item"><b>PyInstaller</b><span>6.x onefile</span></div>
+        <div class="stack-item"><b>pytest</b><span>+ cov + benchmark</span></div>
+        <div class="stack-item"><b>ruff</b><span>+ bandit</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Métriques</h2>
+      <div class="metric-grid">
+        <div class="metric"><b>16 021</b><span>LOC src/</span></div>
+        <div class="metric"><b>3 351</b><span>LOC tests/</span></div>
+        <div class="metric"><b>170</b><span>Tests passing</span></div>
+        <div class="metric"><b>37 MB</b><span>EXE actuel</span></div>
+        <div class="metric"><b>22 MB</b><span>EXE cible audit</span></div>
+        <div class="metric"><b>0</b><span>Bandit High</span></div>
+        <div class="metric"><b>7</b><span>Deps runtime</span></div>
+        <div class="metric"><b>38</b><span>Fichiers .py</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2 : ARCHITECTURE (full width) -->
+  <div class="card" style="margin-bottom: 18px;">
+    <h2>Architecture (3 couches)</h2>
+    <div class="arch">
+      <svg viewBox="0 0 920 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture 3 couches PhotoOrganizer">
+        <style>
+          .layer-bg-ui   { fill: #e8eef6; stroke: #2b5fa1; stroke-width: 1.5; }
+          .layer-bg-core { fill: #e0f0e2; stroke: #2f6a37; stroke-width: 1.5; }
+          .layer-bg-utl  { fill: #f5e9d4; stroke: #b07418; stroke-width: 1.5; }
+          .layer-bg-ext  { fill: #ebebeb; stroke: #6e6e6e; stroke-width: 1.5; }
+          .lbl-layer { font: 600 13px -apple-system,Roboto,sans-serif; }
+          .lbl-mod   { font: 12px Consolas, Menlo, monospace; fill: #1a1f2c; }
+          .lbl-meta  { font: 10px -apple-system,Roboto,sans-serif; fill: #5e6878; }
+          .arrow     { stroke: #5e6878; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+        </style>
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#5e6878"/>
+          </marker>
+        </defs>
+        <!-- Layer 1: UI -->
+        <rect class="layer-bg-ui" x="40" y="20" width="840" height="80" rx="6"/>
+        <text class="lbl-layer" x="55" y="40" fill="#2b5fa1">src/ui/ — Présentation</text>
+        <text class="lbl-mod" x="55" y="62">app.py · frames/{organize, duplicates, history, settings}</text>
+        <text class="lbl-mod" x="55" y="80">theme.py · tooltip.py · tooltips_fr.py · prompt_examples.py</text>
+        <text class="lbl-meta" x="725" y="62">~7 900 LOC · 11 fichiers</text>
+        <!-- arrow UI -> Core -->
+        <line class="arrow" x1="460" y1="105" x2="460" y2="135"/>
+        <!-- Layer 2: Core -->
+        <rect class="layer-bg-core" x="40" y="140" width="840" height="80" rx="6"/>
+        <text class="lbl-layer" x="55" y="160" fill="#2f6a37">src/core/ — Logique métier</text>
+        <text class="lbl-mod" x="55" y="182">metadata/{exif_extractor, date_extractor, camera_detector, gps_processor}</text>
+        <text class="lbl-mod" x="55" y="200">operations/{file_manager, organizer, duplicate_finder, duplicate_manager, quarantine}</text>
+        <text class="lbl-meta" x="725" y="182">~4 900 LOC · 13 fichiers</text>
+        <!-- arrow Core -> Utils -->
+        <line class="arrow" x1="460" y1="225" x2="460" y2="255"/>
+        <!-- Layer 3: Utils -->
+        <rect class="layer-bg-utl" x="40" y="260" width="840" height="60" rx="6"/>
+        <text class="lbl-layer" x="55" y="280" fill="#b07418">src/utils/ — Infrastructure</text>
+        <text class="lbl-mod" x="55" y="302">cache (2-tier EXIF) · hash_cache (SQLite TTL) · config (JSON) · logger</text>
+        <text class="lbl-meta" x="725" y="302">~1 200 LOC · 5 fichiers</text>
+        <!-- arrow Utils -> External -->
+        <line class="arrow" x1="460" y1="325" x2="460" y2="345"/>
+        <!-- External -->
+        <rect class="layer-bg-ext" x="40" y="350" width="840" height="22" rx="4"/>
+        <text class="lbl-mod" x="55" y="367" fill="#5e6878">Système : %LOCALAPPDATA% · Système de fichiers utilisateur · HTTPS (Nominatim opt-in)</text>
+      </svg>
+    </div>
+    <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
+      <b>Règle d'or :</b> aucune dépendance inverse — <code>core/</code> n'importe jamais <code>ui/</code>, <code>utils/</code> n'importe ni l'un ni l'autre.
+      Voir <a href="docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a> pour le détail.
+    </p>
+  </div>
+
+  <!-- ROW 3 : FEATURES + ROADMAP -->
+  <div class="grid">
+    <div class="card">
+      <h2>Fonctionnalités (état)</h2>
+      <table>
+        <thead><tr><th>Feature</th><th>État</th></tr></thead>
+        <tbody>
+          <tr><td>Onglet Organisation (date / caméra / GPS)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Templates de renommage personnalisables</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Détection doublons (MD5 / SHA-1 / Blake3)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Quarantaine réversible</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Historique avec rollback par session</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Cache EXIF 2-tier (RAM + SQLite)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Géocodage Nominatim (opt-in)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Drag-and-drop (tkinterdnd2 opt.)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Toasts Windows (plyer opt.)</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Mode sombre / clair auto</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Raccourcis Ctrl+1..4</td><td><span class="status ok">OK</span></td></tr>
+          <tr><td>Refonte panneau Organisation v2.3</td><td><span class="status wip">WIP</span></td></tr>
+          <tr><td>Optimisation taille EXE (−40 %)</td><td><span class="status todo">À FAIRE</span></td></tr>
+          <tr><td>Batch CLI organisation (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
+          <tr><td>Plugin API (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
+          <tr><td>Watch-folder scheduler (Pro)</td><td><span class="status todo">À FAIRE</span></td></tr>
+          <tr><td>Synchronisation cloud (Pro, étude)</td><td><span class="status todo">À FAIRE</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 11px; color: var(--muted); margin: 8px 0 0 0;">État synchronisé avec <a href="AUDIT.md">AUDIT.md §5</a>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Roadmap</h2>
+      <div class="timeline">
+        <div class="step done">
+          <h4>v1.0.0 — Première release stable</h4>
+          <div class="desc">Décembre 2025 — GUI CustomTkinter, EXIF complet, 45 formats, EXE Windows.</div>
+        </div>
+        <div class="step done">
+          <h4>v2.0.0 — Refactor majeur</h4>
+          <div class="desc">Mai 2026 — 4 onglets, doublons multi-algo, quarantaine, historique rollback, 170 tests.</div>
+        </div>
+        <div class="step wip">
+          <h4>v2.3 — Refonte UI Organisation</h4>
+          <div class="desc">En cours — tabview interne, exemples intégrés, fini les Toplevel.</div>
+        </div>
+        <div class="step todo">
+          <h4>v2.4 — EXE optimisé</h4>
+          <div class="desc">Application de l'audit taille → 22 MB cible (−40 %).</div>
+        </div>
+        <div class="step todo">
+          <h4>v3.0 — Édition Pro</h4>
+          <div class="desc">Premier module Pro : batch CLI d'organisation + watch-folder scheduler.</div>
+        </div>
+        <div class="step todo">
+          <h4>Futur</h4>
+          <div class="desc">Plugin API, rapports HTML/PDF avancés, synchro cloud post-organisation.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3.4 : MODELE ECONOMIQUE -->
+  <div class="card" style="margin-bottom: 18px;">
+    <h2>Modèle économique (Phase 5)</h2>
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 0;">
+      <div>
+        <h4 style="margin: 0 0 6px 0; font-size: 13px; color: var(--accent);">Voie principale — Freemium</h4>
+        <table>
+          <tbody>
+            <tr><td>Core (Apache-2.0)</td><td><b>Gratuit</b></td></tr>
+            <tr><td>Pro Personnelle (1 PC)</td><td><b>19 €</b></td></tr>
+            <tr><td>Pro Studio (3 PC)</td><td><b>49 €</b></td></tr>
+            <tr><td>Lifetime (lancement)</td><td><b>99 €</b></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size: 11px; color: var(--muted); margin: 6px 0 0 0;">
+          Plateforme : Lemon Squeezy (TVA EU gérée). Modules Pro V1 : batch CLI + watch-folder.<br>
+          Effort 5-8 j-h · Revenu cible 12 mois : <b>200-2 000 €</b>.
+        </p>
+      </div>
+      <div>
+        <h4 style="margin: 0 0 6px 0; font-size: 13px; color: var(--ok);">Voie complémentaire — Lead magnet</h4>
+        <p style="font-size: 12px; margin: 0 0 8px 0;">Le projet sert de démonstrateur de compétences (Python desktop · packaging Windows · tests · CI · archi en couches).</p>
+        <table>
+          <tbody>
+            <tr><td>Revenu direct</td><td>0 €</td></tr>
+            <tr><td>Valeur indirecte (missions freelance)</td><td><b>5-30 k€</b></td></tr>
+            <tr><td>Effort</td><td>2-3 j (posts LinkedIn)</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size: 11px; color: var(--muted); margin: 6px 0 0 0;">
+          À cumuler systématiquement avec le freemium.
+        </p>
+      </div>
+    </div>
+    <p style="font-size: 12px; color: var(--muted); margin: 12px 0 0 0;">
+      <b>Pré-requis avant lancement :</b> retirer ExifTool bundlé (GPL, cf. <a href="docs/exe-optimization.md">exe-optimization F-01</a>), auto-entreprise, page Privacy Policy minimale, S-01 + G-01 (assets). Plan détaillé : <a href="docs/MONETIZATION.md">docs/MONETIZATION.md</a>.
+    </p>
+  </div>
+
+  <!-- ROW 3.45 : DISTRIBUTION PHASE 6 -->
+  <div class="card" style="margin-bottom: 18px;">
+    <h2>Plan de lancement (Phase 6)</h2>
+    <table>
+      <thead>
+        <tr><th>Semaine</th><th>Plateforme</th><th>Action</th><th>Type</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>S−1</td><td>Préparation</td><td>Produire S-01, G-01, logo · release notes · setup Lemon Squeezy</td><td><span class="status wip">PREP</span></td></tr>
+        <tr><td>S+0</td><td>GitHub + Lemon Squeezy</td><td>Tag v2.2.0 · release EXE · page Pro silencieuse</td><td><span class="status ok">DISTRIB</span></td></tr>
+        <tr><td>S+1</td><td>PyPI · Reddit r/freeware</td><td>Upload wheel · post court factuel</td><td><span class="status ok">DISTRIB</span></td></tr>
+        <tr><td>S+2</td><td>Reddit r/datahoarder</td><td>Post storytelling</td><td><span class="status ok">DISTRIB</span></td></tr>
+        <tr><td>S+3 mardi 9h</td><td><b>Product Hunt</b> + LinkedIn + X</td><td>Submission jour J · post 1 LinkedIn · thread Twitter</td><td><span class="status bad">LAUNCH</span></td></tr>
+        <tr><td>S+4</td><td><b>Show HN</b> + Indie Hackers</td><td>Article technique audit EXE · post Milestone freemium</td><td><span class="status bad">LAUNCH</span></td></tr>
+        <tr><td>S+5</td><td>Reddit r/photography · LinkedIn carrousel · dev.to A1</td><td>3 canaux marketing</td><td><span class="status wip">REACH</span></td></tr>
+        <tr><td>S+6</td><td>AlternativeTo</td><td>Recensement vs Lightroom / FastStone</td><td><span class="status ok">SEO</span></td></tr>
+        <tr><td>S+7-10</td><td>dev.to A2 · LinkedIn 3 · dev.to A3</td><td>Marketing organique long terme</td><td><span class="status wip">REACH</span></td></tr>
+      </tbody>
+    </table>
+    <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
+      <b>Effort total :</b> 60-85 h sur 6-10 semaines (~ 8-11 j-h). <b>KPI 90 j :</b> 200-500 stars GitHub · 10-100 ventes Pro · 1 000-3 000 downloads EXE.
+      Plan détaillé : <a href="docs/DISTRIBUTION.md">docs/DISTRIBUTION.md</a>.
+    </p>
+  </div>
+
+  <!-- ROW 3.5 : GAPS AUDIT PHASE 4 -->
+  <div class="card" style="margin-bottom: 18px;">
+    <h2>Gaps audit (Phase 4)</h2>
+    <table>
+      <thead><tr><th>Dimension</th><th>État</th><th>Priorité</th><th>Effort</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>Onboarding (install &lt; 5 min)</td><td><span class="status ok">OK</span></td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Configuration (paths/secrets)</td><td><span class="status ok">OK</span></td><td>P2</td><td>15 min</td><td>Externaliser URL Nominatim (optionnel)</td></tr>
+        <tr><td>Robustesse (gestion erreurs I/O)</td><td><span class="status wip">À COMPLÉTER</span></td><td>P2</td><td>10 min</td><td>Remplacer 1 <code>bare except</code> par <code>UnicodeDecodeError</code></td></tr>
+        <tr><td>Packaging (.exe distribuable)</td><td><span class="status ok">OK</span></td><td>—</td><td>—</td><td>EXE 37 MB, release auto sur tag</td></tr>
+        <tr><td>Cross-platform</td><td><span class="status wip">WINDOWS ONLY</span></td><td>P3</td><td>4-8 h</td><td>Matrice CI multi-OS si stratégie élargie</td></tr>
+        <tr><td>Tests (smoke + chemins critiques)</td><td><span class="status ok">OK</span></td><td>P1</td><td>1-2 j</td><td>Couverture UI fonctionnelle à compléter</td></tr>
+        <tr><td>Docs (compréhension en 30 s)</td><td><span class="status ok">OK</span></td><td>—</td><td>—</td><td>README + ARCHI + CONTRIB + SECURITY OK</td></tr>
+        <tr><td><b>Démo visuelle</b> (GIF/screenshot)</td><td><span class="status bad">BLOQUANT</span></td><td><b>P0</b></td><td><b>4-6 h</b></td><td>Produire S-01 + G-01 minimum (voir <a href="docs/MEDIA.md">docs/MEDIA.md</a>)</td></tr>
+        <tr><td>Versionning (tag + release)</td><td><span class="status wip">DÉSALIGNÉ</span></td><td>P1</td><td>5 min</td><td>Code en 2.0.0 mais tag v2.1.0 publié → bumper à 2.2.0-dev</td></tr>
+        <tr><td>Sécurité (secrets, CVE)</td><td><span class="status wip">À COMPLÉTER</span></td><td>P1</td><td>30 min</td><td>Ajouter pip-audit + bandit au workflow CI</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
+      <b>Bilan :</b> 1 bloquant P0 (démo visuelle), 3 P1, le reste OK. Cumul P0+P1 ≈ <b>6-8 h</b> pour rendre le projet pleinement shippable publiquement.
+      Plan détaillé : <a href="AUDIT.md">AUDIT.md §14</a>.
+    </p>
+  </div>
+
+  <!-- ROW 4 : LIENS -->
+  <div class="card">
+    <h2>Ressources</h2>
+    <div class="links">
+      <a href="https://github.com/Kiriiaq/PhotoOrganizer">Repo GitHub</a>
+      <a href="https://github.com/Kiriiaq/PhotoOrganizer/releases">Releases (.exe)</a>
+      <a href="README.md">README</a>
+      <a href="AUDIT.md">AUDIT.md</a>
+      <a href="docs/ARCHITECTURE.md">Architecture</a>
+      <a href="docs/exe-optimization.md">Audit EXE</a>
+      <a href="docs/exe-optimization.html">Audit EXE (HTML)</a>
+      <a href="docs/MEDIA.md">Assets à produire</a>
+      <a href="docs/MONETIZATION.md">Monétisation</a>
+      <a href="docs/DISTRIBUTION.md">Distribution &amp; lancement</a>
+      <a href="LINKEDIN_DRAFTS.md">Drafts LinkedIn / X / Show HN</a>
+      <a href="CHANGELOG.md">Changelog</a>
+      <a href="CONTRIBUTING.md">Contributing</a>
+      <a href="SECURITY.md">Security</a>
+      <a href="CLAUDE.md">CLAUDE.md (mémoire IA)</a>
+      <a href="https://ko-fi.com/kiriiaq">Ko-fi</a>
+    </div>
+  </div>
+
+  <footer>
+    PhotoOrganizer · Apache-2.0 · Kiriiaq (Emmanuel Grolleau) · Dashboard généré le 2026-05-19.
+    <br>Ouvrable hors-ligne — aucun script, aucune dépendance externe. CSS et SVG inline.
+  </footer>
+</div>
+</body>
+</html>

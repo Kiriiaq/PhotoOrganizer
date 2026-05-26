@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Audit d'optimisation .exe — PhotoOrganizer v2.0.0</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --border: #d9d9d9;
+    --row-alt: #f3f3f3;
+    --code-bg: #f4f4f4;
+    --code-fg: #111;
+    --accent: #2b5fa1;
+    --sev-high: #b3261e;
+    --sev-mid:  #b07418;
+    --sev-low:  #2f6a37;
+    --bar-1: #2b5fa1;
+    --bar-2: #b07418;
+    --bar-3: #2f6a37;
+    --bar-4: #6e4fa1;
+    --bar-5: #b3261e;
+  }
+  html, body {
+    background: var(--bg); color: var(--fg);
+    font-family: Georgia, 'Times New Roman', serif;
+    margin: 0; padding: 0; line-height: 1.55;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 36px; }
+  h1, h2, h3, h4 { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif; }
+  h1 { font-size: 28px; margin: 0 0 4px 0; border-bottom: 3px solid var(--accent); padding-bottom: 8px;}
+  h2 { font-size: 22px; margin-top: 36px; border-bottom: 1px solid var(--border); padding-bottom: 4px;}
+  h3 { font-size: 17px; margin-top: 26px; }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .summary {
+    background: #fff; border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    padding: 14px 18px; margin: 14px 0 22px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: #ececec; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre, kbd {
+    font-family: 'Consolas', 'Menlo', 'Liberation Mono', monospace;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-fg);
+    padding: 10px 14px; border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    overflow-x: auto;
+    line-height: 1.4;
+    white-space: pre;
+  }
+  code { background: var(--code-bg); padding: 1px 4px; border-radius: 2px; }
+  pre code { background: transparent; padding: 0; }
+  .sev { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 11px;
+         font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 600; color: #fff; }
+  .sev.high { background: var(--sev-high); }
+  .sev.mid  { background: var(--sev-mid);  }
+  .sev.low  { background: var(--sev-low);  }
+  .badge { display:inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px;
+           background: #e7e7e7; color: #333; font-family: -apple-system, "Segoe UI", sans-serif;}
+  .ok { color: var(--sev-low); }
+  .warn { color: var(--sev-mid); }
+  .bad { color: var(--sev-high); }
+  .finding {
+    background: #fff; border: 1px solid var(--border); border-left: 3px solid var(--muted);
+    padding: 10px 16px; margin: 14px 0;
+  }
+  .finding.high { border-left-color: var(--sev-high); }
+  .finding.mid  { border-left-color: var(--sev-mid); }
+  .finding.low  { border-left-color: var(--sev-low); }
+  .kpi { display: inline-block; margin-right: 18px; font-family: -apple-system,Roboto,sans-serif; }
+  .kpi b { font-size: 22px; }
+  .kpi span { display: block; font-size: 12px; color: var(--muted); }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .twocol pre { margin: 0; }
+  .anchor { color: var(--accent); text-decoration: none; }
+  .anchor:hover { text-decoration: underline; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
+  @media print {
+    .wrap { padding: 10px; max-width: none; }
+    .finding { page-break-inside: avoid; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+    h2 { page-break-after: avoid; }
+  }
+  svg.bars { width: 100%; height: auto; background: #fff; border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Audit d'optimisation <code>.exe</code> — PhotoOrganizer v2.0.0</h1>
+<div class="meta">
+  Date : 2026-05-19 · Auditeur : audit-pyinstaller-customtkinter ·
+  Cible : <code>dist/PhotoOrganizer-2.0.0.exe</code> ·
+  Méthodologie : <code>pyi-archive_viewer</code> + ruff + analyse imports
+</div>
+
+<!-- ============================================ -->
+<h2>1. Synthèse</h2>
+
+<div class="summary">
+  <div class="kpi"><b>37.06 MB</b><span>Taille actuelle</span></div>
+  <div class="kpi"><b class="ok">≈ 22 MB</b><span>Cible réaliste</span></div>
+  <div class="kpi"><b class="ok">−15 MB (−40 %)</b><span>Gain estimé</span></div>
+  <div class="kpi"><b>1&nbsp;721</b><span>Fichiers embarqués</span></div>
+  <div class="kpi"><b>19</b><span>Findings</span></div>
+</div>
+
+<h3>Top 5 actions à impact maximal</h3>
+<table>
+<thead><tr><th>#</th><th>Action</th><th>Gain (MB)</th><th>Effort</th><th>Risque</th><th>ID</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Exclure entièrement <code>assets/tools/</code> (ExifTool Perl) du bundle</td><td class="num">~10.3</td><td>Faible</td><td>Moyen</td><td><a class="anchor" href="#f-01">F-01</a></td></tr>
+<tr><td>2</td><td>Construire dans un venv minimal isolé</td><td class="num">~5–6</td><td>Faible</td><td>Nul</td><td><a class="anchor" href="#f-02">F-02</a></td></tr>
+<tr><td>3</td><td>Passer <code>pillow-heif</code> → <code>pi-heif</code> (HEVC read-only)</td><td class="num">~2.3</td><td>Faible</td><td>Faible</td><td><a class="anchor" href="#f-03">F-03</a></td></tr>
+<tr><td>4</td><td>Exclure <code>PIL._avif</code> (ou pin <code>Pillow&lt;12</code>)</td><td class="num">~1.8</td><td>Faible</td><td>Faible</td><td><a class="anchor" href="#f-04">F-04</a></td></tr>
+<tr><td>5</td><td>Recompresser <code>assets/icons/icon.png</code> (945 KB → ~80 KB)</td><td class="num">~0.85</td><td>Trivial</td><td>Nul</td><td><a class="anchor" href="#f-05">F-05</a></td></tr>
+</tbody>
+</table>
+
+<!-- ============================================ -->
+<h2>2. Mesure de référence</h2>
+
+<p>Le binaire <code>--onefile</code> contient une archive PyInstaller de
+<strong>34.94 MB compressé</strong> sur 1 721 fichiers ; les 2.12 MB restants sont
+le bootloader stub.</p>
+
+<h3>Décomposition par catégorie</h3>
+<table>
+<thead><tr><th>#</th><th>Catégorie</th><th>Taille (MB)</th><th>%</th><th>Fichiers</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><b>ExifTool (Perl bundle)</b></td><td class="num">10.31</td><td class="num">29.5 %</td><td class="num">508</td></tr>
+<tr><td>2</td><td>cryptography / OpenSSL</td><td class="num">4.19</td><td class="num">12.0 %</td><td class="num">14</td></tr>
+<tr><td>3</td><td>Autres (stdlib .pyd, .dll, dist-info)</td><td class="num">3.81</td><td class="num">10.9 %</td><td class="num">241</td></tr>
+<tr><td>4</td><td>Pillow (PIL)</td><td class="num">3.55</td><td class="num">10.2 %</td><td class="num">7</td></tr>
+<tr><td>5</td><td>PYZ (code projet + libs zip)</td><td class="num">3.47</td><td class="num">9.9 %</td><td class="num">1</td></tr>
+<tr><td>6</td><td>pillow_heif + libheif/x265/de265</td><td class="num">2.95</td><td class="num">8.4 %</td><td class="num">4</td></tr>
+<tr><td>7</td><td>Tcl/Tk runtime</td><td class="num">2.05</td><td class="num">5.9 %</td><td class="num">834</td></tr>
+<tr><td>8</td><td>Python runtime</td><td class="num">2.03</td><td class="num">5.8 %</td><td class="num">4</td></tr>
+<tr><td>9</td><td>Icons projet (<code>assets/icons</code>)</td><td class="num">0.93</td><td class="num">2.7 %</td><td class="num">2</td></tr>
+<tr><td>10</td><td>chardet</td><td class="num">0.82</td><td class="num">2.3 %</td><td class="num">25</td></tr>
+<tr><td>11</td><td>tkinterdnd2</td><td class="num">0.43</td><td class="num">1.2 %</td><td class="num">67</td></tr>
+<tr><td>12</td><td>customtkinter</td><td class="num">0.19</td><td class="num">0.5 %</td><td class="num">9</td></tr>
+<tr><td>13</td><td>requests stack (HTTP)</td><td class="num">0.14</td><td class="num">0.4 %</td><td class="num">4</td></tr>
+<tr><td>14</td><td>PyYAML</td><td class="num">0.09</td><td class="num">0.2 %</td><td class="num">1</td></tr>
+<tr><th></th><th>TOTAL</th><th class="num">34.94</th><th class="num">100.0 %</th><th class="num">1 721</th></tr>
+</tbody>
+</table>
+
+<h3>Visualisation (SVG inline)</h3>
+<svg class="bars" viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Décomposition par catégorie">
+  <style>
+    .lbl { font: 11px -apple-system,Roboto,sans-serif; fill: #333; }
+    .v   { font: 11px -apple-system,Roboto,sans-serif; fill: #111; font-weight:600; }
+    .grid{ stroke: #ddd; stroke-width: 1; }
+  </style>
+  <!-- axes verticaux : 0, 5, 10 MB -->
+  <line class="grid" x1="220" y1="20" x2="220" y2="340"/>
+  <line class="grid" x1="375" y1="20" x2="375" y2="340"/>
+  <line class="grid" x1="530" y1="20" x2="530" y2="340"/>
+  <line class="grid" x1="685" y1="20" x2="685" y2="340"/>
+  <text x="220" y="355" class="lbl" text-anchor="middle">0</text>
+  <text x="375" y="355" class="lbl" text-anchor="middle">3 MB</text>
+  <text x="530" y="355" class="lbl" text-anchor="middle">6 MB</text>
+  <text x="685" y="355" class="lbl" text-anchor="middle">9 MB</text>
+
+  <!-- bars : scale 1 MB = 52 px (3 MB = 156 px) -->
+  <!-- ExifTool 10.31 -->
+  <rect x="220" y="22" width="536" height="18" fill="#b3261e"/>
+  <text x="215" y="36" class="lbl" text-anchor="end">ExifTool (Perl)</text>
+  <text x="760" y="36" class="v" text-anchor="start">10.31 MB · 29.5 %</text>
+  <!-- crypto 4.19 -->
+  <rect x="220" y="46" width="218" height="18" fill="#b07418"/>
+  <text x="215" y="60" class="lbl" text-anchor="end">cryptography/OpenSSL</text>
+  <text x="445" y="60" class="v">4.19 MB · 12 %</text>
+  <!-- Autres 3.81 -->
+  <rect x="220" y="70" width="198" height="18" fill="#6e4fa1"/>
+  <text x="215" y="84" class="lbl" text-anchor="end">Autres stdlib/.pyd</text>
+  <text x="425" y="84" class="v">3.81 MB · 10.9 %</text>
+  <!-- PIL 3.55 -->
+  <rect x="220" y="94" width="185" height="18" fill="#2b5fa1"/>
+  <text x="215" y="108" class="lbl" text-anchor="end">Pillow (PIL)</text>
+  <text x="412" y="108" class="v">3.55 MB · 10.2 %</text>
+  <!-- PYZ 3.47 -->
+  <rect x="220" y="118" width="180" height="18" fill="#2f6a37"/>
+  <text x="215" y="132" class="lbl" text-anchor="end">PYZ (code projet)</text>
+  <text x="407" y="132" class="v">3.47 MB · 9.9 %</text>
+  <!-- pillow_heif 2.95 -->
+  <rect x="220" y="142" width="153" height="18" fill="#2b5fa1"/>
+  <text x="215" y="156" class="lbl" text-anchor="end">pillow_heif + libs</text>
+  <text x="380" y="156" class="v">2.95 MB · 8.4 %</text>
+  <!-- Tcl/Tk 2.05 -->
+  <rect x="220" y="166" width="107" height="18" fill="#2f6a37"/>
+  <text x="215" y="180" class="lbl" text-anchor="end">Tcl/Tk runtime</text>
+  <text x="334" y="180" class="v">2.05 MB · 5.9 %</text>
+  <!-- Python runtime 2.03 -->
+  <rect x="220" y="190" width="106" height="18" fill="#6e4fa1"/>
+  <text x="215" y="204" class="lbl" text-anchor="end">Python runtime</text>
+  <text x="333" y="204" class="v">2.03 MB · 5.8 %</text>
+  <!-- Icons 0.93 -->
+  <rect x="220" y="214" width="48" height="18" fill="#b07418"/>
+  <text x="215" y="228" class="lbl" text-anchor="end">Icons (projet)</text>
+  <text x="275" y="228" class="v">0.93 MB · 2.7 %</text>
+  <!-- chardet 0.82 -->
+  <rect x="220" y="238" width="43" height="18" fill="#b3261e"/>
+  <text x="215" y="252" class="lbl" text-anchor="end">chardet</text>
+  <text x="270" y="252" class="v">0.82 MB · 2.3 %</text>
+  <!-- tkinterdnd2 0.43 -->
+  <rect x="220" y="262" width="22" height="18" fill="#2b5fa1"/>
+  <text x="215" y="276" class="lbl" text-anchor="end">tkinterdnd2</text>
+  <text x="249" y="276" class="v">0.43 MB · 1.2 %</text>
+  <!-- customtkinter 0.19 -->
+  <rect x="220" y="286" width="10" height="18" fill="#2f6a37"/>
+  <text x="215" y="300" class="lbl" text-anchor="end">customtkinter</text>
+  <text x="237" y="300" class="v">0.19 MB · 0.5 %</text>
+  <!-- requests stack 0.14 -->
+  <rect x="220" y="310" width="7" height="18" fill="#b07418"/>
+  <text x="215" y="324" class="lbl" text-anchor="end">requests stack</text>
+  <text x="234" y="324" class="v">0.14 MB · 0.4 %</text>
+</svg>
+
+<h3>Top 20 fichiers les plus lourds (compressé)</h3>
+<table>
+<thead><tr><th>#</th><th>Taille</th><th>Fichier</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="num">3 555 KB</td><td><code>PYZ.pyz</code> (bytecode projet + libs Python pures)</td></tr>
+<tr><td>2</td><td class="num">2 583 KB</td><td><code>cryptography\hazmat\bindings\_rust.pyd</code></td></tr>
+<tr><td>3</td><td class="num">2 314 KB</td><td><code>libx265-215-…dll</code> (encoder HEVC)</td></tr>
+<tr><td>4</td><td class="num">1 874 KB</td><td><code>assets\tools\exiftool_files\lib\Image\ExifTool\Geolocation.dat</code></td></tr>
+<tr><td>5</td><td class="num">1 788 KB</td><td><code>PIL\_avif.cp311-win_amd64.pyd</code> (décoder AVIF)</td></tr>
+<tr><td>6</td><td class="num">1 636 KB</td><td><code>python311.dll</code></td></tr>
+<tr><td>7</td><td class="num">1 486 KB</td><td><code>libcrypto-3.dll</code> (OpenSSL)</td></tr>
+<tr><td>8</td><td class="num">916 KB</td><td><code>assets\icons\icon.png</code></td></tr>
+<tr><td>9</td><td class="num">821 KB ×2</td><td><code>perl532.dll</code> (1 copie aussi dans <code>exiftool_files\</code>)</td></tr>
+<tr><td>10</td><td class="num">785 KB</td><td><code>PIL\_imaging.cp311-win_amd64.pyd</code></td></tr>
+<tr><td>11</td><td class="num">772 KB</td><td><code>PIL\_imagingft.cp311-win_amd64.pyd</code></td></tr>
+<tr><td>12</td><td class="num">657 KB</td><td><code>tcl86t.dll</code></td></tr>
+<tr><td>13</td><td class="num">632 KB</td><td><code>sqlite3.dll</code></td></tr>
+<tr><td>14</td><td class="num">619 KB + 308 KB</td><td><code>libstdc++-6.dll</code> (×2 — doublon)</td></tr>
+<tr><td>15</td><td class="num">555 KB</td><td><code>tk86t.dll</code></td></tr>
+<tr><td>16</td><td class="num">511 KB</td><td><code>chardet\models\models.bin</code></td></tr>
+<tr><td>17</td><td class="num">505 KB</td><td><code>libheif-…dll</code></td></tr>
+<tr><td>18</td><td class="num">429 KB</td><td><code>assets\tools\exiftool_files\Licenses_Strawberry_Perl.zip</code></td></tr>
+<tr><td>19</td><td class="num">358 KB</td><td><code>base_library.zip</code> (Python stdlib core)</td></tr>
+<tr><td>20</td><td class="num">309 KB</td><td><code>assets\tools\exiftool_files\lib\Image\ExifTool\TagNames.pod</code></td></tr>
+</tbody>
+</table>
+
+<p><strong>Outils de reproduction :</strong></p>
+<pre><code>python -m PyInstaller.utils.cliutils.archive_viewer -l dist/PhotoOrganizer-2.0.0.exe &gt; exe_listing.txt
+python tools/_audit_breakdown.py</code></pre>
+
+
+<!-- ============================================ -->
+<h2>3. Findings détaillés</h2>
+
+<!-- ============== F-01 ============== -->
+<div id="f-01" class="finding high">
+<h3>[F-01] ExifTool Perl (10.31 MB) — fallback non opérationnel <span class="sev high">FORT</span></h3>
+<p><b>Gain estimé :</b> ~10.3 MB compressé · <b>Effort :</b> Faible · <b>Risque :</b> Moyen</p>
+<p>ExifTool est invoqué comme <strong>fallback subprocess</strong> (<code>src/core/metadata/exif_extractor.py:299</code>).
+Les méthodes primaires (<code>exifread</code>, Pillow, pillow_heif) couvrent l'usage cible
+(JPEG/PNG/HEIC/RAW/vidéos). Le code cherche le binaire à
+<code>assets/exiftool.exe</code> alors que le bundle le place à
+<code>assets/tools/exiftool.exe</code> — donc le fallback est <em>cassé</em> en pratique
+(sauf si <code>exiftool</code> est dans le PATH système).</p>
+
+<div class="twocol">
+<div><b>Avant — <code>build.py:176-179</code></b>
+<pre><code>for data_dir in ["assets", "resources", "src"]:
+    src_path = project_dir / data_dir
+    if src_path.exists():
+        cmd.extend([
+            "--add-data",
+            f"{src_path}{os.pathsep}{data_dir}"
+        ])
+</code></pre></div>
+<div><b>Après — whitelist <code>assets/icons</code></b>
+<pre><code>ASSETS_INCLUDE = ["icons"]  # tools/ exclu
+for sub in ASSETS_INCLUDE:
+    src_path = project_dir / "assets" / sub
+    if src_path.exists():
+        cmd.extend([
+            "--add-data",
+            f"{src_path}{os.pathsep}assets/{sub}"
+        ])
+for data_dir in ["resources", "src"]:
+    src_path = project_dir / data_dir
+    if src_path.exists():
+        cmd.extend([
+            "--add-data",
+            f"{src_path}{os.pathsep}{data_dir}"
+        ])
+</code></pre></div>
+</div>
+<p><b>Risque :</b> Perte du fallback pour fichiers exotiques (DNG anciens, MOV propriétaires).
+Atténuation : documenter dans le README qu'ExifTool peut être installé via
+<code>winget install exiftool</code>, le code de détection (<code>_find_exiftool</code>)
+le retrouvera dans le PATH.</p>
+</div>
+
+<!-- ============== F-02 ============== -->
+<div id="f-02" class="finding high">
+<h3>[F-02] Build depuis un venv minimal isolé (CRITIQUE) <span class="sev high">FORT</span></h3>
+<p><b>Gain estimé :</b> ~5–6 MB · <b>Effort :</b> 5 min · <b>Risque :</b> Nul</p>
+<p>Le Python global utilisé pour le build contient <strong>325 paquets</strong>
+(<code>numpy 2.4.4</code>, <code>pandas 3.0.2</code>, <code>scipy 1.17.1</code>,
+<code>matplotlib 3.10.9</code>, <code>cryptography 48.0.0</code>, etc.). PyInstaller
+collecte des hooks/datas inattendus même avec <code>--exclude-module</code>.</p>
+
+<pre><code># Création
+python -m venv .venv-build
+.\.venv-build\Scripts\Activate.ps1
+
+# Installation stricte
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install pyinstaller&gt;=6.0
+
+# Build
+python build.py
+</code></pre>
+
+<p>Variante automatisée — ajouter un garde-fou en début de <code>build.py</code> :</p>
+<pre><code>def _require_clean_env():
+    import importlib.util
+    forbidden = ["numpy", "pandas", "scipy", "matplotlib", "jupyter", "ipython"]
+    found = [m for m in forbidden if importlib.util.find_spec(m)]
+    if found:
+        print(f"[WARN] Build env pollué : {found}")
+        print("       Utiliser un venv minimal : .venv-build")
+        if "--allow-polluted-env" not in sys.argv:
+            sys.exit(1)
+</code></pre>
+</div>
+
+<!-- ============== F-03 ============== -->
+<div id="f-03" class="finding high">
+<h3>[F-03] <code>pillow-heif</code> → <code>pi-heif</code> (sans libx265) <span class="sev high">FORT</span></h3>
+<p><b>Gain estimé :</b> ~2.3 MB compressé (libx265-215-…dll) · <b>Effort :</b> 10 min · <b>Risque :</b> Faible</p>
+<p><code>pillow_heif 1.3.0</code> embarque libx265 (<em>encodeur</em> HEVC) alors que
+le projet ne fait que <em>lire</em> des HEIC. Le sister-package <code>pi-heif</code>
+(même auteur) fournit l'API <code>register_heif_opener()</code> identique sans libx265.</p>
+<div class="twocol">
+<div><b>Avant — <code>requirements.txt</code></b>
+<pre><code>pillow-heif&gt;=0.13.0
+</code></pre></div>
+<div><b>Après</b>
+<pre><code>pi-heif&gt;=0.20.0
+</code></pre></div>
+</div>
+<p>Aucun changement requis dans le code (<code>from pillow_heif import register_heif_opener</code>
+fonctionne avec <code>pi-heif</code> qui expose le même module top-level pour
+compatibilité — à confirmer sur la doc upstream avant d'appliquer).</p>
+<p><b>Risque :</b> Faible — l'app n'écrit jamais de HEIC.</p>
+</div>
+
+<!-- ============== F-04 ============== -->
+<div id="f-04" class="finding high">
+<h3>[F-04] <code>PIL._avif</code> (1.79 MB) non requis <span class="sev high">FORT</span></h3>
+<p><b>Gain estimé :</b> ~1.8 MB compressé · <b>Effort :</b> 5 min · <b>Risque :</b> Faible</p>
+<p>Pillow 12+ embarque <code>_avif.cp311-win_amd64.pyd</code> (7.7 MB sur disque,
+1.79 MB compressé). Le projet liste <code>.avif</code> comme extension scannée mais
+l'extraction métadonnées passe par <code>exifread</code> ou <code>PIL.Image.open()</code> ;
+les vraies photos AVIF sont rares dans l'usage cible (smartphone JPEG/HEIC).</p>
+
+<div class="twocol">
+<div><b>Option A — pin Pillow &lt; 12 (recommandé)</b>
+<pre><code># requirements.txt + pyproject.toml
+Pillow&gt;=10.0.0,&lt;12.0.0
+</code></pre></div>
+<div><b>Option B — exclude module (plus fragile)</b>
+<pre><code># build.py
+EXCLUDE_MODULES = [..., "PIL._avif"]
+</code></pre></div>
+</div>
+<p><b>Risque :</b> Si un utilisateur a des <code>.avif</code>, les métadonnées EXIF
+profondes ne seront pas lues, mais <code>_extract_basic</code> fournit toujours
+FileName/Size/MTime.</p>
+</div>
+
+<!-- ============== F-05 ============== -->
+<div id="f-05" class="finding mid">
+<h3>[F-05] <code>icon.png</code> sur-dimensionné (945 KB) <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain estimé :</b> ~850 KB · <b>Effort :</b> Trivial · <b>Risque :</b> Nul</p>
+<p>Un PNG d'icône devrait peser 30-100 KB max. La compression actuelle est défavorable.</p>
+<pre><code># Avec pngquant (256 couleurs, qualité 80-95%)
+pngquant --quality=80-95 --strip --skip-if-larger \
+  --ext .png --force assets/icons/icon.png
+
+# OU avec oxipng (lossless agressif)
+oxipng -o max --strip safe assets/icons/icon.png
+</code></pre>
+</div>
+
+<!-- ============== F-06 ============== -->
+<div id="f-06" class="finding low">
+<h3>[F-06] Imports morts détectés par ruff <span class="sev low">FAIBLE</span></h3>
+<p><b>Gain :</b> &lt; 50 KB · <b>Effort :</b> 5 min</p>
+<p>Quelques imports inutilisés détectés (F401/F841). Le PYZ ne fait que 3.47 MB
+donc le gain reste marginal mais c'est du nettoyage gratuit.</p>
+<pre><code>ruff check src/ --select F401,F841 --fix</code></pre>
+<p>Garder les sentinelles try/except (test de disponibilité de
+<code>send2trash</code>, <code>tkinterdnd2</code>, <code>plyer</code>) avec
+<code># noqa: F401</code>.</p>
+</div>
+
+<!-- ============== F-07 ============== -->
+<div id="f-07" class="finding mid">
+<h3>[F-07] <code>piexif</code> listé en hidden import mais JAMAIS importé <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain :</b> ~160 KB raw → ~50 KB compressé · <b>Effort :</b> 2 min · <b>Risque :</b> Nul</p>
+<p>Le code ne contient aucun <code>import piexif</code>. Seules deux mentions en
+docstring dans <code>gps_processor.py</code>.</p>
+<div class="twocol">
+<div><b>Avant — <code>build.py:29</code></b>
+<pre><code>HIDDEN_IMPORTS = [
+    ...,
+    "piexif",
+    ...,
+]
+</code></pre></div>
+<div><b>Après</b>
+<pre><code>HIDDEN_IMPORTS = [
+    ...,
+    # piexif retiré (dead code)
+    ...,
+]
+</code></pre></div>
+</div>
+<p>Retirer aussi de <code>requirements.txt:11</code> et <code>pyproject.toml:19</code>.</p>
+</div>
+
+<!-- ============== F-08 ============== -->
+<div id="f-08" class="finding mid">
+<h3>[F-08] <code>requests</code> pour 1 seul GET → <code>urllib.request</code> stdlib <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain :</b> ~140 KB requests stack + libère <a href="#f-09" class="anchor">cryptography</a> indirectement · <b>Effort :</b> 30 min · <b>Risque :</b> Faible</p>
+<p>Le seul appel HTTP du projet est un GET vers Nominatim
+(<code>src/core/metadata/gps_processor.py:216</code>). Trivialement remplaçable.</p>
+<div class="twocol">
+<div><b>Avant</b>
+<pre><code>import requests
+
+url = "https://nominatim.openstreetmap.org/reverse"
+params = {'format':'json','lat':lat,'lon':lon,
+          'zoom':16,'addressdetails':1}
+headers = {'User-Agent': 'PhotoOrganizer/2.0'}
+
+response = requests.get(url, params=params,
+                        headers=headers, timeout=5)
+if response.status_code == 200:
+    data = response.json()
+</code></pre></div>
+<div><b>Après — stdlib uniquement</b>
+<pre><code>import json
+import urllib.parse
+import urllib.request
+
+url = "https://nominatim.openstreetmap.org/reverse"
+params = {'format':'json','lat':lat,'lon':lon,
+          'zoom':16,'addressdetails':1}
+full = f"{url}?{urllib.parse.urlencode(params)}"
+req = urllib.request.Request(
+    full, headers={'User-Agent':'PhotoOrganizer/2.0'})
+try:
+    with urllib.request.urlopen(req, timeout=5) as r:
+        if r.status == 200:
+            data = json.loads(r.read().decode('utf-8'))
+except Exception as e:
+    logger.debug(f"Géocodage échoué: {e}")
+    data = None
+</code></pre></div>
+</div>
+<p>Puis retirer <code>requests / urllib3 / charset_normalizer / idna</code> de
+<code>HIDDEN_IMPORTS</code> et de <code>requirements.txt</code> / <code>pyproject.toml</code>.</p>
+</div>
+
+<!-- ============== F-09 ============== -->
+<div id="f-09" class="finding high">
+<h3>[F-09] <code>cryptography</code> (4.19 MB) embarqué inutilement <span class="sev high">FORT</span></h3>
+<p><b>Gain :</b> ~4.2 MB compressé · <b>Effort :</b> 2 min (après <a href="#f-02" class="anchor">F-02</a>) · <b>Risque :</b> Faible</p>
+<p><code>cryptography 48.0.0</code> est installé globalement (tiré par
+<code>msoffcrypto-tool</code>, <code>pdfminer.six</code>, <code>pyAesCrypt</code> —
+<em>aucun</em> n'est utilisé par PhotoOrganizer). PyInstaller le détecte via le
+runtime hook <code>pyi_rth_cryptography_openssl</code>.</p>
+<pre><code># build.py
+EXCLUDE_MODULES = [..., "cryptography", "cffi", "_cffi_backend"]
+</code></pre>
+<p><b>Risque :</b> Vérifier qu'<code>urllib.request</code> HTTPS fonctionne sans cryptography
+(= utilise <code>ssl</code> stdlib, OK). Si on garde <code>requests</code>
+(<a href="#f-08" class="anchor">F-08</a> non appliqué), <code>urllib3 ≥ 2</code> retombe
+sur <code>ssl</code> stdlib si <code>cryptography</code> est absent.</p>
+</div>
+
+<!-- ============== F-10 ============== -->
+<div id="f-10" class="finding mid">
+<h3>[F-10] <code>chardet</code> (823 KB) tiré inutilement <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain :</b> ~820 KB compressé · <b>Effort :</b> 2 min · <b>Risque :</b> Faible</p>
+<p>Probablement tiré par <code>requests</code> (qui dépend de
+<code>charset_normalizer</code> OU <code>chardet</code>). Aucun import direct dans
+<code>src/</code>.</p>
+<pre><code># build.py
+EXCLUDE_MODULES = [..., "chardet"]
+</code></pre>
+</div>
+
+<!-- ============== F-11 / F-12 / F-13 / F-14 ============== -->
+<div id="f-11" class="finding low">
+<h3>[F-11] Fichiers <code>.DS_Store</code> macOS embarqués <span class="sev low">FAIBLE</span></h3>
+<p><b>Gain :</b> ~12 KB · <b>Effort :</b> 10 min en mode <code>.spec</code>.
+<code>customtkinter/assets/.DS_Store</code> + <code>customtkinter/assets/icons/.DS_Store</code>
+sont auto-collectés. Résolu par le hook <code>_dedupe</code> du <code>.spec</code> proposé en §5.</p>
+</div>
+
+<div id="f-12" class="finding low">
+<h3>[F-12] Thèmes CustomTkinter inutilisés (<code>dark-blue.json</code>, <code>green.json</code>) <span class="sev low">FAIBLE</span></h3>
+<p><b>Gain :</b> ~9 KB · L'app utilise <code>set_default_color_theme("blue")</code> en dur
+(<code>src/ui/app.py:62</code>). Effort &gt; bénéfice — laisser tel quel.</p>
+</div>
+
+<div id="f-13" class="finding mid">
+<h3>[F-13] <code>--onefile</code> vs <code>--onedir</code> — décision humaine <span class="sev mid">MOYEN</span></h3>
+<p><code>--onefile</code> décompresse dans <code>%TEMP%\_MEIxxxxx\</code> à chaque
+lancement (1–3 s sur HDD + scan Defender). <code>--onedir</code> = démarrage
+instantané, plus gros sur disque mais distributable en ZIP, et patch incrémental
+possible.</p>
+</div>
+
+<div id="f-14" class="finding mid">
+<h3>[F-14] UPX désactivé (<code>--noupx</code>) <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain :</b> ~3–5 MB · <b>Effort :</b> 30 min · <b>Risque :</b> Moyen (faux-positifs Defender)</p>
+<pre><code>winget install upx-project.upx
+# OU placer upx.exe dans tools/upx/
+
+# Dans build.py
+upx_dir = project_dir / "tools" / "upx"
+if (upx_dir / "upx.exe").exists():
+    cmd.extend(["--upx-dir", str(upx_dir)])
+    for excl in ["vcruntime140.dll", "python311.dll",
+                 "tcl86t.dll", "tk86t.dll", "_tkinter.pyd"]:
+        cmd.extend(["--upx-exclude", excl])
+</code></pre>
+</div>
+
+<!-- ============== F-15 / F-16 / F-17 / F-18 / F-19 ============== -->
+<div id="f-15" class="finding low">
+<h3>[F-15] <code>EXCLUDE_MODULES</code> à enrichir <span class="sev low">FAIBLE</span></h3>
+<p><b>Gain :</b> 200–500 KB. Ajouter <code>cryptography</code>, <code>cffi</code>,
+<code>chardet</code> (cf. F-09/F-10), encodings asiatiques rares
+(<code>cp932</code>, <code>cp949</code>, <code>cp950</code>, <code>euc_jp</code>,
+<code>euc_kr</code>, <code>gb2312</code>, <code>gbk</code>,
+<code>iso2022_jp</code>, <code>iso2022_kr</code>),
+<code>email.mime</code>, <code>email.policy</code>, <code>xmlrpc</code>,
+<code>wsgiref</code>.</p>
+</div>
+
+<div id="f-16" class="finding mid">
+<h3>[F-16] Duplications DLL (<code>perl532.dll</code> ×2, <code>libstdc++-6.dll</code> ×2) <span class="sev mid">MOYEN</span></h3>
+<p><b>Gain :</b> ~1 MB. <code>perl532.dll</code> est résolu par F-01 (retrait ExifTool).
+Les <code>libstdc++-6.dll</code> et <code>libde265-0-…dll</code> doublons proviennent
+d'un double-passage de PyInstaller sur les hooks et le binary collection.
+Résolu par le filtre <code>_dedupe</code> dans le <code>.spec</code> proposé.</p>
+</div>
+
+<div id="f-17" class="finding low">
+<h3>[F-17] <code>--optimize=2</code> <span class="sev low">RÉF</span></h3>
+<p><span class="badge">Déjà actif</span> Bénéficie au PYZ (3.47 MB). Aucune action.</p>
+</div>
+
+<div id="f-18" class="finding low">
+<h3>[F-18] <code>--strip</code> <span class="sev low">RÉF</span></h3>
+<p><span class="badge">Déjà actif</span> Limité sous Windows (nécessite <code>strip.exe</code>
+de MinGW). Gain marginal ~100-300 KB si présent, sinon no-op silencieux.</p>
+</div>
+
+<div id="f-19" class="finding low">
+<h3>[F-19] Migrer <code>build.py</code> → <code>.spec</code> versionné <span class="sev low">FAIBLE</span></h3>
+<p>Refactor recommandé pour bénéficier du filtrage post-Analysis
+(<code>_dedupe</code>, exclusions .DS_Store, etc.). Cf. <code>.spec</code> complet en §5.</p>
+</div>
+
+
+<!-- ============================================ -->
+<h2>4. Plan d'action ordonné</h2>
+<table>
+<thead><tr><th>Ordre</th><th>ID</th><th>Action</th><th>Gain (MB)</th><th>Effort</th><th>Risque</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><a class="anchor" href="#f-02">F-02</a></td><td>Créer un venv minimal isolé pour le build</td><td class="num">5–6</td><td>5 min</td><td>Nul</td></tr>
+<tr><td>2</td><td><a class="anchor" href="#f-01">F-01</a></td><td>Exclure <code>assets/tools/</code> (ExifTool) du bundle</td><td class="num">10.3</td><td>15 min</td><td>Moyen</td></tr>
+<tr><td>3</td><td><a class="anchor" href="#f-03">F-03</a></td><td><code>pillow-heif</code> → <code>pi-heif</code> (HEVC read-only)</td><td class="num">2.3</td><td>10 min</td><td>Faible</td></tr>
+<tr><td>4</td><td><a class="anchor" href="#f-04">F-04</a></td><td>Pin <code>Pillow&lt;12</code></td><td class="num">1.8</td><td>5 min</td><td>Faible</td></tr>
+<tr><td>5</td><td><a class="anchor" href="#f-05">F-05</a></td><td>Recompresser <code>icon.png</code></td><td class="num">0.85</td><td>5 min</td><td>Nul</td></tr>
+<tr><td>6</td><td><a class="anchor" href="#f-09">F-09</a></td><td>Exclure <code>cryptography</code>+<code>cffi</code></td><td class="num">4.2</td><td>2 min</td><td>Faible</td></tr>
+<tr><td>7</td><td><a class="anchor" href="#f-10">F-10</a></td><td>Exclure <code>chardet</code></td><td class="num">0.8</td><td>2 min</td><td>Faible</td></tr>
+<tr><td>8</td><td><a class="anchor" href="#f-08">F-08</a></td><td>Remplacer <code>requests</code> → <code>urllib.request</code></td><td class="num">0.15+</td><td>30 min</td><td>Faible</td></tr>
+<tr><td>9</td><td><a class="anchor" href="#f-07">F-07</a></td><td>Retirer <code>piexif</code> (dead)</td><td class="num">0.05</td><td>2 min</td><td>Nul</td></tr>
+<tr><td>10</td><td><a class="anchor" href="#f-14">F-14</a></td><td>Activer UPX</td><td class="num">3–5</td><td>30 min</td><td>Moyen</td></tr>
+<tr><td>11</td><td><a class="anchor" href="#f-06">F-06</a></td><td><code>ruff --fix</code> imports morts</td><td class="num">&lt;0.05</td><td>5 min</td><td>Nul</td></tr>
+<tr><td>12</td><td><a class="anchor" href="#f-15">F-15</a></td><td>Enrichir <code>EXCLUDE_MODULES</code></td><td class="num">0.2–0.5</td><td>10 min</td><td>Faible</td></tr>
+<tr><td>13</td><td><a class="anchor" href="#f-11">F-11</a>, <a class="anchor" href="#f-12">F-12</a>, <a class="anchor" href="#f-16">F-16</a></td><td>.DS_Store, thèmes morts, dll doublons (via <code>.spec</code>)</td><td class="num">0.05</td><td>30 min</td><td>Nul</td></tr>
+<tr><td>14</td><td><a class="anchor" href="#f-13">F-13</a></td><td>Décider <code>--onefile</code> vs <code>--onedir</code></td><td class="num">variable</td><td>—</td><td>—</td></tr>
+<tr><td>15</td><td><a class="anchor" href="#f-19">F-19</a></td><td>Migrer <code>build.py</code> → <code>.spec</code> versionné</td><td class="num">0 (refactor)</td><td>1 h</td><td>Nul</td></tr>
+</tbody>
+</table>
+<p><b>Cumul réaliste (lignes 1–9) :</b> ~25 MB → <strong>exe ≈ 22-24 MB</strong>.<br>
+<b>Avec UPX (ligne 10) :</b> ~13 MB → <strong>exe ≈ 11-13 MB</strong> (optimiste).</p>
+
+
+<!-- ============================================ -->
+<h2>5. <code>.spec</code> PyInstaller optimisé proposé</h2>
+<p>À placer en <code>PhotoOrganizer.spec</code> et invoquer via
+<code>pyinstaller PhotoOrganizer.spec</code>.</p>
+
+<pre><code># -*- mode: python ; coding: utf-8 -*-
+"""PhotoOrganizer build spec - optimise taille.
+
+Prealable : creer un venv minimal isole (cf. F-02) :
+    python -m venv .venv-build
+    .\.venv-build\Scripts\Activate.ps1
+    pip install -r requirements.txt pyinstaller&gt;=6.0
+"""
+import os
+from pathlib import Path
+
+APP_NAME = "PhotoOrganizer"
+VERSION = "2.0.0"
+PROJECT_DIR = Path(SPECPATH)
+
+HIDDEN_IMPORTS = [
+    "customtkinter", "darkdetect",
+    "PIL", "PIL._imaging", "PIL._imagingft",
+    "exifread", "pillow_heif",   # ou pi_heif (cf. F-03)
+    "sqlite3", "_sqlite3",
+    "yaml",
+    "tkinterdnd2", "plyer", "plyer.platforms.win.notification",
+]
+
+EXCLUDE_MODULES = [
+    # Libs lourdes jamais utilisees
+    "scipy", "cv2", "dlib", "moviepy", "whisper", "oletools",
+    "pandas", "numpy", "openpyxl", "fitz", "pymupdf",
+    "docx", "pptx", "PyPDF2", "reportlab", "matplotlib", "seaborn", "win32com",
+    "IPython", "jupyter", "notebook", "sphinx",
+    "tornado", "zmq", "babel",
+    "PyQt5", "PyQt6", "PySide2", "PySide6", "wx",
+    "pytz", "dateutil", "blake3",
+    # F-09, F-10
+    "cryptography", "cffi", "_cffi_backend", "chardet",
+    # F-04 option B (fragile)
+    # "PIL._avif",
+    # F-08 (si applique)
+    # "requests", "urllib3", "charset_normalizer", "idna", "certifi",
+    # Stdlib outils dev
+    "unittest", "test", "tests", "pytest", "pydoc", "doctest",
+    "lib2to3", "ensurepip", "venv", "distutils",
+    "setuptools", "pkg_resources", "pip",
+    "tkinter.test", "idlelib",
+    "asyncio.test_support", "concurrent.futures.process",
+    "email.test", "xmlrpc", "wsgiref",
+    "ruff", "mypy", "vulture", "bandit",
+    # Encodings Asie peu utilises (F-15)
+    "encodings.cp932", "encodings.cp949", "encodings.cp950",
+    "encodings.euc_jp", "encodings.euc_kr",
+    "encodings.gb2312", "encodings.gbk",
+    "encodings.iso2022_jp", "encodings.iso2022_kr",
+]
+
+# Datas - F-01 : exclut assets/tools/
+datas = []
+icons_dir = PROJECT_DIR / "assets" / "icons"
+if icons_dir.exists():
+    datas.append((str(icons_dir), "assets/icons"))
+res_dir = PROJECT_DIR / "resources"
+if res_dir.exists():
+    datas.append((str(res_dir), "resources"))
+datas.append((str(PROJECT_DIR / "src"), "src"))
+
+try:
+    import tkinterdnd2 as _tkdnd
+    tkdnd_dir = Path(_tkdnd.__path__[0]) / "tkdnd"
+    if tkdnd_dir.is_dir():
+        datas.append((str(tkdnd_dir), "tkinterdnd2/tkdnd"))
+except ImportError:
+    pass
+
+
+a = Analysis(
+    [str(PROJECT_DIR / "main.py")],
+    pathex=[str(PROJECT_DIR)],
+    binaries=[],
+    datas=datas,
+    hiddenimports=HIDDEN_IMPORTS,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=EXCLUDE_MODULES,
+    noarchive=False,
+    optimize=2,  # F-17
+)
+
+# Post-Analysis cleanup : .DS_Store + dedupe dll (F-11, F-16)
+_seen = set()
+def _dedupe(files):
+    out = []
+    for entry in files:
+        name = entry[0]
+        base = os.path.basename(name).lower()
+        if base in ('.ds_store', 'thumbs.db'):
+            continue
+        if name.endswith(('.dll', '.pyd')) and base in _seen:
+            continue
+        _seen.add(base)
+        out.append(entry)
+    return out
+
+a.datas = _dedupe(a.datas)
+a.binaries = _dedupe(a.binaries)
+
+pyz = PYZ(a.pure)
+
+# UPX (F-14)
+UPX_DIR = str(PROJECT_DIR / "tools" / "upx") \
+    if (PROJECT_DIR / "tools" / "upx" / "upx.exe").exists() else None
+UPX_EXCLUDES = [
+    "vcruntime140.dll", "python311.dll",
+    "tcl86t.dll", "tk86t.dll", "_tkinter.pyd",
+]
+
+exe = EXE(
+    pyz, a.scripts, a.binaries, a.datas, [],
+    name=f"{APP_NAME}-{VERSION}",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=True,                # F-18
+    upx=bool(UPX_DIR),
+    upx_dir=UPX_DIR,
+    upx_exclude=UPX_EXCLUDES,
+    runtime_tmpdir=None,
+    console=False, windowed=True,
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=str(PROJECT_DIR / "assets" / "icons" / "icon.ico"),
+)
+</code></pre>
+
+
+<!-- ============================================ -->
+<h2>6. Commande de build finale recommandée</h2>
+<pre><code># 1) Preparer le venv minimal (une fois)
+python -m venv .venv-build
+.\.venv-build\Scripts\Activate.ps1
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install pyinstaller&gt;=6.0
+
+# 2) (Optionnel) Installer UPX
+winget install upx-project.upx
+# OU telecharger upx.exe dans tools/upx/
+
+# 3) Optimiser les assets (une fois)
+pngquant --quality=80-95 --strip --skip-if-larger \
+  --ext .png --force assets/icons/icon.png
+
+# 4) Builder
+pyinstaller PhotoOrganizer.spec --noconfirm
+
+# 5) Verifier
+ls -lh dist/PhotoOrganizer-2.0.0.exe
+python -m PyInstaller.utils.cliutils.archive_viewer -l \
+  dist/PhotoOrganizer-2.0.0.exe | wc -l
+</code></pre>
+
+
+<!-- ============================================ -->
+<h2>7. Questions ouvertes (décision humaine)</h2>
+<ol>
+  <li><b>ExifTool fallback</b> (<a class="anchor" href="#f-01">F-01</a>) : tolérer
+  la perte du fallback subprocess ? Ou packager une version "deluxe" séparée
+  avec ExifTool pour les utilisateurs avancés ?</li>
+  <li><b>AVIF support</b> (<a class="anchor" href="#f-04">F-04</a>) : maintenir
+  AVIF dans la liste des extensions scannées ? (Si non, retirer aussi de
+  <code>EXTENSIONS['image']</code> dans <code>exif_extractor.py</code> et
+  <code>file_manager.py</code>.)</li>
+  <li><b><code>pi-heif</code> vs <code>pillow-heif</code></b>
+  (<a class="anchor" href="#f-03">F-03</a>) : confirmer que le projet ne <em>crée</em>
+  jamais de HEIC (= encodage HEVC). Si un bouton "Convertir en HEIC" existe →
+  garder <code>pillow-heif</code>.</li>
+  <li><b><code>--onefile</code> vs <code>--onedir</code></b>
+  (<a class="anchor" href="#f-13">F-13</a>) : portabilité (1 fichier) prioritaire
+  ou démarrage rapide ?</li>
+  <li><b>UPX et antivirus</b> (<a class="anchor" href="#f-14">F-14</a>) : tolérer
+  le risque de faux-positif Windows Defender (heuristique vs UPX) ?</li>
+  <li><b>Reprise de l'audit</b> : appliquer les actions par ordre du plan §4 ?
+  Choisir un sous-ensemble ?</li>
+</ol>
+
+<hr>
+<div class="meta">
+  Généré le 2026-05-19. Pour la mémoire long-terme et le suivi des actions
+  appliquées, voir <code>AUDIT.md</code> à la racine du projet.
+</div>
+
+</div>
+</body>
+</html>

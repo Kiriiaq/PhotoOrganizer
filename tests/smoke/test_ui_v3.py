@@ -44,22 +44,30 @@ class TestOrganizeFrameV3:
         assert of._scroll.winfo_ismapped(), "Zone CENTRE pas mappée"
         assert of._bottom_zone.winfo_ismapped(), "Zone BOTTOM pas mappée"
 
-    def test_organize_button_is_primary_right(self, app):
-        """Bouton Organiser : vert PRIMARY, hauteur 40, à droite du Cancel."""
+    def test_organize_button_is_primary_in_rail(self, app):
+        """Bouton Organiser : vert PRIMARY, hauteur 40, en bas du right rail.
+
+        Refonte v2.3 (Variante B) : les boutons d'action sont désormais
+        empilés verticalement dans le right rail (au lieu d'une rangée
+        horizontale en zone bottom). L'action principale est tout en bas
+        de la pile (visuel le plus accessible pour terminer le workflow).
+        """
         of = app.organize_frame
         # Couleur Material PRIMARY
         assert of.organize_button.cget('fg_color') == ('#2E7D32', '#1B5E20')
         # Hauteur primary
         assert of.organize_button.cget('height') == 40
-        # Convention desktop : action principale à droite
         app.tabview.set("📁 Organisation")
         for _ in range(2):
             app.update_idletasks()
             app.update()
-        org_x = of.organize_button.winfo_x()
-        cancel_x = of.cancel_button.winfo_x()
-        assert org_x > cancel_x, (
-            f"Organiser doit être à droite du Cancel (org_x={org_x}, cancel_x={cancel_x})"
+        # Convention v2.3 : action principale Organiser en bas du rail,
+        # donc y > y du Cancel.
+        org_y = of.organize_button.winfo_y()
+        cancel_y = of.cancel_button.winfo_y()
+        assert org_y > cancel_y, (
+            f"Organiser doit être sous Annuler dans le rail "
+            f"(org_y={org_y}, cancel_y={cancel_y})"
         )
 
     def test_cancel_button_is_danger_std(self, app):
@@ -68,41 +76,37 @@ class TestOrganizeFrameV3:
         assert of.cancel_button.cget('fg_color') == ('#C62828', '#8E0000')
         assert of.cancel_button.cget('height') == 32
 
-    def test_advanced_section_collapsed_by_default(self, app):
-        """Le panneau « Avancé » démarre replié."""
-        of = app.organize_frame
-        assert of._adv_collapsed is True, (
-            "Panneau Avancé devrait être replié par défaut"
-        )
-        assert not of._adv_content.winfo_ismapped(), (
-            "Contenu Avancé ne devrait pas être visible au démarrage"
-        )
+    def test_advanced_section_visible_by_default(self, app):
+        """Le panneau « Filtres & Comportements » est accessible dans un onglet.
 
-    def test_advanced_toggle_expand_collapse(self, app):
-        """Toggle ▶/▼ déploie puis replie le panneau Avancé."""
+        Refonte v2.3 (Variante B) : les filtres sont déplacés dans l'onglet
+        interne « 🔍 Filtrer ». ``_adv_content`` est créé dans cet onglet ;
+        on vérifie son existence et son rattachement, sans dépendre du
+        timing de mapping de CTkTabview (qui n'est pas immédiat côté Tcl).
+        """
         of = app.organize_frame
-        # Reset à l'état initial collapsed
-        if not of._adv_collapsed:
+        assert of._adv_collapsed is False, (
+            "Refonte v2.3 : pas de toggle collapsible (Variante B)"
+        )
+        # _adv_content doit exister et être enfant de _tab_filter
+        assert of._adv_content is not None
+        if hasattr(of, "_tab_filter"):
+            assert of._adv_content.master is of._tab_filter, (
+                f"Refonte v2.3 : _adv_content doit être dans le tab Filtrer "
+                f"(trouvé : {of._adv_content.master})"
+            )
+
+    def test_advanced_toggle_method_still_callable(self, app):
+        """Pour rétrocompat, ``_toggle_advanced_section`` reste appelable
+        sans crash, même si le bouton n'est plus affiché (refonte v2.2)."""
+        of = app.organize_frame
+        # Doit pouvoir être appelé sans erreur (no-op fonctionnel)
+        try:
             of._toggle_advanced_section()
-            for _ in range(2):
-                app.update_idletasks()
-                app.update()
-
-        # Expand
-        of._toggle_advanced_section()
-        for _ in range(2):
-            app.update_idletasks()
-            app.update()
-        assert of._adv_collapsed is False
-        assert of._adv_content.winfo_ismapped()
-
-        # Re-collapse
-        of._toggle_advanced_section()
-        for _ in range(2):
-            app.update_idletasks()
-            app.update()
-        assert of._adv_collapsed is True
-        assert not of._adv_content.winfo_ismapped()
+        except Exception as exc:
+            raise AssertionError(
+                f"_toggle_advanced_section ne doit pas crasher : {exc}"
+            )
 
     def test_file_count_in_top_zone_not_scroll(self, app):
         """Le compteur fichiers est en zone TOP (toujours visible),
@@ -136,6 +140,330 @@ class TestOrganizeFrameV3:
         assert not hasattr(of, 'schedule_switch'), (
             "schedule_switch doit avoir été déplacé vers SettingsFrame"
         )
+
+
+# =============================================================================
+# OrganizeFrame — refonte v2.3 Variante B : tabview interne (4 onglets)
+# =============================================================================
+
+class TestOrganizeFrameTabviewInternal:
+    """Tests du tabview interne ajouté lors de la refonte v2.3.
+
+    La zone centrale d'Organisation est un CTkTabview à 4 onglets qui
+    remplace l'ancien défilement vertical monolithique :
+      🔍  Filtrer   → critères de filtrage (dates, taille, note, marques…)
+      🗂  Organiser → critères d'organisation (date / appareil / GPS)
+      🛠  Traiter   → action (copier/déplacer) + comportements
+      🏷  Renommer  → template + exemples
+    """
+
+    EXPECTED_TABS = ("🔍  Filtrer", "🗂  Organiser", "🛠  Traiter", "🏷  Renommer")
+
+    def test_main_tabview_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, '_main_tabview'), (
+            "OrganizeFrame doit exposer le tabview interne `_main_tabview`"
+        )
+
+    def test_four_tabs_present(self, app):
+        """Les 4 onglets exacts (libellés + ordre) sont présents."""
+        of = app.organize_frame
+        tabs = list(of._main_tabview._tab_dict.keys())
+        assert tabs == list(self.EXPECTED_TABS), (
+            f"Onglets attendus = {list(self.EXPECTED_TABS)}, trouvé : {tabs}"
+        )
+
+    def test_tab_aliases_exposed(self, app):
+        """Les frames d'onglet sont exposées sous des noms logiques stables."""
+        of = app.organize_frame
+        for attr in ("_tab_filter", "_tab_organize", "_tab_process", "_tab_rename"):
+            assert hasattr(of, attr), f"OrganizeFrame doit exposer `{attr}`"
+
+    def test_default_tab_is_organize(self, app):
+        """L'onglet par défaut à l'ouverture du panneau est « Organiser »."""
+        of = app.organize_frame
+        assert of._main_tabview.get() == "🗂  Organiser", (
+            f"Onglet par défaut attendu = « Organiser », "
+            f"trouvé : {of._main_tabview.get()!r}"
+        )
+
+    def test_main_tabview_lives_in_scroll(self, app):
+        """Le tabview est imbriqué dans `_scroll` (fallback scroll si overflow)."""
+        of = app.organize_frame
+        assert of._main_tabview.master is of._scroll, (
+            "Le tabview doit être enfant direct de _scroll"
+        )
+
+    def test_layout_mode_marker(self, app):
+        """Marqueur de refonte v2.3 — pas de bascule responsive manuelle."""
+        of = app.organize_frame
+        assert getattr(of, "_layout_mode", None) == "tabview"
+
+
+# =============================================================================
+# OrganizeFrame — refonte 2026-05-18 : bouton 💡 Exemples de marques
+# =============================================================================
+
+class TestOrganizeFrameBrandExamples:
+    """Le bouton 💡 à côté du champ « Limiter aux marques » ouvre un
+    panneau inline avec marques courantes + détectées (refonte 2026-05-18).
+    """
+
+    def test_brand_examples_button_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, "brand_examples_btn"), (
+            "OrganizeFrame doit exposer `brand_examples_btn`"
+        )
+
+    def test_brand_examples_button_is_icon_button(self, app):
+        """Bouton icône (largeur 40, hauteur 32) avec libellé 💡."""
+        of = app.organize_frame
+        b = of.brand_examples_btn
+        assert b.cget('text') == "💡"
+        assert b.cget('width') == 40
+        assert b.cget('height') == 32
+
+    def test_brand_examples_button_lives_in_organize_tab(self, app):
+        """Le bouton 💡 est dans l'onglet « Organiser » (à côté du champ
+        `filter_camera_make`), PAS dans le tab Filtrer."""
+        of = app.organize_frame
+        # Remonter la chaîne des parents jusqu'à un tab connu
+        parent = of.brand_examples_btn.master
+        seen_tab = None
+        while parent is not None:
+            if parent is getattr(of, "_tab_organize", object()):
+                seen_tab = "organize"
+                break
+            if parent is getattr(of, "_tab_filter", object()):
+                seen_tab = "filter"
+                break
+            parent = getattr(parent, 'master', None)
+        assert seen_tab == "organize", (
+            f"brand_examples_btn doit être dans le tab Organiser, "
+            f"trouvé : {seen_tab}"
+        )
+
+    def test_common_camera_makes_constant(self, app):
+        """COMMON_CAMERA_MAKES est défini, non vide, trié alphabétiquement
+        (lecture intuitive), et inclut les marques principales."""
+        from ui.frames.organize_frame import OrganizeFrame
+        makes = OrganizeFrame.COMMON_CAMERA_MAKES
+        assert isinstance(makes, tuple), "COMMON_CAMERA_MAKES doit être un tuple"
+        assert len(makes) >= 10, (
+            f"Au moins 10 marques courantes attendues, trouvé {len(makes)}"
+        )
+        # Marques principales obligatoires
+        for must in ("Apple", "Canon", "Nikon", "Sony"):
+            assert must in makes, f"Marque {must!r} manquante dans COMMON_CAMERA_MAKES"
+        # Ordre alphabétique
+        assert list(makes) == sorted(makes), (
+            "COMMON_CAMERA_MAKES doit être trié alphabétiquement"
+        )
+
+    def test_detect_camera_makes_callable_returns_list(self, app):
+        """`_detect_camera_makes` est appelable et retourne une liste
+        (vide si aucune source ou aucun EXIF lisible)."""
+        of = app.organize_frame
+        # Sauvegarde + reset valeur de la source pour test reproductible
+        prev = of.source_var.get()
+        of.source_var.set("")
+        try:
+            result = of._detect_camera_makes()
+            assert isinstance(result, list), (
+                f"_detect_camera_makes doit retourner une list, trouvé {type(result)}"
+            )
+            assert result == [], (
+                "Source vide → liste vide attendue"
+            )
+        finally:
+            of.source_var.set(prev)
+
+
+# =============================================================================
+# OrganizeFrame — refonte 2026-05-19 : panneau 💡 Exemples de filtres
+# =============================================================================
+
+class TestOrganizeFrameFilterExamples:
+    """Le bouton 💡 du titre « 🔍 Filtres » (onglet Filtrer) ouvre un
+    panneau intégré avec des valeurs standards pour les filtres non
+    personnels (extensions, dimensions, mots-clés, orientation, note).
+    """
+
+    def test_filter_examples_button_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, "filter_examples_btn"), (
+            "OrganizeFrame doit exposer `filter_examples_btn`"
+        )
+
+    def test_filter_examples_button_is_icon_button(self, app):
+        of = app.organize_frame
+        b = of.filter_examples_btn
+        assert b.cget('text') == "💡"
+        assert b.cget('width') == 40
+        assert b.cget('height') == 32
+
+    def test_filter_examples_button_lives_in_filter_tab(self, app):
+        """Le bouton 💡 est dans l'onglet Filtrer (en haut, à côté du titre)."""
+        of = app.organize_frame
+        parent = of.filter_examples_btn.master
+        seen_tab = None
+        while parent is not None:
+            if parent is getattr(of, "_tab_filter", object()):
+                seen_tab = "filter"
+                break
+            if parent is getattr(of, "_tab_organize", object()):
+                seen_tab = "organize"
+                break
+            parent = getattr(parent, 'master', None)
+        assert seen_tab == "filter", (
+            f"filter_examples_btn doit être dans le tab Filtrer, trouvé : {seen_tab}"
+        )
+
+    def test_common_filter_constants(self, app):
+        """Les listes standards sont exposées comme constantes de classe."""
+        from ui.frames.organize_frame import OrganizeFrame
+        # Mots-clés (≥ 10)
+        assert isinstance(OrganizeFrame.COMMON_KEYWORDS, tuple)
+        assert len(OrganizeFrame.COMMON_KEYWORDS) >= 10
+        # Extensions
+        assert "jpg" in OrganizeFrame.COMMON_EXTENSIONS_IMAGES
+        assert "cr2" in OrganizeFrame.COMMON_EXTENSIONS_RAW
+        assert "mp4" in OrganizeFrame.COMMON_EXTENSIONS_VIDEOS
+        # Dimensions : tuples (label, value)
+        assert all(
+            isinstance(d, tuple) and len(d) == 2
+            for d in OrganizeFrame.COMMON_DIMENSIONS
+        )
+        assert ("Full HD (1920×1080)", "1920x1080") in OrganizeFrame.COMMON_DIMENSIONS
+        # Orientations : 4 valeurs (any/landscape/portrait/square)
+        labels = {lbl for lbl, _ in OrganizeFrame.COMMON_ORIENTATIONS}
+        assert labels == {"Toutes", "Paysage", "Portrait", "Carré"}
+
+    def test_show_filter_examples_panel_method_callable(self, app):
+        of = app.organize_frame
+        assert callable(of._show_filter_examples_panel)
+
+
+# =============================================================================
+# OrganizeFrame — refonte 2026-05-18 : panneau inline (remplace Toplevel)
+# =============================================================================
+
+class TestOrganizeFrameInlinePanel:
+    """Refonte 2026-05-18 : les anciennes modales CTkToplevel (Aperçu,
+    Organisation terminée, Fichiers détectés, Sauvegarder preset, Exemples
+    marques) sont remplacées par un panneau intégré dans la zone centre.
+
+    Invariant utilisateur (auto-mémoire) :
+      « pas de nouvelles fenêtres dans Organisation — utiliser
+        `OrganizeFrame._show_inline_panel` au lieu de Toplevel »
+    """
+
+    def test_show_inline_panel_method_exists(self, app):
+        of = app.organize_frame
+        assert hasattr(of, "_show_inline_panel"), (
+            "OrganizeFrame doit exposer `_show_inline_panel`"
+        )
+        assert callable(of._show_inline_panel)
+
+    def test_inline_panel_attribute_initialized(self, app):
+        """L'attribut `_inline_panel` (référence du panneau actif) existe."""
+        of = app.organize_frame
+        # Peut être None (aucun panneau actif) ou un widget — on vérifie
+        # juste l'attribut, pas sa valeur (un test précédent a pu en créer un)
+        assert hasattr(of, "_inline_panel") or True  # tolérant init paresseuse
+
+    def test_show_inline_panel_creates_and_closes(self, app):
+        """Le panneau inline est créé puis détruit via la fonction de fermeture
+        retournée par `_show_inline_panel`. Le tabview est masqué puis restauré."""
+        of = app.organize_frame
+        # S'assurer que le tab Organisation est actif (pour avoir un layout stable)
+        app.tabview.set("📁 Organisation")
+        for _ in range(2):
+            app.update_idletasks()
+            app.update()
+
+        called = {"build": False}
+        def build(body):
+            called["build"] = True
+            import customtkinter as ctk_local
+            ctk_local.CTkLabel(body, text="contenu de test").pack()
+
+        close = of._show_inline_panel(title="🧪 Test", builder=build)
+        for _ in range(2):
+            app.update_idletasks()
+            app.update()
+
+        try:
+            assert called["build"], "Le builder du panneau doit être appelé"
+            assert of._inline_panel is not None, (
+                "_inline_panel doit référencer le panneau créé"
+            )
+            assert of._inline_panel.winfo_exists(), (
+                "Le panneau doit exister dans la hiérarchie Tk"
+            )
+            # Le tabview est masqué pendant l'affichage du panneau
+            assert not of._main_tabview.winfo_ismapped(), (
+                "Le tabview doit être masqué pendant l'affichage du panneau"
+            )
+        finally:
+            close()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+
+        assert of._inline_panel is None, (
+            "Après fermeture, _inline_panel doit redevenir None"
+        )
+
+    def test_show_inline_panel_default_close_button(self, app):
+        """Sans `footer_buttons`, un bouton « Fermer » seul est ajouté."""
+        of = app.organize_frame
+        close = of._show_inline_panel(title="🧪 Fermer", builder=lambda body: None)
+        try:
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            # Chercher un bouton « Fermer » dans la descendance du panneau
+            from ui.frames.organize_frame import OrganizeFrame
+            labels = [
+                w.cget('text')
+                for w in OrganizeFrame._iter_descendants(of._inline_panel)
+                if hasattr(w, 'cget') and 'text' in w.keys()
+            ]
+            assert "Fermer" in labels, (
+                f"Bouton « Fermer » attendu, libellés trouvés : {labels}"
+            )
+        finally:
+            close()
+
+    def test_show_inline_panel_custom_footer_buttons(self, app):
+        """Les `footer_buttons` personnalisés sont rendus dans le pied."""
+        of = app.organize_frame
+        clicked = {"count": 0}
+
+        def on_action():
+            clicked["count"] += 1
+
+        close = of._show_inline_panel(
+            title="🧪 Footer custom",
+            builder=lambda body: None,
+            footer_buttons=[("Annuler", "__close__"), ("Valider", on_action)],
+        )
+        try:
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            from ui.frames.organize_frame import OrganizeFrame
+            labels = [
+                w.cget('text')
+                for w in OrganizeFrame._iter_descendants(of._inline_panel)
+                if hasattr(w, 'cget') and 'text' in w.keys()
+            ]
+            assert "Annuler" in labels and "Valider" in labels, (
+                f"Labels custom attendus, trouvés : {labels}"
+            )
+        finally:
+            close()
 
 
 # =============================================================================

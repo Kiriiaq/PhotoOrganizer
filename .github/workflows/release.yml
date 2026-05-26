@@ -15,58 +15,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
       - name: Get version from tag
         id: version
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
       - name: Build Release executable
-        shell: cmd
-        run: |
-          pyinstaller --onefile --noconsole ^
-            --name "photoorganizer-%VERSION%-windows-release" ^
-            --icon "resources/icons/icon.ico" ^
-            --add-data "resources;resources" ^
-            --add-data "src;src" ^
-            --hidden-import customtkinter ^
-            --hidden-import PIL._tkinter_finder ^
-            --hidden-import exifread ^
-            --hidden-import piexif ^
-            --hidden-import pillow_heif ^
-            --hidden-import darkdetect ^
-            --exclude-module matplotlib ^
-            --exclude-module scipy ^
-            --exclude-module jupyter ^
-            --exclude-module pytest ^
-            main.py
+        run: python build.py
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
+
       - name: Build Debug executable
-        shell: cmd
-        run: |
-          pyinstaller --onefile --console --debug=all ^
-            --name "photoorganizer-%VERSION%-windows-debug" ^
-            --icon "resources/icons/icon.ico" ^
-            --add-data "resources;resources" ^
-            --add-data "src;src" ^
-            --hidden-import customtkinter ^
-            --hidden-import PIL._tkinter_finder ^
-            --hidden-import exifread ^
-            --hidden-import piexif ^
-            --hidden-import pillow_heif ^
-            --hidden-import darkdetect ^
-            --exclude-module matplotlib ^
-            --exclude-module scipy ^
-            --exclude-module jupyter ^
-            --exclude-module pytest ^
-            main.py
+        run: python build.py --debug
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
           PHOTOORGANIZER_DEBUG: "1"
+
       - name: Generate checksums
         shell: bash
         run: cd dist && sha256sum *.exe > checksums-sha256.txt
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -74,6 +48,7 @@ jobs:
           path: |
             dist/*.exe
             dist/checksums-sha256.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -82,8 +57,8 @@ jobs:
             ## PhotoOrganizer ${{ github.ref_name }}
 
             ### Downloads
-            - **Release**: `photoorganizer-${{ steps.version.outputs.VERSION }}-windows-release.exe`
-            - **Debug**: `photoorganizer-${{ steps.version.outputs.VERSION }}-windows-debug.exe`
+            - **Release**: `PhotoOrganizer-${{ steps.version.outputs.VERSION }}.exe` (windowed, no console)
+            - **Debug**: `PhotoOrganizer-${{ steps.version.outputs.VERSION }}-debug.exe` (console + verbose logging)
 
             Download the Release `.exe` and run it. No installation required.
 

@@ -4,39 +4,77 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photoorganizer"
-version = "2.0.0"
-description = "Automatic photo organizer by EXIF metadata"
+version = "2.2.0"
+description = "Automatic photo organizer by EXIF metadata (Windows desktop, CustomTkinter)"
 readme = "README.md"
-license = {text = "MIT"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
-authors = [{name = "Kiriiaq"}]
+authors = [{name = "Kiriiaq", email = "manugrolleau48@gmail.com"}]
+keywords = ["photo", "exif", "organizer", "metadata", "customtkinter", "windows"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Desktop Environment :: File Managers",
+]
 
 dependencies = [
     "customtkinter>=5.2.0,<6.0.0",
     "darkdetect>=0.8.0,<1.0.0",
     "Pillow>=10.0.0,<12.0.0",
     "exifread>=3.0.0,<4.0.0",
-    "piexif>=1.1.3,<2.0.0",
     "pillow-heif>=0.13.0,<1.0.0",
     "requests>=2.31.0,<3.0.0",
+    "PyYAML>=6.0,<7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
+    "pytest-cov>=4.0",
+    "pytest-benchmark>=4.0",
     "ruff>=0.4.0",
+    "bandit>=1.7",
     "pyinstaller>=6.0.0",
 ]
+dnd = [
+    "tkinterdnd2>=0.4.0",
+]
+toast = [
+    "plyer>=2.1",
+]
+pro = [
+    # Pour le module watch-folder (sinon fallback polling 10s)
+    "watchdog>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Kiriiaq/PhotoOrganizer"
+Repository = "https://github.com/Kiriiaq/PhotoOrganizer"
+Issues = "https://github.com/Kiriiaq/PhotoOrganizer/issues"
+Funding = "https://ko-fi.com/kiriiaq"
 
 [project.scripts]
 photo-organizer = "src.main:main"
+photo-organizer-dedup = "src.cli.duplicate_cli:main"
+# Pro edition entry points (modules absent in this open-source repo,
+# fully functional only when LICENSE-PRO has been validated locally
+# and the `pro` extras are installed)
+photo-organizer-pro-batch = "src.photoorganizer_pro.cli.batch_organize:main"
+photo-organizer-pro-watch = "src.photoorganizer_pro.scheduler.watch_folder:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.ico", "*.png", "*.jpg", "*.svg"]
+"*" = ["*.json", "*.ico", "*.png", "*.jpg"]
 
 [tool.ruff]
 target-version = "py311"
@@ -49,3 +87,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "slow: marks tests as slow (deselect with -m \"not slow\")",
+]

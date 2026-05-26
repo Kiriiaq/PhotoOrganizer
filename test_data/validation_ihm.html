@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Validation IHM — PhotoOrganizer 2.3-dev</title>
+<style>
+  /* ----------- Design sobre, imprimable, sans dépendance externe ---------- */
+  :root {
+    --bg:        #fafafa;
+    --panel:     #ffffff;
+    --text:      #222;
+    --muted:     #777;
+    --border:    #ddd;
+    --primary:   #1565C0;
+    --ok:        #2E7D32;
+    --nok:       #C62828;
+    --na:        #757575;
+    --header-bg: #1F6AA5;
+    --header-fg: #ffffff;
+    --row-alt:   #f4f8fc;
+    --section-bg:#E3F2FD;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+    background: var(--bg); color: var(--text); margin: 0; padding: 20px;
+    line-height: 1.4;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; color: var(--primary); }
+  h2 { font-size: 16px; margin: 22px 0 8px; color: var(--header-bg); }
+  .subtitle { color: var(--muted); margin-bottom: 16px; }
+  .meta {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 18px; margin-bottom: 16px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;
+  }
+  .meta label { display: block; font-size: 12px; color: var(--muted); }
+  .meta input {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 13px; font-family: inherit;
+  }
+  .toolbar {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .toolbar button {
+    padding: 8px 14px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--panel); cursor: pointer; font-size: 13px;
+    font-family: inherit; color: var(--text);
+  }
+  .toolbar button:hover { background: var(--section-bg); }
+  .toolbar button.primary {
+    background: var(--primary); color: white; border-color: var(--primary);
+  }
+  .toolbar button.danger {
+    background: var(--nok); color: white; border-color: var(--nok);
+  }
+  .progress-bar {
+    margin-left: auto; padding: 6px 12px; background: var(--section-bg);
+    border-radius: 4px; font-size: 13px; color: var(--text); font-weight: 600;
+  }
+  table {
+    width: 100%; border-collapse: collapse; background: var(--panel);
+    border: 1px solid var(--border); margin-bottom: 20px; font-size: 13px;
+  }
+  thead th {
+    background: var(--header-bg); color: var(--header-fg); padding: 8px 10px;
+    text-align: left; font-weight: 600; border: 1px solid #1a5a8e;
+    position: sticky; top: 0; z-index: 10;
+  }
+  tbody td {
+    padding: 8px 10px; border: 1px solid var(--border); vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr.section-row {
+    background: var(--section-bg); font-weight: 700; color: var(--header-bg);
+  }
+  .col-id        { width: 60px; font-family: 'Consolas', monospace; color: var(--muted); }
+  .col-widget    { width: 220px; font-weight: 600; }
+  .col-desc      { width: 280px; }
+  .col-attendu   { width: 260px; color: var(--muted); }
+  .col-status    { width: 110px; }
+  .col-observe   { width: 180px; }
+  .col-comment   { width: 200px; }
+  select.status {
+    width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
+    font-family: inherit; font-size: 12px;
+  }
+  select.status[data-value="OK"]      { background: #E8F5E9; color: var(--ok); font-weight: 600; }
+  select.status[data-value="NOK"]     { background: #FFEBEE; color: var(--nok); font-weight: 600; }
+  select.status[data-value="NA"]      { background: #F5F5F5; color: var(--na); }
+  input.field, textarea.field {
+    width: 100%; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
+    font-family: inherit; font-size: 12px; resize: vertical;
+  }
+  textarea.field { min-height: 28px; }
+  details { margin-bottom: 16px; }
+  details summary {
+    cursor: pointer; padding: 8px 12px; background: var(--section-bg);
+    border-radius: 4px; font-weight: 600; color: var(--header-bg);
+  }
+  .export-area {
+    background: #f0f0f0; border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px; margin-top: 10px; font-family: 'Consolas', monospace;
+    font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow: auto;
+    display: none;
+  }
+  .export-area.visible { display: block; }
+  /* Imprimante : optimisations */
+  @media print {
+    body { background: white; padding: 0; }
+    .toolbar { display: none; }
+    .meta, table { box-shadow: none; page-break-inside: avoid; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🧪 Validation IHM — PhotoOrganizer 2.3-dev</h1>
+<p class="subtitle">Liste de vérification visuelle de l'interface. Pas besoin de connaissances techniques.</p>
+
+<!-- Bloc d'instructions pour le testeur -->
+<details open style="background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px 18px; margin-bottom: 16px;">
+  <summary>📖 Comment utiliser cette page (cliquer pour replier)</summary>
+  <div style="margin-top: 10px; line-height: 1.6;">
+    <p><strong>1. Remplir l'en-tête</strong> ci-dessous (Outil, Version, Testeur, Date, Environnement).</p>
+    <p><strong>2. Pour chaque élément du tableau</strong> :</p>
+    <ul style="margin: 4px 0 8px 20px;">
+      <li>Lire la colonne <em>« Où le trouver »</em> pour localiser le bouton/champ dans l'application.</li>
+      <li>Faire l'action décrite dans la colonne <em>« Ce qu'il faut tester »</em>.</li>
+      <li>Choisir un statut :
+        <span style="background: #E8F5E9; color: var(--ok); padding: 2px 6px; border-radius: 3px; font-weight: 600;">OK</span> si tout se passe comme attendu,
+        <span style="background: #FFEBEE; color: var(--nok); padding: 2px 6px; border-radius: 3px; font-weight: 600;">NOK</span> si un comportement ne fonctionne pas,
+        <span style="background: #F5F5F5; color: var(--na); padding: 2px 6px; border-radius: 3px; font-weight: 600;">NA</span> si l'élément n'est pas applicable (fonctionnalité absente, dépendance manquante…).
+      </li>
+      <li>Noter dans <em>« Valeur observée »</em> ce qui s'est réellement passé.</li>
+      <li>Ajouter un commentaire libre si nécessaire (suggestion, anomalie, capture d'écran…).</li>
+    </ul>
+    <p><strong>3. Votre progression est sauvegardée automatiquement</strong> dans le navigateur. Vous pouvez fermer la page et reprendre plus tard.</p>
+    <p><strong>4. À la fin</strong> : cliquer <em>📝 Générer résumé Markdown</em> pour obtenir un texte prêt à coller dans le rapport, ou <em>📤 Exporter JSON</em> pour archiver la session complète.</p>
+    <p style="margin-top: 10px; color: var(--muted); font-size: 12px;">
+      💡 Astuce : pour démarrer l'application, lancer <code>PhotoOrganizer.exe</code> (ou <code>python src/main.py</code> en développement). Aucune installation préalable n'est requise.
+    </p>
+  </div>
+</details>
+
+<!-- En-tête métadonnées (saisies par le testeur) -->
+<div class="meta">
+  <div>
+    <label>Outil</label>
+    <input id="meta-tool" value="PhotoOrganizer">
+  </div>
+  <div>
+    <label>Version</label>
+    <input id="meta-version" value="2.3-dev">
+  </div>
+  <div>
+    <label>Testeur</label>
+    <input id="meta-tester" placeholder="Nom complet">
+  </div>
+  <div>
+    <label>Date</label>
+    <input id="meta-date" type="date">
+  </div>
+  <div>
+    <label>Environnement</label>
+    <input id="meta-env" placeholder="Windows 11, écran 1920×1080…">
+  </div>
+  <div>
+    <label>Empreinte de version</label>
+    <input id="meta-hash" placeholder="empreinte du commit (ex. 20d895a)">
+  </div>
+</div>
+
+<!-- Toolbar : actions globales -->
+<div class="toolbar">
+  <button onclick="exportJSON()">📤 Exporter JSON</button>
+  <button onclick="exportMarkdown()" class="primary">📝 Générer résumé Markdown</button>
+  <button onclick="window.print()">🖨 Imprimer</button>
+  <button onclick="clearAll()" class="danger">🗑 Effacer tout</button>
+  <span class="progress-bar" id="progress">0 / 136 — 0 %</span>
+</div>
+
+<!-- Conteneur du tableau (rempli en JS) -->
+<div id="checklist"></div>
+
+<!-- Zone d'export (cachée par défaut) -->
+<div class="export-area" id="export-out"></div>
+
+<script>
+/* ========================================================================
+   Configuration : liste des 136 widgets à valider.
+   Réutilisable d'un outil à l'autre — modifier ``WIDGETS`` ci-dessous.
+   Format : { id, section, widget, desc, attendu }
+   ======================================================================== */
+const WIDGETS = [
+  // ----- Application : en-tête -----
+  { id: "W01", section: "Application (en-tête)", widget: "Bouton thème ☀️/🌙",       desc: "En-tête haut-droite",                    attendu: "Clic bascule clair/sombre, icône change" },
+  { id: "W02", section: "Application (en-tête)", widget: "Bouton aide ❓",            desc: "En-tête haut-droite",                    attendu: "Ouvre la fenêtre « À propos »" },
+  { id: "W03", section: "Application (en-tête)", widget: "Onglets principaux (×4)",  desc: "📁 Organisation / 🔍 Doublons / 📜 Historique / ⚙️ Paramètres", attendu: "Navigation fluide, l'onglet actif est mis en évidence" },
+  { id: "W04", section: "Application (en-tête)", widget: "Barre d'état",            desc: "Bas de fenêtre",                          attendu: "Affiche « Prêt » au démarrage, message contextuel pendant les opérations" },
+  { id: "W05", section: "Application (en-tête)", widget: "Barre de progression",    desc: "Bas de fenêtre, à droite",                attendu: "Visible uniquement pendant une opération en cours" },
+
+  // ----- Organisation : zone TOP -----
+  { id: "W06", section: "Organisation - Sources/Destination", widget: "Champ Source(s)",      desc: "Champ de saisie zone TOP",            attendu: "Saisie chemin, glisser-déposer accepté, séparateur ;" },
+  { id: "W07", section: "Organisation - Sources/Destination", widget: "Bouton 📂 Source",      desc: "À droite du champ Source",            attendu: "Ouvre le sélecteur de dossier" },
+  { id: "W08", section: "Organisation - Sources/Destination", widget: "Bouton + Source",      desc: "À droite du 📂 Source",               attendu: "Ouvre le sélecteur, ajoute le chemin avec « ; » devant l'existant" },
+  { id: "W09", section: "Organisation - Sources/Destination", widget: "Champ Destination",    desc: "Champ de saisie zone TOP",            attendu: "Saisie chemin, glisser-déposer accepté" },
+  { id: "W10", section: "Organisation - Sources/Destination", widget: "Bouton 📂 Destination", desc: "À droite du champ Destination",       attendu: "Ouvre le sélecteur de dossier" },
+  { id: "W11", section: "Organisation - Sources/Destination", widget: "Bouton ↗ Ouvrir destination", desc: "À droite du 📂 destination",          attendu: "Ouvre le dossier de destination dans l'explorateur Windows" },
+  { id: "W12", section: "Organisation - Sources/Destination", widget: "Compteur fichiers",           desc: "Sous Source/Destination",             attendu: "« 📂 N fichier(s) prêt(s) » mis à jour en temps réel" },
+
+  // ----- Organisation : critères (col. gauche) -----
+  { id: "W13", section: "Organisation - Critères", widget: "Case Par date",          desc: "Onglet Organiser, 1re case sous « Critères d'organisation »", attendu: "Cocher → les photos seront rangées dans des dossiers selon leur date de prise de vue (ex. 2024/06/2024_06_15/). Décocher → ce critère n'est pas appliqué." },
+  { id: "W14", section: "Organisation - Critères", widget: "Menu format date",       desc: "5 formats : année/mois/jour, etc.",       attendu: "Choix dans la liste déroulante" },
+  { id: "W15", section: "Organisation - Critères", widget: "Case Par appareil photo", desc: "Onglet Organiser, sous « Critères d'organisation »",       attendu: "Cocher → les photos seront rangées par marque et modèle d'appareil (ex. Sony ILCE-7M3/). Décocher → ce critère n'est pas appliqué. Lorsqu'elle est cochée, le champ « Limiter aux marques » apparaît juste en dessous." },
+  { id: "W16", section: "Organisation - Critères", widget: "Case Par GPS",           desc: "Critère localisation",                    attendu: "Active critère + révèle sous-options géocodage/distance" },
+  { id: "W17", section: "Organisation - Critères", widget: "Case Géocodage",         desc: "Sous-option de GPS",                      attendu: "Bascule entre nom de lieu / coordonnées brutes Lat_x_Lon_y" },
+  { id: "W18", section: "Organisation - Critères", widget: "Slider distance max",    desc: "0-50 km, pas 1 km",                       attendu: "Glissement met à jour le label" },
+  { id: "W19", section: "Organisation - Critères", widget: "Boutons ◀/▶ distance",   desc: "Pas fin 100 m",                           attendu: "Label change par tranches de 0.1 km" },
+  { id: "W20", section: "Organisation - Critères", widget: "Label distance live",    desc: "Affiche '1.3 km' etc.",                   attendu: "Synchro avec slider" },
+  { id: "W21", section: "Organisation - Critères", widget: "Switch multicouche",     desc: "Combine plusieurs critères",              attendu: "ON : révèle sous-panneau d'ordre" },
+  { id: "W22", section: "Organisation - Critères", widget: "Boutons ▲/▼ ordre",      desc: "Réordonne critères en multilayer",        attendu: "Cards bougent dans la liste" },
+
+  // ----- Organisation : options traitement (col. droite) -----
+  { id: "W23", section: "Organisation - Traitement", widget: "Radio Copier",            desc: "Action COPY",                              attendu: "Une seule des 2 cochée" },
+  { id: "W24", section: "Organisation - Traitement", widget: "Radio Déplacer",          desc: "Action MOVE",                              attendu: "Mutex avec Copier" },
+  { id: "W25", section: "Organisation - Traitement", widget: "Case Sous-dossiers",      desc: "Récursif on/off",                          attendu: "Affecte le scan" },
+  { id: "W26", section: "Organisation - Traitement", widget: "Case Images",             desc: "Inclut JPG/PNG/HEIC/…",                    attendu: "Filtre extensions" },
+  { id: "W27", section: "Organisation - Traitement", widget: "Case RAW",                desc: "Inclut ARW/CR2/NEF/…",                     attendu: "Filtre extensions" },
+  { id: "W28", section: "Organisation - Traitement", widget: "Case Vidéos",             desc: "Inclut MP4/MOV/…",                         attendu: "Filtre extensions" },
+
+  // ----- Organisation : panneau Avancé -----
+  { id: "W29", section: "Organisation - Avancé", widget: "Bouton ▶/▼ Avancé",       desc: "Bouton large, libellé clair",              attendu: "Clic : déplie/replie le contenu (remplacé par l'onglet Filtrer en v2.3)" },
+  { id: "W30", section: "Organisation - Avancé", widget: "Champ Date min",          desc: "YYYY-MM-DD",                               attendu: "Filtre photos antérieures rejetées" },
+  { id: "W31", section: "Organisation - Avancé", widget: "Champ Date max",          desc: "YYYY-MM-DD",                               attendu: "Filtre photos postérieures rejetées" },
+  { id: "W32", section: "Organisation - Avancé", widget: "Champ Taille min",        desc: "ex. '100KB'",                              attendu: "Filtre fichiers plus petits" },
+  { id: "W33", section: "Organisation - Avancé", widget: "Champ Taille max",        desc: "ex. '50MB'",                               attendu: "Filtre fichiers plus grands" },
+  { id: "W34", section: "Organisation - Avancé", widget: "Liste déroulante Note ≥",       desc: "Onglet Filtrer, valeurs 0 à 5",                attendu: "Choisir 4 → seules les photos notées 4 étoiles ou plus sont traitées. Choisir 0 → pas de filtre par note." },
+  { id: "W35", section: "Organisation - Avancé", widget: "Champ Mots-clés",         desc: "Onglet Filtrer, séparateur virgule",            attendu: "Saisir « vacances, mariage » → seules les photos qui contiennent AU MOINS UN de ces mots-clés (dans leurs métadonnées) sont traitées. Vide = pas de filtre par mots-clés." },
+  { id: "W36", section: "Organisation - Avancé", widget: "Case Ignorer si identique", desc: "Exigence R2",                              attendu: "Ignore le fichier si son empreinte à destination est identique à la source" },
+  { id: "W37", section: "Organisation - Avancé", widget: "Case Conserver paires RAW+JPEG", desc: "Exigence R3",                          attendu: "Co-localise les paires de même nom de base dans le même dossier" },
+  { id: "W38", section: "Organisation - Avancé", widget: "Case Cleanup vides",      desc: "R5 (MOVE only)",                           attendu: "Supprime sous-dossiers source vides post-MOVE" },
+  { id: "W39", section: "Organisation - Avancé", widget: "Case Valider espace disque", desc: "Exigence R6",                            attendu: "Avertissement si espace disponible < total à copier" },
+  { id: "W40", section: "Organisation - Avancé", widget: "Case Notification",       desc: "Q5",                                       attendu: "Toast Windows à la fin" },
+  { id: "W41", section: "Organisation - Avancé", widget: "Case Mode incrémental",   desc: "S5",                                       attendu: "Cache .photoorganizer_index.json persistant" },
+  { id: "W42", section: "Organisation - Avancé", widget: "Case Bursts",             desc: "S1",                                       attendu: "Sous-dossier Burst_NN/ pour rafales" },
+  { id: "W43", section: "Organisation - Avancé", widget: "Liste déroulante Burst écart",  desc: "1/2/3/5/10 s",                             attendu: "Seuil temporel pour grouper" },
+  { id: "W44", section: "Organisation - Avancé", widget: "Liste déroulante Burst min",    desc: "2/3/4/5/8 photos",                         attendu: "Taille minimale pour rafale" },
+  { id: "W45", section: "Organisation - Avancé", widget: "Case Index CSV",          desc: "Exigence R7",                              attendu: "Génère un fichier d'index CSV listant toutes les opérations" },
+  { id: "W46", section: "Organisation - Avancé", widget: "Case Index JSON",         desc: "Exigence R7",                              attendu: "Génère un fichier d'index JSON listant toutes les opérations" },
+
+  // ----- Organisation : Renommage -----
+  { id: "W47", section: "Organisation - Renommage", widget: "Bouton ▶/▼ Renommage", desc: "Bouton large repliable",                   attendu: "Clic : déplie/replie ; état persisté entre sessions (remplacé par l'onglet Renommer en v2.3)" },
+  { id: "W48", section: "Organisation - Renommage", widget: "10 exemples cliquables", desc: "Liste scrollable",                         attendu: "Clic injecte le template dans le champ" },
+  { id: "W49", section: "Organisation - Renommage", widget: "Bouton Réinitialiser",  desc: "Sous la liste",                            attendu: "Vide le champ template" },
+  { id: "W50", section: "Organisation - Renommage", widget: "Champ Template",        desc: "Zone d'édition",                           attendu: "Saisie libre, tokens {date}, {original}, …" },
+  { id: "W51", section: "Organisation - Renommage", widget: "Aperçu live",           desc: "Sous le champ",                            attendu: "« IMG_0001.jpg → 20260507_… » MAJ en temps réel" },
+  { id: "W52", section: "Organisation - Renommage", widget: "Liste déroulante Preset",     desc: "Liste presets sauvegardés",                attendu: "Charge le preset sélectionné" },
+  { id: "W53", section: "Organisation - Renommage", widget: "Bouton 💾 Sauver",      desc: "Icon à côté du menu",                      attendu: "simpledialog askstring + save preset" },
+  { id: "W54", section: "Organisation - Renommage", widget: "Bouton 🗑 Suppr",       desc: "Icon à côté",                              attendu: "Confirmation puis suppression" },
+
+  // ----- Organisation : zone BOTTOM (actions) -----
+  { id: "W55", section: "Organisation - Actions", widget: "ProgressBar",            desc: "Zone bottom",                              attendu: "Visible à 0% au démarrage, monte pendant op" },
+  { id: "W56", section: "Organisation - Actions", widget: "Label progression",      desc: "Sous progress bar",                        attendu: "« Organisation : 17/42 — file.jpg »" },
+  { id: "W57", section: "Organisation - Actions", widget: "Bouton 📊 Analyser",     desc: "Panneau latéral droit, en haut",                attendu: "Lance la lecture des métadonnées des photos sans rien copier ni déplacer. Une barre de progression doit apparaître." },
+  { id: "W58", section: "Organisation - Actions", widget: "Bouton 👁 Aperçu",       desc: "Boutons gauche",                           attendu: "Modale arborescence dry-run" },
+  { id: "W59", section: "Organisation - Actions", widget: "Bouton ❌ Annuler",       desc: "Panneau latéral droit (rouge, hauteur 32 px)",  attendu: "Pendant une organisation en cours, cliquer ce bouton → l'opération s'arrête proprement entre 2 fichiers (latence ≤ 2 s). Le statut passe à « Annulé »." },
+  { id: "W60", section: "Organisation - Actions", widget: "Bouton 🚀 Organiser",    desc: "Boutons droite (vert, 40px)",              attendu: "Lance le pipeline complet" },
+
+  // ----- Doublons -----
+  { id: "W61", section: "Doublons - En-tête", widget: "Bouton Charger configuration", desc: "Dans l'en-tête",                          attendu: "Ouvre le sélecteur de fichier YAML à charger" },
+  { id: "W62", section: "Doublons - En-tête", widget: "Bouton Sauvegarder configuration", desc: "Dans l'en-tête",                      attendu: "Ouvre la boîte de sauvegarde de fichier YAML" },
+  { id: "W63", section: "Doublons - En-tête", widget: "Champ Source",              desc: "Champ de saisie",                          attendu: "Saisie du chemin du dossier à scanner" },
+  { id: "W64", section: "Doublons - En-tête", widget: "Bouton Parcourir source",   desc: "À droite du champ",                       attendu: "Ouvre le sélecteur de dossier" },
+  { id: "W65", section: "Doublons - En-tête", widget: "Radio Simulation",          desc: "Mode DRY_RUN",                             attendu: "Aucune modif disque" },
+  { id: "W66", section: "Doublons - En-tête", widget: "Radio Supprimer",           desc: "Mode DELETE",                              attendu: "Suppression définitive ; bouton devient rouge" },
+  { id: "W67", section: "Doublons - En-tête", widget: "Radio Déplacer",            desc: "Mode MOVE",                                attendu: "Révèle champ Destination ; bouton devient bleu" },
+  { id: "W68", section: "Doublons - En-tête", widget: "Radio Corbeille",           desc: "Mode TRASH",                               attendu: "send2trash ; bouton devient orange" },
+  { id: "W69", section: "Doublons - En-tête", widget: "Champ Destination MOVE",    desc: "Visible si MOVE",                          attendu: "Saisie dossier destination" },
+  { id: "W70", section: "Doublons - En-tête", widget: "Bouton Parcourir dest",     desc: "À droite",                                 attendu: "Ouvre le sélecteur de dossier" },
+  { id: "W71", section: "Doublons - Panneau latéral", widget: "Liste déroulante Algorithme",     desc: "Onglet Doublons, panneau latéral gauche",      attendu: "Choisir un algorithme dans la liste (sha256, sha1, md5, blake3) → l'algorithme sera utilisé pour calculer les empreintes de fichiers. sha256 par défaut (le plus sûr)." },
+  { id: "W72", section: "Doublons - Panneau latéral", widget: "Liste déroulante Chunks MB",      desc: "1/2/4/8/16",                               attendu: "Taille blocs lecture" },
+  { id: "W73", section: "Doublons - Panneau latéral", widget: "Case Mode rapide",          desc: "Empreinte partielle",                       attendu: "Empreinte début + fin du fichier (pré-filtrage rapide)" },
+  { id: "W74", section: "Doublons - Panneau latéral", widget: "Case Cache des empreintes", desc: "Cache SQLite",                              attendu: "Réutilise les empreintes calculées lors d'une session précédente" },
+  { id: "W75", section: "Doublons - Panneau latéral", widget: "Cases types fichiers",      desc: "Images/RAW/Vidéos",                        attendu: "Filtre extensions scan" },
+  { id: "W76", section: "Doublons - Panneau latéral", widget: "Case Récursif",             desc: "Sous-dossiers",                            attendu: "Scan profondeur" },
+  { id: "W77", section: "Doublons - Panneau latéral", widget: "Champ Taille min/max",      desc: "ex. '1KB' / '500MB'",                      attendu: "Filtres" },
+  { id: "W78", section: "Doublons - Panneau latéral", widget: "Case Dossier prioritaire",  desc: "Règle de conservation n°1",                 attendu: "Active le critère « dossier prioritaire » dans le choix du fichier à garder" },
+  { id: "W79", section: "Doublons - Panneau latéral", widget: "Case Extension préférée",   desc: "Règle de conservation n°2 (RAW > TIFF > JPG)", attendu: "Active le critère « extension préférée »" },
+  { id: "W80", section: "Doublons - Panneau latéral", widget: "Choix Date de conservation", desc: "plus ancien / plus récent / aucun",         attendu: "Si égalité d'extension, garde le plus ancien ou le plus récent" },
+  { id: "W81", section: "Doublons - Panneau latéral", widget: "Choix Chemin de conservation", desc: "plus court / plus long / aucun",          attendu: "Si égalité de date, choisit le chemin le plus court ou le plus long" },
+  { id: "W82", section: "Doublons - Panneau latéral", widget: "Champ Dossiers prioritaires", desc: "Séparateur ;",                              attendu: "Liste de chemins prioritaires" },
+  { id: "W83", section: "Doublons - Panneau latéral", widget: "Bouton + dossier prioritaire", desc: "Icône",                                attendu: "Sélecteur de dossier + concaténation avec « ; »" },
+  { id: "W84", section: "Doublons - Panneau latéral", widget: "Liste déroulante Nombre de processus", desc: "Onglet Doublons, panneau latéral (0/1/2/4/8)",  attendu: "Choisir un nombre de processus parallèles pour le calcul des empreintes. 0 = automatique (~ nb de cœurs CPU). Plus de processus = plus rapide mais plus de CPU consommé." },
+  { id: "W85", section: "Doublons - Panneau latéral", widget: "Case Vérifier avant suppression", desc: "Recalcul de l'empreinte",              attendu: "Sécurité avant suppression définitive" },
+  { id: "W86", section: "Doublons - Panneau latéral", widget: "Cases CSV/JSON/TXT",        desc: "3 cases de formats de rapport",            attendu: "Génère les fichiers de rapport correspondants" },
+  { id: "W87", section: "Doublons - Panneau latéral", widget: "Champ Dossier des rapports", desc: "Chemin",                                  attendu: "Saisie du dossier de sortie des rapports" },
+  { id: "W88", section: "Doublons - Panneau latéral", widget: "Bouton ... rapports",       desc: "Icône",                                    attendu: "Ouvre le sélecteur de dossier" },
+  { id: "W89", section: "Doublons - Résultats", widget: "Onglets Résultats / Détails", desc: "2 onglets",                                attendu: "Bascule entre vue récapitulative et vue détaillée" },
+  { id: "W90", section: "Doublons - Résultats", widget: "Textbox résultats",        desc: "Liste groupes",                            attendu: "Format monospace, lecture seule" },
+  { id: "W91", section: "Doublons - Résultats", widget: "Textbox détails",          desc: "Décisions par fichier",                    attendu: "Format détaillé avec actions choisies" },
+  { id: "W92", section: "Doublons - Actions", widget: "ProgressBar",                desc: "Zone bas",                                 attendu: "Visible pendant scan" },
+  { id: "W93", section: "Doublons - Actions", widget: "Bouton 🔍 Rechercher",       desc: "Bouton neutre droite",                     attendu: "Lance scan + analyse" },
+  { id: "W94", section: "Doublons - Actions", widget: "Bouton Exécuter",            desc: "Bouton principal à droite, couleur dynamique", attendu: "Selon mode : vert/rouge/orange/bleu" },
+  { id: "W95", section: "Doublons - Actions", widget: "Bouton ❌ Annuler",           desc: "Bouton d'avertissement à gauche",              attendu: "Propage l'annulation au gestionnaire de doublons" },
+
+  // ----- Historique -----
+  { id: "W96", section: "Historique", widget: "Label stats inline",          desc: "Titre + stats",                              attendu: "« 12 op. — ✅ 10 ❌ 2 » format compact" },
+  { id: "W97", section: "Historique", widget: "Textbox historique",          desc: "Plein écran",                                attendu: "Liste opérations format monospace" },
+  { id: "W98", section: "Historique", widget: "Bouton ↩️ Annuler dernière",  desc: "Bas, orange (avertissement)",                attendu: "Annule la dernière opération — désactivé si l'historique est vide" },
+  { id: "W99", section: "Historique", widget: "Bouton ↩️ Annuler tout",      desc: "Bas, orange (avertissement)",                attendu: "Annule toutes les opérations en ordre inverse avec récapitulatif {réussi, échoué, ignoré}" },
+  { id: "W100", section: "Historique", widget: "Bouton 🔄 Rafraîchir",       desc: "Bas, icône",                                 attendu: "Recharge l'historique depuis le gestionnaire de fichiers" },
+  { id: "W101", section: "Historique", widget: "Bouton 🗑️ Effacer",         desc: "Bas, rouge (danger)",                        attendu: "Demande confirmation puis efface sans toucher aux fichiers disque" },
+
+  // ----- Paramètres -----
+  { id: "W102", section: "Paramètres", widget: "Radios thème",               desc: "Sombre / Clair / Système",                   attendu: "Bascule live ; persiste après save" },
+  { id: "W103", section: "Paramètres", widget: "Radios action défaut",       desc: "Copier / Déplacer",                          attendu: "Détermine pré-coche dans Organize" },
+  { id: "W104", section: "Paramètres", widget: "Case récursif défaut",       desc: "",                                            attendu: "Détermine pré-coche dans Organize" },
+  { id: "W105", section: "Paramètres", widget: "Switch Planification",       desc: "Section dédiée",                              attendu: "Active scheduler quotidien" },
+  { id: "W106", section: "Paramètres", widget: "Champ Heure HH:MM",          desc: "Format HH:MM",                                attendu: "Validation au save" },
+  { id: "W107", section: "Paramètres", widget: "Label statut planning",      desc: "Sous le switch",                              attendu: "« Prochaine exécution : … 23:00 »" },
+  { id: "W108", section: "Paramètres", widget: "Case Cache activé",          desc: "Section Performance",                         attendu: "Active cache SQLite des métadonnées" },
+  { id: "W109", section: "Paramètres", widget: "Label stats cache",          desc: "« 1234 entrées, 12 MB disque »",              attendu: "Stats lisibles" },
+  { id: "W110", section: "Paramètres", widget: "Bouton 🗑 Vider cache",      desc: "Action destructive",                          attendu: "Demande confirmation puis vide le cache" },
+  { id: "W111", section: "Paramètres", widget: "Case Géocodage",             desc: "Section API",                                 attendu: "Active géocodage inverse" },
+  { id: "W112", section: "Paramètres", widget: "Champ clé API",              desc: "show=*",                                      attendu: "Saisie masquée" },
+  { id: "W113", section: "Paramètres", widget: "Liste déroulante niveau log",      desc: "DEBUG/INFO/WARNING/ERROR",                    attendu: "Persiste après save" },
+  { id: "W114", section: "Paramètres", widget: "Bouton Effacer récents",     desc: "",                                            attendu: "Confirm + vide recent_sources/destinations" },
+  { id: "W115", section: "Paramètres", widget: "Bouton 🔄 Réinitialiser",    desc: "En bas, orange (avertissement)",              attendu: "Demande confirmation puis remet les valeurs par défaut" },
+  { id: "W116", section: "Paramètres", widget: "Bouton 💾 Sauvegarder",      desc: "En bas, vert (action principale)",            attendu: "Enregistre les paramètres et affiche une boîte de confirmation" },
+  { id: "W117", section: "Paramètres", widget: "Switch + Heure auto-save",   desc: "Persistance immédiate",                       attendu: "Pas besoin de cliquer Sauvegarder pour planning" },
+
+  // ----- v2.3 : Refonte des onglets internes + panneau intégré -----
+  { id: "W118", section: "Organisation - Onglets internes (v2.3)", widget: "Bandeau de 4 onglets internes",   desc: "Dans le panneau Organisation, au-dessus des options",                                          attendu: "Vérifier qu'on voit exactement 4 onglets : 🔍 Filtrer, 🗂 Organiser, 🛠 Traiter, 🏷 Renommer. À l'ouverture, c'est « Organiser » qui est sélectionné." },
+  { id: "W119", section: "Organisation - Onglets internes (v2.3)", widget: "Onglet 🔍 Filtrer",               desc: "1er onglet à gauche dans le panneau Organisation",                                              attendu: "Cliquer dessus → on voit les filtres (date, taille, note, mots-clés, extensions, dimensions, orientation). L'ancien bouton « ▶ Avancé » n'existe plus." },
+  { id: "W120", section: "Organisation - Onglets internes (v2.3)", widget: "Onglet 🗂 Organiser",             desc: "2e onglet (actif par défaut)",                                                                  attendu: "Cliquer dessus → on voit les critères (Par date / Par appareil / Par GPS), le curseur de distance GPS et l'interrupteur Multicouche." },
+  { id: "W121", section: "Organisation - Onglets internes (v2.3)", widget: "Onglet 🛠 Traiter",               desc: "3e onglet",                                                                                     attendu: "Cliquer dessus → on voit Copier/Déplacer, les types de fichiers et les comportements (ignorer si identique, rafales, mode incrémental, etc.)." },
+  { id: "W122", section: "Organisation - Onglets internes (v2.3)", widget: "Onglet 🏷 Renommer",              desc: "4e onglet (à droite)",                                                                          attendu: "Cliquer dessus → on voit le champ de modèle de nom et au moins 5 boutons d'exemples cliquables. L'ancien bouton « Renommage repliable » n'existe plus." },
+
+  // ----- v2.3 finition 2026-05-18 : bouton 💡 Exemples de marques -----
+  { id: "W123", section: "Organisation - Critères (v2.3)", widget: "Bouton 💡 Exemples de marques",         desc: "Onglet Organiser, à droite du champ « Limiter aux marques »",                                       attendu: "Cliquer dessus → un panneau s'ouvre dans la zone centrale (sans nouvelle fenêtre) avec des marques d'appareils." },
+  { id: "W124", section: "Panneaux intégrés (v2.3)", widget: "Panneau « 💡 Exemples de marques »",          desc: "S'ouvre après avoir cliqué 💡 (W123)",                                                              attendu: "Cliquer une marque (ex. Sony) → le champ « Limiter aux marques » se remplit. Re-cliquer la même → pas de doublon. Bouton 🗑 Vider → le champ revient à vide." },
+  { id: "W125", section: "Panneaux intégrés (v2.3)", widget: "Panneau « 👁 Aperçu »",                       desc: "S'ouvre après le bouton « Aperçu » du panneau latéral droit",                                       attendu: "Voir l'arborescence cible des 100 premiers fichiers, sans rien copier sur le disque. Bouton Fermer pour revenir aux onglets. Aucune nouvelle fenêtre Windows ne doit s'ouvrir." },
+  { id: "W126", section: "Panneaux intégrés (v2.3)", widget: "Panneau « ✅ Organisation terminée »",        desc: "S'ouvre automatiquement à la fin d'une organisation",                                               attendu: "Voir le récapitulatif (nombre de fichiers, erreurs) + bouton « 📂 Ouvrir destination » qui ouvre l'explorateur Windows. Aucune nouvelle fenêtre ne doit s'ouvrir." },
+  { id: "W127", section: "Panneaux intégrés (v2.3)", widget: "Panneau « 💾 Sauvegarder un preset »",        desc: "S'ouvre après le bouton 💾 du panneau latéral droit",                                               attendu: "Saisir un nom avec un espace → message d'erreur rouge en ligne. Saisir un nom valide → le preset est enregistré et le panneau se ferme. Aucune boîte de dialogue Windows séparée." },
+  { id: "W128", section: "Panneaux intégrés (v2.3)", widget: "Panneau « 📋 Fichiers détectés »",            desc: "S'ouvre après avoir cliqué 📋 (à côté du compteur de fichiers)",                                    attendu: "La liste des fichiers détectés s'affiche dans la zone centrale (jusqu'à 500 chemins, sinon « … et N de plus »). Aucune nouvelle fenêtre." },
+
+  // ----- v2.3 finition 2026-05-19 : panneau 💡 Exemples de filtres -----
+  { id: "W129", section: "Filtres (v2.3) - Bouton 💡", widget: "Bouton 💡 Exemples de filtres",                 desc: "Onglet Filtrer, à côté du titre « 🔍 Filtres »",                                                    attendu: "Cliquer dessus → un panneau s'ouvre dans la zone centrale (sans nouvelle fenêtre) avec plusieurs sections d'exemples." },
+  { id: "W130", section: "Panneaux intégrés (v2.3)", widget: "Section Mots-clés du panneau Filtres",          desc: "Section 🏷️ avec une grille de 19 mots-clés (vacances, mariage, portrait, paysage, famille, voyage…)", attendu: "Cliquer un mot (ex. « vacances ») → le champ Mots-clés se remplit. Re-cliquer le même → pas de doublon. Cliquer un autre → ajout en virgule. Bouton 🗑 Vider → champ remis à vide." },
+  { id: "W131", section: "Panneaux intégrés (v2.3)", widget: "Section Extensions du panneau Filtres",          desc: "3 sous-sections : 🖼️ Images (jpg, png, heic…) / 📷 RAW (cr2, nef, arw…) / 🎬 Vidéos (mp4, mov…)",     attendu: "Cliquer « jpg » puis « cr2 » → le champ Extensions doit afficher « jpg,cr2 ». Le champ est le même quel que soit la sous-section utilisée. Pas de doublon possible." },
+  { id: "W132", section: "Panneaux intégrés (v2.3)", widget: "Section Dimensions du panneau Filtres",          desc: "Section 📐 avec 8 dimensions standards (SD, VGA, HD, Full HD, 2K, 4K, 6K, 8K) et 2 boutons par ligne", attendu: "Cliquer « ↧ min » à côté de Full HD → le champ « Dim. min » devient « 1920x1080 ». Cliquer « ↥ max » à côté de 4K → le champ « Dim. max » devient « 3840x2160 ». Chaque champ a son propre bouton 🗑." },
+  { id: "W133", section: "Panneaux intégrés (v2.3)", widget: "Section Orientation du panneau Filtres",         desc: "Section 📐 Orientation : 4 boutons (Toutes / Paysage / Portrait / Carré)",                          attendu: "Cliquer « Portrait » → l'option Orientation du panneau Filtrer passe à « Portrait ». La valeur courante est affichée juste en dessous des boutons." },
+  { id: "W134", section: "Panneaux intégrés (v2.3)", widget: "Section Note minimale du panneau Filtres",       desc: "Section ⭐ Note minimale : 6 boutons (0 toutes, ★, ★★, ★★★, ★★★★, ★★★★★)",                          attendu: "Cliquer le bouton 4 étoiles → la note minimale passe à 4 (visible dans l'onglet Filtrer). Cliquer « 0 (toutes) » → revient à 0 (pas de filtre)." },
+
+  // ----- v2.3 finition 2026-05-19 (II) : quarantaine réversible -----
+  { id: "W135", section: "Doublons - Quarantaine (v2.3)", widget: "Bouton 🗑 Vider quarantaine",                desc: "Panneau Doublons, en bas, à côté du bouton Annuler (couleur orange)",                                 attendu: "Au démarrage : libellé « 🗑 Vider quarantaine (0) » et bouton désactivé. Après une suppression en mode « Corbeille (récupérable) » : libellé devient « 🗑 Vider quarantaine (N — XX MB) » et bouton actif." },
+  { id: "W136", section: "Doublons - Quarantaine (v2.3)", widget: "Mode « Corbeille (récupérable) »",            desc: "Onglet Doublons, en haut, 4e radio dans la barre « Mode »",                                            attendu: "Sélectionner ce mode + exécuter sur des doublons → les fichiers sont déplacés en quarantaine interne, l'historique liste des opérations 'trash'. Le bouton « ↩️ Annuler dernière » du panneau Historique restaure le fichier à sa source d'origine." },
+];
+
+// v4 : incrémenté lors de l'ajout des widgets W135-W136 (quarantaine
+// réversible, refonte 2026-05-19 II). v3 : ajout des widgets W129-W134
+// (panneau 💡 Exemples de filtres). v2 : W118-W128 (v2.3 + finition
+// 2026-05-18). Bump à chaque évolution majeure pour isoler l'ancien état.
+const STORAGE_KEY = "photoorganizer_validation_ihm_v4";
+
+/* ========================================================================
+   Build UI : génère le tableau et restaure l'état depuis localStorage
+   ======================================================================== */
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveState() {
+  const state = {
+    meta: {
+      tool:     document.getElementById("meta-tool").value,
+      version:  document.getElementById("meta-version").value,
+      tester:   document.getElementById("meta-tester").value,
+      date:     document.getElementById("meta-date").value,
+      env:      document.getElementById("meta-env").value,
+      hash:     document.getElementById("meta-hash").value,
+    },
+    widgets: {},
+  };
+  WIDGETS.forEach(w => {
+    state.widgets[w.id] = {
+      status:  document.querySelector(`select[data-widget="${w.id}"]`).value,
+      observe: document.querySelector(`input[data-widget="${w.id}"][data-field="observe"]`).value,
+      comment: document.querySelector(`textarea[data-widget="${w.id}"][data-field="comment"]`).value,
+    };
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = WIDGETS.length;
+  let done = 0;
+  WIDGETS.forEach(w => {
+    const status = document.querySelector(`select[data-widget="${w.id}"]`).value;
+    if (status === "OK" || status === "NOK" || status === "NA") done++;
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("progress").textContent = `${done} / ${total} — ${pct} %`;
+}
+
+function buildChecklist() {
+  const state = loadState();
+  // Restaurer métadonnées
+  if (state.meta) {
+    Object.entries(state.meta).forEach(([k, v]) => {
+      const el = document.getElementById(`meta-${k}`);
+      if (el) el.value = v;
+    });
+  }
+  // Date par défaut = aujourd'hui
+  const dateInput = document.getElementById("meta-date");
+  if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+
+  // Construire tableau groupé par section
+  const container = document.getElementById("checklist");
+  const sections = {};
+  WIDGETS.forEach(w => {
+    if (!sections[w.section]) sections[w.section] = [];
+    sections[w.section].push(w);
+  });
+
+  let html = '';
+  Object.entries(sections).forEach(([section, widgets]) => {
+    html += `<details open>
+      <summary>${section} <span style="color:#777;font-weight:normal;">(${widgets.length})</span></summary>
+      <table>
+        <thead>
+          <tr>
+            <th class="col-id">N°</th>
+            <th class="col-widget">Élément à tester</th>
+            <th class="col-desc">Où le trouver</th>
+            <th class="col-attendu">Ce qu'il faut tester (action → résultat attendu)</th>
+            <th class="col-status">Statut</th>
+            <th class="col-observe">Valeur observée</th>
+            <th class="col-comment">Commentaire</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    widgets.forEach(w => {
+      const s = (state.widgets && state.widgets[w.id]) || {};
+      const status  = s.status  || "À faire";
+      const observe = s.observe || "";
+      const comment = s.comment || "";
+      html += `<tr>
+        <td class="col-id">${w.id}</td>
+        <td class="col-widget">${escapeHtml(w.widget)}</td>
+        <td class="col-desc">${escapeHtml(w.desc)}</td>
+        <td class="col-attendu">${escapeHtml(w.attendu)}</td>
+        <td>
+          <select class="status" data-widget="${w.id}" data-value="${status}" onchange="updateStatusColor(this); saveState();">
+            <option value="À faire" ${status === 'À faire' ? 'selected' : ''}>À faire</option>
+            <option value="OK"      ${status === 'OK' ? 'selected' : ''}>OK</option>
+            <option value="NOK"     ${status === 'NOK' ? 'selected' : ''}>NOK</option>
+            <option value="NA"      ${status === 'NA' ? 'selected' : ''}>NA</option>
+          </select>
+        </td>
+        <td><input class="field" data-widget="${w.id}" data-field="observe" value="${escapeHtml(observe)}" oninput="saveState()" placeholder="ex. couleur, position…"></td>
+        <td><textarea class="field" data-widget="${w.id}" data-field="comment" oninput="saveState()" placeholder="Notes…">${escapeHtml(comment)}</textarea></td>
+      </tr>`;
+    });
+    html += `</tbody></table></details>`;
+  });
+  container.innerHTML = html;
+
+  // Initial color update
+  document.querySelectorAll("select.status").forEach(updateStatusColor);
+  updateProgress();
+}
+
+function updateStatusColor(select) {
+  select.setAttribute("data-value", select.value);
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+/* ========================================================================
+   Persistence métadonnées sur changement
+   ======================================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  buildChecklist();
+  // Auto-save sur changement métadonnées
+  ["meta-tool", "meta-version", "meta-tester", "meta-date", "meta-env", "meta-hash"].forEach(id => {
+    document.getElementById(id).addEventListener("input", saveState);
+  });
+});
+
+/* ========================================================================
+   Export JSON / Markdown / Effacer tout
+   ======================================================================== */
+function exportJSON() {
+  const state = loadState();
+  saveState();
+  const json = JSON.stringify(loadState(), null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `validation_ihm_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportMarkdown() {
+  saveState();
+  const state = loadState();
+  const meta = state.meta || {};
+  let md = `## Validation IHM — ${meta.tool || ""} ${meta.version || ""}\n\n`;
+  md += `| Champ | Valeur |\n|---|---|\n`;
+  md += `| Testeur | ${meta.tester || ""} |\n`;
+  md += `| Date | ${meta.date || ""} |\n`;
+  md += `| Environnement | ${meta.env || ""} |\n`;
+  md += `| Empreinte de version | ${meta.hash || ""} |\n\n`;
+
+  // Synthèse
+  const counts = { "OK": 0, "NOK": 0, "NA": 0, "À faire": 0 };
+  WIDGETS.forEach(w => {
+    const s = (state.widgets || {})[w.id] || {};
+    const st = s.status || "À faire";
+    counts[st] = (counts[st] || 0) + 1;
+  });
+  const total = WIDGETS.length;
+  md += `### Synthèse\n\n`;
+  md += `| Statut | Nombre | Taux |\n|---|---|---|\n`;
+  Object.entries(counts).forEach(([k, v]) => {
+    const pct = total ? Math.round(v / total * 1000) / 10 : 0;
+    md += `| ${k} | ${v} | ${pct} % |\n`;
+  });
+
+  // Anomalies (NOK uniquement)
+  const noks = WIDGETS.filter(w => {
+    const s = (state.widgets || {})[w.id] || {};
+    return s.status === "NOK";
+  });
+  if (noks.length) {
+    md += `\n### Anomalies détectées\n\n`;
+    md += `| ID | Widget | Section | Observation | Commentaire |\n|---|---|---|---|---|\n`;
+    noks.forEach(w => {
+      const s = (state.widgets || {})[w.id] || {};
+      md += `| ${w.id} | ${w.widget.replace(/\|/g, '\\|')} | ${w.section.replace(/\|/g, '\\|')} | ${(s.observe || '').replace(/\|/g, '\\|')} | ${(s.comment || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`;
+    });
+  }
+
+  const out = document.getElementById("export-out");
+  out.textContent = md;
+  out.classList.add("visible");
+  // Copier dans le presse-papier si possible
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(md).then(() => {
+      alert("Markdown copié dans le presse-papier !");
+    }).catch(() => {});
+  }
+}
+
+function clearAll() {
+  if (!confirm("Effacer tous les statuts, observations et commentaires ?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+</script>
+
+</body>
+</html>

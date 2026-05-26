@@ -32,7 +32,7 @@ class PhotoOrganizerApp(ctk.CTk):
     """Application principale PhotoOrganizer."""
 
     APP_NAME = "PhotoOrganizer"
-    APP_VERSION = "2.0.0"
+    APP_VERSION = "2.2.0"
 
     def __init__(self):
         """Initialise l'application."""
@@ -434,7 +434,7 @@ Licence MIT
         fonction de la plateforme. Échec gracieux si tkinterdnd2 absent.
         """
         try:
-            import tkinterdnd2
+            import tkinterdnd2  # noqa: F401  (availability sentinel)
             from tkinterdnd2 import TkinterDnD
         except ImportError:
             logger.debug("tkinterdnd2 absent — DnD desactive")

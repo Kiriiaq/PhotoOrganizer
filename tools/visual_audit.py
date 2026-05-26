@@ -170,18 +170,25 @@ def audit_layout_consistency(app):
              of._bottom_zone.winfo_ismapped()]),
     ))
 
-    # OrganizeFrame : Avancé replié par défaut
+    # OrganizeFrame : Avancé accessible via onglet (refonte v2.3 Variante B)
+    # Le contenu _adv_content est déplacé dans l'onglet « 🔍 Filtrer » ;
+    # on vérifie qu'il existe et que son parent est _tab_filter (au lieu
+    # de tester winfo_ismapped() qui dépend de l'onglet actif).
     checks.append((
-        "Panneau « Avancé » collapsed par défaut",
-        of._adv_collapsed is True and not of._adv_content.winfo_ismapped(),
+        "Panneau « Filtres » dans onglet Filtrer (refonte v2.3)",
+        of._adv_collapsed is False
+        and hasattr(of, "_tab_filter")
+        and of._adv_content.master is of._tab_filter,
     ))
 
-    # OrganizeFrame : organize_button vert 40px à droite du cancel
-    org_x = of.organize_button.winfo_x()
-    can_x = of.cancel_button.winfo_x()
+    # OrganizeFrame : organize_button dans le right rail (refonte v2.3)
+    # Auparavant en zone bottom horizontale (x > cancel.x). Désormais
+    # empilé verticalement dans le right rail (y > cancel.y).
+    org_y = of.organize_button.winfo_y()
+    can_y = of.cancel_button.winfo_y()
     checks.append((
-        "Organiser à droite (x=%d) > Annuler (x=%d)" % (org_x, can_x),
-        org_x > can_x,
+        "Organiser sous Annuler dans right rail (org_y=%d, cancel_y=%d)" % (org_y, can_y),
+        org_y > can_y,
     ))
     checks.append((
         "Organiser height=40 (primary) ; Annuler height=32 (std)",

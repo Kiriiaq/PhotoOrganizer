@@ -104,7 +104,8 @@ class OrganizationOptions:
     #     vraies rafales rapides et ignorer les pauses normales
     #     entre clichés d'un même endroit.
     detect_bursts: bool = False
-    burst_mode: str = "manual"  # "manual" | "auto"
+    # "manual" | "auto_mean" | "auto_stddev" | "auto" (alias rétrocompat = auto_stddev)
+    burst_mode: str = "manual"
     burst_threshold_seconds: int = 3
     burst_min_count: int = 3
     burst_auto_min_seconds: int = 1
@@ -1073,10 +1074,21 @@ class SmartOrganizer:
         # Trier chronologiquement
         dated.sort(key=lambda t: t[1])
 
-        # Mode auto : recalculer threshold à partir des deltas réels.
-        # Si moins de 3 photos datées, on retombe sur le manuel.
+        # Modes auto (audit 2026-05-17 it. 3) : calcul 100% automatique
+        # sur les Δt EXIF du dossier. Les bornes auto_min/auto_max sont
+        # IGNORÉES en mode auto pur (auto_mean / auto_stddev) — seul un
+        # plancher de 1 s reste, pour éviter un seuil nul si les photos
+        # ont des timestamps identiques.
+        #
+        # Si moins de 3 photos datées, on retombe sur le seuil manuel.
+        #   - ``auto_mean``   : seuil = mean(Δ)  (regroupe les photos dont
+        #                       l'écart est inférieur à la moyenne globale)
+        #   - ``auto_stddev`` : seuil = mean(Δ) − stddev(Δ)  (plus strict)
+        #   - ``auto``        : alias rétrocompat de ``auto_stddev``
         effective_threshold = threshold_seconds
-        if mode == "auto" and len(dated) >= 3:
+        is_pure_auto = mode in ("auto_mean", "auto_stddev")
+        is_legacy_auto = (mode == "auto")
+        if (is_pure_auto or is_legacy_auto) and len(dated) >= 3:
             deltas = []
             for i in range(1, len(dated)):
                 delta = (dated[i][1] - dated[i - 1][1]).total_seconds()
@@ -1087,15 +1099,29 @@ class SmartOrganizer:
 
                 mean = statistics.mean(deltas)
                 stddev = statistics.pstdev(deltas) if len(deltas) > 1 else 0.0
-                # Seuil = mean - stddev, clampé à [auto_min ; auto_max] —
-                # bornes exposées comme options avancées depuis 2026-05-15.
-                auto_thr = max(auto_min_seconds, min(mean - stddev, auto_max_seconds))
+                if mode == "auto_mean":
+                    raw_thr = mean
+                else:  # "auto" (rétrocompat) ou "auto_stddev"
+                    raw_thr = mean - stddev
+                if is_pure_auto:
+                    # Mode auto pur (it. 3) : pas de clamp utilisateur,
+                    # juste un plancher de sécurité à 1 s.
+                    auto_thr = max(1.0, raw_thr)
+                    logger.info(
+                        f"Bursts mode {mode} : mean={mean:.1f}s, "
+                        f"stddev={stddev:.1f}s → seuil={int(round(auto_thr))}s "
+                        f"(auto pur — aucune borne utilisateur)"
+                    )
+                else:
+                    # Legacy auto : clamp utilisateur conservé pour rétrocompat.
+                    auto_thr = max(auto_min_seconds, min(raw_thr, auto_max_seconds))
+                    logger.info(
+                        f"Bursts mode auto (legacy) : mean={mean:.1f}s, "
+                        f"stddev={stddev:.1f}s → seuil={int(round(auto_thr))}s "
+                        f"(clamp [{int(auto_min_seconds)}s ; "
+                        f"{int(auto_max_seconds)}s])"
+                    )
                 effective_threshold = int(round(auto_thr))
-                logger.info(
-                    f"Bursts mode auto : mean={mean:.1f}s, stddev={stddev:.1f}s "
-                    f"→ seuil={effective_threshold}s "
-                    f"(clamp [{int(auto_min_seconds)}s ; {int(auto_max_seconds)}s])"
-                )
 
         membership: Dict[str, Optional[str]] = {fp: None for fp in file_paths}
         groups: List[List[str]] = []

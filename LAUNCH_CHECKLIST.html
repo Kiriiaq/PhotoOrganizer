@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>PhotoOrganizer — Launch Checklist</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --fg: #1a1f2c;
+    --muted: #5e6878;
+    --border: #d6dbe3;
+    --accent: #2b5fa1;
+    --accent-soft: #e8eef6;
+    --ok: #2f6a37;
+    --ok-soft: #e0f0e2;
+    --wip: #b07418;
+    --wip-soft: #f5e9d4;
+    --todo: #6e6e6e;
+    --bad: #b3261e;
+    --bad-soft: #f7dad7;
+    --code-bg: #f4f4f4;
+    --code-fg: #1a1a1a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 22px 70px; }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, #2b5fa1 0%, #1d4174 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 22px;
+  }
+  header h1 { margin: 0 0 6px 0; font-size: 26px; letter-spacing: -0.3px; }
+  header p { margin: 0 0 12px 0; opacity: 0.92; font-size: 15px; }
+  header .meta-line { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+  header .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 12px;
+  }
+  header .pill.ok { background: rgba(47,106,55,0.85); }
+
+  /* Section bands */
+  .section-band {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 22px;
+    border-radius: 10px;
+    margin: 32px 0 14px;
+    font-weight: 600;
+    font-size: 18px;
+  }
+  .section-band .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%;
+    font-size: 14px; font-weight: 700;
+  }
+  .section-band.done    { background: var(--ok-soft); color: var(--ok); }
+  .section-band.done .num { background: var(--ok); color: #fff; }
+  .section-band.todo    { background: var(--wip-soft); color: var(--wip); }
+  .section-band.todo .num { background: var(--wip); color: #fff; }
+  .section-band.blocker { background: var(--bad-soft); color: var(--bad); }
+  .section-band.blocker .num { background: var(--bad); color: #fff; }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 14px;
+  }
+  .card h3 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px;
+  }
+  .card .h-meta { font-weight: 500; font-size: 12px; color: var(--muted); }
+  .card p.lead { margin: 6px 0 12px; color: var(--muted); font-size: 13px; }
+
+  /* Tags / labels */
+  .tag {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+  }
+  .tag.p0  { background: var(--bad);  color: #fff; }
+  .tag.p1  { background: var(--wip);  color: #fff; }
+  .tag.p2  { background: #5e6878;     color: #fff; }
+  .tag.done { background: var(--ok); color: #fff; }
+  .tag.eff { background: #e8eef6; color: var(--accent); }
+  .tag.skill { background: #ebebeb; color: #333; }
+
+  /* Steps */
+  ol.steps { padding-left: 20px; margin: 8px 0 0; }
+  ol.steps li { margin-bottom: 10px; }
+  ol.steps li b { color: var(--accent); }
+
+  /* Code */
+  code {
+    background: var(--code-bg); padding: 1px 5px; border-radius: 3px;
+    font-family: Consolas, "Liberation Mono", monospace; font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-fg);
+    padding: 10px 14px; border-radius: 6px;
+    border-left: 3px solid var(--accent);
+    overflow-x: auto;
+    line-height: 1.4;
+    font-family: Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+    margin: 8px 0;
+  }
+  pre.copyable {
+    cursor: copy;
+    position: relative;
+  }
+  pre.copyable::after {
+    content: "click to copy";
+    position: absolute; top: 4px; right: 8px;
+    font-size: 10px; color: var(--muted);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  pre.copyable:hover::after { opacity: 1; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #ececec; font-weight: 600; }
+
+  /* Links */
+  a { color: var(--accent); }
+  a.btn {
+    display: inline-block;
+    padding: 5px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12.5px;
+    margin: 4px 6px 4px 0;
+  }
+  a.btn:hover { background: var(--accent); color: #fff; }
+
+  /* TOC */
+  .toc {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 18px;
+    font-size: 13px;
+  }
+  .toc h2 { margin: 0 0 8px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); }
+  .toc ul { margin: 0; padding-left: 18px; }
+  .toc li { margin-bottom: 3px; }
+
+  /* Checkbox */
+  .checkbox {
+    display: inline-block; width: 16px; height: 16px;
+    border: 1.5px solid var(--muted); border-radius: 3px;
+    vertical-align: middle; margin-right: 8px;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 40px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Print friendliness */
+  @media print {
+    .wrap { max-width: none; padding: 8px; }
+    .card, .section-band { page-break-inside: avoid; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+    a.btn { display: inline; padding: 0; border: 0; }
+    pre.copyable::after { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>PhotoOrganizer — Launch Checklist</h1>
+  <p>Tout ce qui a été automatisé par Claude (en bas) + tout ce que tu dois faire à la main pour lancer publiquement le projet, avec procédures pas-à-pas, commandes copiables, et liens directs.</p>
+  <div class="meta-line">
+    <span class="pill ok">Tests : 184/184 ✅</span>
+    <span class="pill">Version : 2.2.0</span>
+    <span class="pill">License : Apache-2.0 (core) + Proprietary (Pro)</span>
+    <span class="pill">Plan estimé : 5-7 h pour le lancement</span>
+  </div>
+</header>
+
+<div class="toc">
+  <h2>Sommaire</h2>
+  <ul>
+    <li><a href="#done">1. Ce que Claude a fait automatiquement</a> (24 actions)</li>
+    <li><a href="#blockers">2. 🔴 Bloquants avant tout lancement</a> (3 actions, ~5 h)</li>
+    <li><a href="#tomanual">3. 🟡 À faire à la main</a> (par catégorie)</li>
+    <li><a href="#proc-secret">3.1 Générer la clé secrète Pro</a></li>
+    <li><a href="#proc-visuels">3.2 Produire les visuels (P0)</a></li>
+    <li><a href="#proc-legal">3.3 Cadre juridique (auto-entreprise, IP, clauses)</a></li>
+    <li><a href="#proc-lemonsqueezy">3.4 Setup Lemon Squeezy + webhook</a></li>
+    <li><a href="#proc-pypi">3.5 Publier sur PyPI</a></li>
+    <li><a href="#proc-release">3.6 Publier la release GitHub v2.2.0</a></li>
+    <li><a href="#proc-launch">3.7 Lancement (Product Hunt, Show HN, LinkedIn, Reddit)</a></li>
+    <li><a href="#proc-followup">3.8 Suivi 30 / 60 / 90 jours</a></li>
+    <li><a href="#commit">4. Commit final &amp; push</a></li>
+  </ul>
+</div>
+
+<!-- ============================================ -->
+<div class="section-band done">
+  <span class="num">1</span>
+  <span>Ce que Claude a fait automatiquement</span>
+</div>
+
+<p class="lead" style="margin-left: 4px;">Toutes ces actions sont déjà appliquées dans le repo. Tu n'as rien à faire — juste lire la liste pour savoir où tu en es.</p>
+
+<div class="card">
+  <h3>Audit projet en 7 phases <span class="tag done">DONE</span></h3>
+  <table>
+    <thead><tr><th>Phase</th><th>Livrable</th><th>Lien</th></tr></thead>
+    <tbody>
+      <tr><td>1 — Inventaire</td><td>Stack, modules, fonctionnel, artefacts polluants, code mort</td><td><a href="AUDIT.md">AUDIT.md</a></td></tr>
+      <tr><td>2 — Restructuration</td><td>572 renames, 4 suppressions, 7 refactors, 0 régression</td><td>—</td></tr>
+      <tr><td>3 — Standards</td><td>README, CHANGELOG, CONTRIBUTING, SECURITY, ARCHITECTURE, MEDIA, CLAUDE.md, PROJECT_OVERVIEW.html</td><td><a href="README.md">README.md</a> · <a href="docs/ARCHITECTURE.md">Archi</a></td></tr>
+      <tr><td>4 — Complétude</td><td>10 dimensions évaluées (Onboarding · Robustesse · Tests · Docs · Sécurité…)</td><td><a href="AUDIT.md">AUDIT.md §14</a></td></tr>
+      <tr><td>5 — Monétisation</td><td>Freemium 19 € / 49 € / 99 €, plateforme Lemon Squeezy</td><td><a href="docs/MONETIZATION.md">docs/MONETIZATION.md</a></td></tr>
+      <tr><td>6 — Distribution</td><td>Calendrier 6 semaines (GitHub → PyPI → Product Hunt → Show HN → LinkedIn)</td><td><a href="docs/DISTRIBUTION.md">docs/DISTRIBUTION.md</a></td></tr>
+      <tr><td>7 — Communication</td><td>5 drafts copiables (LinkedIn court · carrousel · long · X thread · Show HN)</td><td><a href="LINKEDIN_DRAFTS.md">LINKEDIN_DRAFTS.md</a></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>LOT A — Quick wins P1 <span class="tag done">DONE</span></h3>
+  <ul>
+    <li>Version bumpée <code>2.0.0 → 2.2.0</code> dans <code>pyproject.toml</code>, <code>src/ui/app.py</code>, <code>build.py</code></li>
+    <li><code>bare except</code> remplacé par <code>except UnicodeDecodeError</code> dans <code>src/core/metadata/exif_extractor.py:193</code></li>
+    <li>CI GitHub Actions étendue : <code>bandit -r src -ll</code> dans le job lint + nouveau job <code>audit</code> avec <code>pip-audit --requirement requirements.txt --strict</code></li>
+    <li>CHANGELOG complété : entrée <code>[2.1.0] — 2026-05-15</code> ajoutée entre v1.0.0 et v2.0.0, section Unreleased synchronisée</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>LOT B — Modules Pro V1 (squelette fonctionnel) <span class="tag done">DONE</span></h3>
+  <ul>
+    <li><b>Système de licence offline</b> HMAC SHA-256 :
+      <ul>
+        <li><code>src/photoorganizer_pro/license/validator.py</code> — validation, persistance, gestion expiration</li>
+        <li><code>src/photoorganizer_pro/license/keygen.py</code> — génération côté auteur (CLI)</li>
+        <li>3 éditions : Personal (1 PC) / Studio (3 PC) / Lifetime (30 ans)</li>
+        <li>Stockage utilisateur : <code>%LOCALAPPDATA%\PhotoOrganizer\license.dat</code></li>
+      </ul>
+    </li>
+    <li><b>Batch CLI</b> (<code>src/photoorganizer_pro/cli/batch_organize.py</code>) :
+      <ul>
+        <li>Réutilise <code>FileManager</code> + <code>SmartOrganizer</code> du core (zéro duplication)</li>
+        <li>Options : source, dest, by-date, by-camera, by-gps, rename template, dry-run, copy/move</li>
+        <li>Vérification licence avant toute action</li>
+      </ul>
+    </li>
+    <li><b>Watch-folder</b> (<code>src/photoorganizer_pro/scheduler/watch_folder.py</code>) :
+      <ul>
+        <li><code>watchdog</code> si disponible, fallback polling 10 s</li>
+        <li>Debounce 5 s (laisse le temps aux transferts SD card)</li>
+        <li>Documentation pour service Windows via <code>nssm</code></li>
+      </ul>
+    </li>
+    <li><b>LICENSE-PRO</b> — EULA propriétaire complet (13 sections : licence, restrictions, mises à jour, support, RGPD, garantie, responsabilité, remboursement 14 j, juridiction française)</li>
+    <li><b>14 tests pytest</b> sur la licence (génération, validation, falsification, expiration, persistance) — tous verts</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>LOT C — Documentation Pro &amp; conformité <span class="tag done">DONE</span></h3>
+  <ul>
+    <li><b><a href="docs/PRIVACY.md">docs/PRIVACY.md</a></b> — Privacy Policy RGPD-compliant pour le checkout Lemon Squeezy</li>
+    <li><b><a href="docs/PRO.md">docs/PRO.md</a></b> — Guide utilisateur complet de l'édition Pro (achat, activation, batch CLI, watch-folder, FAQ)</li>
+    <li><b><code>pyproject.toml</code></b> : extras <code>pro</code> ajoutés (<code>watchdog</code>), 2 entry points CLI Pro câblés</li>
+    <li><b><code>build.py --pro</code></b> : flag ajouté pour build dual (output renommé <code>PhotoOrganizerPro-X.Y.Z.exe</code>)</li>
+    <li><b><code>.gitignore</code></b> : <code>src/photoorganizer_pro/license/_secret.py</code> et <code>license.dat</code> exclus du tracking</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>État final tests &amp; lint <span class="tag done">DONE</span></h3>
+  <table>
+    <tbody>
+      <tr><th>Tests pytest</th><td><b>184/184 verts</b> (170 anciens + 14 nouveaux Pro license) en ~30 s</td></tr>
+      <tr><th>ruff E722</th><td><b>0</b> (était 1)</td></tr>
+      <tr><th>ruff F401/F841</th><td><b>0</b> (sentinelles try/except marquées <code># noqa: F401</code>)</td></tr>
+      <tr><th>Bandit High</th><td><b>0</b></td></tr>
+      <tr><th>pip-audit</th><td><b>0 CVE</b> sur les deps runtime</td></tr>
+      <tr><th>Couverture core</th><td><b>~70 %</b> (rapportée dans <code>test_data/rapport_qualification.md</code>)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ============================================ -->
+<div class="section-band blocker">
+  <span class="num">2</span>
+  <span>🔴 Bloquants avant tout lancement public</span>
+</div>
+
+<p class="lead" style="margin-left: 4px;">Ces 3 actions doivent être faites avant de publier où que ce soit. Sans elles, soit ça ne marche pas (clé Pro), soit ça ne convertit pas (visuels), soit c'est illégal (auto-entreprise).</p>
+
+<!-- BLOCKER 1 : SECRET KEY -->
+<div class="card" id="proc-secret">
+  <h3>2.1 — Générer la vraie <code>SECRET_KEY</code> Pro <span class="tag p0">P0</span> <span class="tag eff">5 min</span></h3>
+  <p class="lead">La clé actuelle dans <code>validator.py</code> est un placeholder public. Si tu lances avec elle, n'importe qui peut générer ses propres clés. Cette étape DOIT être faite avant le premier build Pro.</p>
+
+  <ol class="steps">
+    <li><b>Génère une clé aléatoire de 32 bytes</b> :
+      <pre class="copyable">python -c "import secrets; print(secrets.token_hex(32))"</pre>
+    </li>
+    <li><b>Crée le fichier secret</b> (déjà gitignored, ne sera jamais commit) :
+      <pre class="copyable">notepad src\photoorganizer_pro\license\_secret.py</pre>
+      Colle dedans :
+      <pre class="copyable">SECRET_KEY = b"a8d2f3e9b1c5d7e4a6b8c0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b4c6d8e0f2"  # remplace par ta clé hex
+SECRET_KEY = bytes.fromhex(SECRET_KEY.decode())</pre>
+      Adapte avec ta vraie clé. Sauve.
+    </li>
+    <li><b>Vérifie que le module l'importe</b> :
+      <pre class="copyable">python -c "from src.photoorganizer_pro.license.validator import SECRET_KEY; print(len(SECRET_KEY), 'bytes')"</pre>
+      Tu dois voir <code>32 bytes</code>.
+    </li>
+    <li><b>Sauvegarde cette clé dans un password manager</b>. Si tu la perds, toutes les clés générées avant deviennent invalides → chaos pour les acheteurs.</li>
+    <li><b>Lance les tests pour vérifier que rien n'est cassé</b> :
+      <pre class="copyable">python -m pytest tests/functional/test_pro_license.py -v</pre>
+      Les 14 tests doivent passer (avec ta nouvelle clé).
+    </li>
+  </ol>
+</div>
+
+<!-- BLOCKER 2 : VISUELS -->
+<div class="card" id="proc-visuels">
+  <h3>2.2 — Produire les visuels P0 (screenshot + GIF) <span class="tag p0">P0</span> <span class="tag eff">4-6 h</span></h3>
+  <p class="lead">Le README pointe vers <code>docs/media/screenshot-organize.png</code> et un GIF de démo. Tant qu'ils n'existent pas, le README a une image cassée et aucune publication n'est crédible.</p>
+
+  <table>
+    <thead><tr><th>ID</th><th>Fichier</th><th>Contenu</th><th>Outil</th></tr></thead>
+    <tbody>
+      <tr><td><b>S-01</b></td><td><code>docs/media/screenshot-organize.png</code></td><td>Capture statique de l'onglet Organisation (1920×1200 ou plus)</td><td>Win+Shift+S ou ShareX</td></tr>
+      <tr><td><b>G-01</b></td><td><code>docs/media/demo-organize.gif</code></td><td>GIF 8-10 s : sélection dossier → critères → clic Organiser → progress → résultat</td><td><a href="https://www.screentogif.com/">ScreenToGif</a></td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top: 14px;"><b>Procédure recommandée :</b></p>
+  <ol class="steps">
+    <li>Crée un dossier de démo neutre avec ~30-50 photos variées (smartphone, RAW, HEIC) dans <code>D:\Demo\Photos</code> (ou équivalent). <b>Pas de photos personnelles identifiables</b> (visages, scènes intimes).</li>
+    <li><b>Lance l'app depuis source ou EXE</b> :
+      <pre class="copyable">python main.py</pre>
+    </li>
+    <li>Mets l'app en mode <b>clair</b> (Paramètres → Apparence → Light) pour meilleur rendu GitHub.</li>
+    <li><b>Capture S-01</b> (statique) avec le panneau Organisation visible, source/destination remplies, critères cochés, mais pas encore lancé.</li>
+    <li><b>Capture G-01</b> (animé) avec ScreenToGif :
+      <ol>
+        <li>Démarre l'enregistrement.</li>
+        <li>Coche "Date" + "Caméra".</li>
+        <li>Clique "Organiser".</li>
+        <li>Laisse la progress bar avancer (3-5 s).</li>
+        <li>Stop enregistrement.</li>
+        <li>Édite : crop à la fenêtre, raccourcis à 10 fps, optimise (ScreenToGif fait ça en 1 clic).</li>
+        <li>Sauve en GIF <strong>≤ 5 MB</strong> (GitHub n'aime pas plus).</li>
+      </ol>
+    </li>
+    <li><b>Place les fichiers</b> :
+      <pre class="copyable">mkdir docs\media
+move screenshot-organize.png docs\media\
+move demo-organize.gif docs\media\</pre>
+    </li>
+    <li><b>Vérifie que le README rend bien</b> en ouvrant <code>README.md</code> sur GitHub après push, ou avec un viewer Markdown local.</li>
+  </ol>
+
+  <p style="margin-top: 14px;"><b>Visuels secondaires P1/P2</b> (pas bloquants mais à produire pour les posts LinkedIn / Product Hunt) : voir liste complète dans <a href="docs/MEDIA.md">docs/MEDIA.md</a> (8 captures, 4 GIFs, 2 vidéos, 1 logo SVG, 1 bannière).</p>
+</div>
+
+<!-- BLOCKER 3 : LEGAL -->
+<div class="card" id="proc-legal">
+  <h3>2.3 — Cadre juridique (auto-entreprise, IP, clauses employeur) <span class="tag p0">P0</span> <span class="tag eff">30 min admin + 1 h vérif</span></h3>
+  <p class="lead">Vendre une licence Pro sans statut légal = facturation impossible + risque administratif. À fermer avant la première vente.</p>
+
+  <ol class="steps">
+    <li><b>Vérifie ton statut actuel</b> :
+      <ul>
+        <li>Si tu as déjà une auto-entreprise (micro-entreprise) ou EURL : OK, vérifie juste que l'activité couvre "édition de logiciel".</li>
+        <li>Si tu n'as rien : crée une auto-entreprise. C'est <b>gratuit et en ligne en 5 minutes</b> : <a href="https://entreprendre.service-public.fr/vosdroits/F31228" target="_blank">entreprendre.service-public.fr</a> → "Créer une micro-entreprise". Activité = "Édition de logiciels" (code APE 5829C).</li>
+      </ul>
+    </li>
+    <li><b>Vérifie la clause employeur</b> (si applicable) :
+      <ul>
+        <li>Si tu as un emploi salarié : relis ton contrat. Cherche les mots <i>"propriété intellectuelle"</i>, <i>"œuvres créées"</i>, <i>"clause de cession"</i>.</li>
+        <li>Si une clause s'applique aux projets perso → demande une autorisation écrite à ton employeur (mail RH suffit en général) avant de monétiser.</li>
+        <li>Vérifie aussi : as-tu commit depuis un poste/réseau employeur ? Si oui, attention.</li>
+      </ul>
+    </li>
+    <li><b>Choisis ton nom commercial</b> :
+      <ul>
+        <li>Garder le pseudo <code>Kiriiaq</code> pour la visibilité projet.</li>
+        <li>Mais <b>les factures, contrats, déclarations doivent porter ton nom légal</b> Emmanuel Grolleau. Lemon Squeezy demande le nom légal lors du setup.</li>
+        <li>Le LICENSE-PRO existant est déjà rédigé au nom de <i>Kiriiaq (Emmanuel Grolleau)</i>, donc OK.</li>
+      </ul>
+    </li>
+    <li><b>Retire le bundle ExifTool</b> du build (compatibilité license GPL) :
+      <p style="margin: 6px 0 4px;">L'audit a montré qu'ExifTool (Perl, GPL) est bundlé dans <code>assets/tools/</code> pour 10 Mo. Le fallback subprocess est cassé en pratique (chemin invalide), et bundler du GPL avec une distribution Pro propriétaire est juridiquement ambigu. <b>Action recommandée</b> : appliquer le finding <a href="docs/exe-optimization.md">F-01 de l'audit EXE</a> avant le premier build Pro.</p>
+      <pre class="copyable">git rm -r assets/tools/</pre>
+      Puis modifier <code>build.py:178</code> pour ne plus inclure <code>assets</code> entier, mais seulement <code>assets/icons</code>.
+    </li>
+  </ol>
+</div>
+
+
+<!-- ============================================ -->
+<div class="section-band todo">
+  <span class="num">3</span>
+  <span>🟡 À faire à la main (par catégorie)</span>
+</div>
+
+
+<!-- 3.4 LEMON SQUEEZY -->
+<div class="card" id="proc-lemonsqueezy">
+  <h3>3.4 — Setup Lemon Squeezy + webhook <span class="tag p1">P1</span> <span class="tag eff">2-3 h</span></h3>
+  <p class="lead">La plateforme de vente. Gère TVA EU + facturation auto. Tu peux laisser la page en mode brouillon et publier silencieusement avant le lancement officiel.</p>
+
+  <ol class="steps">
+    <li><b>Créer un compte Lemon Squeezy</b> (gratuit) : <a class="btn" href="https://app.lemonsqueezy.com/register" target="_blank">app.lemonsqueezy.com/register</a></li>
+    <li><b>Setup store</b> :
+      <ul>
+        <li>Nom : <code>PhotoOrganizer</code></li>
+        <li>Slug : <code>photoorganizer</code> (URL deviendra <code>photoorganizer.lemonsqueezy.com</code>)</li>
+        <li>Default currency : EUR</li>
+        <li>VAT : "Yes, collect VAT" (Lemon Squeezy gère, tu n'as rien à faire)</li>
+      </ul>
+    </li>
+    <li><b>Créer 3 produits</b> dans Products → New :
+      <table>
+        <thead><tr><th>Produit</th><th>Prix</th><th>Variantes</th></tr></thead>
+        <tbody>
+          <tr><td>PhotoOrganizer Pro Personal</td><td>19 € one-time</td><td>aucune</td></tr>
+          <tr><td>PhotoOrganizer Pro Studio</td><td>49 € one-time</td><td>aucune</td></tr>
+          <tr><td>PhotoOrganizer Pro Lifetime</td><td>99 € one-time</td><td>aucune</td></tr>
+        </tbody>
+      </table>
+      Description : reprendre celle de <a href="docs/MONETIZATION.md">docs/MONETIZATION.md §3.3</a>.
+    </li>
+    <li><b>Promo code de lancement</b> : Discounts → Add → code <code>EARLY30</code>, -30 %, expire 30 jours après création.</li>
+    <li><b>Webhook pour générer + envoyer la clé</b> :
+      <ul>
+        <li>Settings → Webhooks → Add endpoint.</li>
+        <li>URL : <code>https://&lt;ton-domaine-ou-ngrok&gt;/lemonsqueezy/webhook</code> (voir option ci-dessous).</li>
+        <li>Events à cocher : <code>order_created</code> et <code>order_refunded</code>.</li>
+      </ul>
+    </li>
+    <li><b>Implémenter le handler webhook</b> — 2 options :
+      <ul>
+        <li><b>Option A (recommandée, gratuit)</b> : déployer un script Python ultra-court sur Cloudflare Workers ou Vercel (free tier). Le script reçoit le webhook, génère la clé avec <code>keygen.py</code>, envoie un email avec la clé via Resend ou Brevo (free tier 100 emails/jour).</li>
+        <li><b>Option B (manuel au début)</b> : Lemon Squeezy envoie l'email d'achat avec un lien de téléchargement. Tu te connectes manuellement, génères la clé :
+          <pre class="copyable">python -m src.photoorganizer_pro.license.keygen --email client@example.com --edition PERS --years 1</pre>
+          Et tu réponds à l'email du client avec la clé. <b>Tenable pour les 10 premières ventes</b>, à automatiser après.
+        </li>
+      </ul>
+    </li>
+    <li><b>Page de remerciement</b> (Settings → Checkout → Thank-you page) : "Tu vas recevoir ta clé par email d'ici 1 minute. Si rien après 5 min, écris à manugrolleau48@gmail.com."</li>
+    <li><b>Test du flow complet</b> en mode test (Lemon Squeezy a des cartes de test).</li>
+    <li><b>Publier la page produit</b> (Status → Published) mais ne pas la promouvoir tant que tu n'as pas testé l'envoi de clé.</li>
+  </ol>
+</div>
+
+
+<!-- 3.5 PyPI -->
+<div class="card" id="proc-pypi">
+  <h3>3.5 — Publier sur PyPI (core gratuit) <span class="tag p2">P2</span> <span class="tag eff">2-3 h</span></h3>
+  <p class="lead">Permet l'install <code>pip install photoorganizer</code>. Pas critique mais bon pour la crédibilité dev.</p>
+
+  <ol class="steps">
+    <li><b>Créer un compte PyPI</b> + activer 2FA (obligatoire depuis 2024) : <a class="btn" href="https://pypi.org/account/register/" target="_blank">pypi.org/register</a></li>
+    <li><b>Vérifier que le nom est libre</b> :
+      <pre class="copyable">curl -s https://pypi.org/pypi/photoorganizer/json | head -c 50</pre>
+      Si tu vois <code>{"error":"Not Found"}</code>, c'est libre. Sinon prends <code>photoorganizer-kiriiaq</code> ou <code>pyphotoorganizer</code> et adapte le <code>name</code> dans <code>pyproject.toml</code>.
+    </li>
+    <li><b>Construire les artefacts</b> :
+      <pre class="copyable">python -m pip install --upgrade build twine
+python -m build
+ls dist/</pre>
+      Tu dois voir <code>photoorganizer-2.2.0-py3-none-any.whl</code> et <code>photoorganizer-2.2.0.tar.gz</code>.
+    </li>
+    <li><b>Tester en local</b> (dans un autre venv) :
+      <pre class="copyable">python -m venv /tmp/test-install
+/tmp/test-install/Scripts/Activate.ps1
+pip install dist/photoorganizer-2.2.0-py3-none-any.whl
+photo-organizer</pre>
+      L'app doit se lancer.
+    </li>
+    <li><b>Upload vers TestPyPI</b> (sandbox) d'abord :
+      <pre class="copyable">twine upload --repository testpypi dist/*</pre>
+    </li>
+    <li><b>Si OK, upload PyPI prod</b> :
+      <pre class="copyable">twine upload dist/*</pre>
+    </li>
+    <li><b>Vérifier en live</b> : <a href="https://pypi.org/project/photoorganizer/">pypi.org/project/photoorganizer/</a></li>
+  </ol>
+
+  <p style="margin-top: 14px;"><b>Alternative pro</b> : configurer <a href="https://docs.pypi.org/trusted-publishers/">PyPI Trusted Publisher</a> dans GitHub Actions pour upload auto à chaque tag (pas de token API à gérer). Voir leur doc, 15 min de plus.</p>
+</div>
+
+
+<!-- 3.6 GITHUB RELEASE -->
+<div class="card" id="proc-release">
+  <h3>3.6 — Publier la release GitHub v2.2.0 <span class="tag p1">P1</span> <span class="tag eff">30 min</span></h3>
+  <p class="lead">Déclenche le build EXE automatique via <code>release.yml</code>. Pré-requis : commit + push de tous les changements actuels.</p>
+
+  <ol class="steps">
+    <li><b>Commit final</b> (cf. <a href="#commit">section 4</a> pour la commande complète) puis push.</li>
+    <li><b>Tag</b> :
+      <pre class="copyable">git tag -a v2.2.0 -m "Release v2.2.0 — Audit complet + frontière Pro + quick wins"
+git push origin v2.2.0</pre>
+    </li>
+    <li><b>Workflow Release</b> se déclenche automatiquement (vérifie sur l'onglet Actions GitHub).</li>
+    <li><b>Vérifier qu'il termine vert</b> (build EXE + checksums + upload).</li>
+    <li><b>Aller sur la page Releases</b>, éditer la release créée :
+      <ul>
+        <li>Coller les notes depuis <code>CHANGELOG.md</code> section <code>[2.2.0]</code>.</li>
+        <li>Vérifier que <code>PhotoOrganizer-2.2.0.exe</code> + <code>PhotoOrganizer-2.2.0-debug.exe</code> + <code>checksums-sha256.txt</code> sont attachés.</li>
+        <li>Marquer comme "Latest release".</li>
+        <li>Publier.</li>
+      </ul>
+    </li>
+    <li><b>Tester le téléchargement</b> sur une autre machine si possible.</li>
+    <li><b>Update du social preview</b> : Settings → General → Social preview → upload <code>docs/media/banner.png</code> (1280×640).</li>
+  </ol>
+</div>
+
+
+<!-- 3.7 LAUNCH -->
+<div class="card" id="proc-launch">
+  <h3>3.7 — Lancement (Product Hunt, Show HN, LinkedIn, Reddit) <span class="tag p1">P1</span> <span class="tag eff">étalé sur 6 sem</span></h3>
+  <p class="lead">Calendrier complet dans <a href="docs/DISTRIBUTION.md">docs/DISTRIBUTION.md</a>. Posts prêts dans <a href="LINKEDIN_DRAFTS.md">LINKEDIN_DRAFTS.md</a>.</p>
+
+  <table>
+    <thead><tr><th>Semaine</th><th>Plateforme</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>S+0</td><td>GitHub + Lemon Squeezy</td><td>Release v2.2.0 + page Pro silencieuse</td></tr>
+      <tr><td>S+1</td><td>PyPI + Reddit r/freeware</td><td>Upload wheel + 1er post Reddit (court, factuel)</td></tr>
+      <tr><td>S+2</td><td>Reddit r/datahoarder</td><td>Post storytelling 50 TB</td></tr>
+      <tr><td>S+3 mardi 9h Paris</td><td><b>Product Hunt</b> + LinkedIn post 1 + X thread</td><td><b>Jour J du lancement</b></td></tr>
+      <tr><td>S+4</td><td><b>Show HN</b> + Indie Hackers</td><td>Angle technique : audit EXE 37→22 MB</td></tr>
+      <tr><td>S+5</td><td>r/photography + LinkedIn carrousel + dev.to A1</td><td>Marketing reach</td></tr>
+      <tr><td>S+6</td><td>AlternativeTo</td><td>SEO long terme</td></tr>
+      <tr><td>S+7-10</td><td>dev.to A2, LinkedIn post 3, dev.to A3</td><td>Marketing organique</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top: 14px;"><b>Pré-requis Product Hunt</b> :</p>
+  <ul>
+    <li>Compte créé &gt; 7 jours avant le launch.</li>
+    <li>Au moins 1 commentaire + 1 upvote sur 3-5 produits dans la semaine précédente (signal de bonne foi à l'algo).</li>
+    <li><b>Hunter influent</b> qui submit pour toi (visibilité ×3-5) : à trouver via <a href="https://hunterboard.io/">hunterboard.io</a> ou demander dans Indie Hackers Discord.</li>
+    <li>4-5 visuels prêts dans la galerie (S-01 + S-03 + S-04 + G-01 + un screenshot mode dark).</li>
+    <li><b>Disponible 4-6 h le jour J</b> pour répondre aux commentaires en temps réel (critique pour le ranking).</li>
+  </ul>
+
+  <p style="margin-top: 10px;"><b>Pré-requis Show HN</b> :</p>
+  <ul>
+    <li>Titre : utiliser la version B technique (<i>"How I went from 37 MB to 22 MB PyInstaller EXE"</i>) plutôt que la version produit. Bien plus upvotée sur HN.</li>
+    <li>Premier commentaire prêt à coller (voir <a href="LINKEDIN_DRAFTS.md">LINKEDIN_DRAFTS.md</a> Format 5).</li>
+    <li>Lien GitHub README UNIQUEMENT, pas vers Lemon Squeezy (HN flag commercial).</li>
+    <li>Disponible 4-6 h post-publication pour répondre.</li>
+  </ul>
+</div>
+
+
+<!-- 3.8 FOLLOWUP -->
+<div class="card" id="proc-followup">
+  <h3>3.8 — Suivi 30 / 60 / 90 jours <span class="tag p2">P2</span></h3>
+  <p class="lead">Mesure pour décider si on continue (V2 Pro modules) ou pivote (lead magnet seul).</p>
+
+  <table>
+    <thead><tr><th>KPI</th><th>Source</th><th>Cible 90 j</th><th>Échec si &lt;</th></tr></thead>
+    <tbody>
+      <tr><td>GitHub stars</td><td>repo</td><td>200-500</td><td>50</td></tr>
+      <tr><td>Downloads EXE</td><td>Release insights</td><td>1 000-3 000</td><td>200</td></tr>
+      <tr><td>Ventes Pro</td><td>Lemon Squeezy dashboard</td><td>10-100</td><td>3</td></tr>
+      <tr><td>Followers LinkedIn delta</td><td>LinkedIn analytics</td><td>+50-200</td><td>+10</td></tr>
+      <tr><td>Dons Ko-fi</td><td>Ko-fi dashboard</td><td>5-30 €</td><td>0</td></tr>
+      <tr><td>Backlinks</td><td>Google Alerts "PhotoOrganizer Kiriiaq"</td><td>5-20</td><td>1</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top: 14px;"><b>Décision T+90 j</b> :</p>
+  <ul>
+    <li>Si ventes Pro &gt; 50 → continuer V2 modules (plugin API, rapports avancés).</li>
+    <li>Si ventes &lt; 10 → bascule sur lead magnet seul (voie 5 monétisation), pas V2 Pro.</li>
+  </ul>
+</div>
+
+
+<!-- ============================================ -->
+<div class="section-band done" id="commit">
+  <span class="num">4</span>
+  <span>Commit final &amp; push</span>
+</div>
+
+<div class="card">
+  <h3>Commit recommandé <span class="tag eff">2 min</span></h3>
+  <p class="lead">Comme demandé, Claude n'a fait aucun commit. À toi de valider et committer quand tu es prêt.</p>
+
+  <p><b>Option A — Un seul commit englobant tout</b> (recommandé pour l'historique propre) :</p>
+  <pre class="copyable">git add -A
+git status   # vérifie une dernière fois ce qui va être commit
+
+git commit -m "chore: méta-audit complet + modules Pro V1 + standards
+
+- Audit en 7 phases (AUDIT.md, docs/exe-optimization.md, docs/MONETIZATION.md, docs/DISTRIBUTION.md)
+- Restructuration: src/photoorganizer_pro/, docs/archives/, test/ -> test_data/
+- Standards: README rewrité, CHANGELOG, CONTRIBUTING, SECURITY, CLAUDE.md, PROJECT_OVERVIEW.html, LAUNCH_CHECKLIST.html
+- License: Apache-2.0 (core) + LICENSE-PRO (proprietary Pro)
+- Modules Pro V1: cli/batch_organize, scheduler/watch_folder, license RSA-HMAC (14 tests)
+- Quick wins: bump 2.0.0->2.2.0, fix bare except, pip-audit+bandit en CI
+- Tests: 184/184 verts (170 anciens + 14 Pro license)"</pre>
+
+  <p><b>Option B — Commits séparés par lot</b> (si tu préfères un historique granulaire) :</p>
+  <pre class="copyable">git add AUDIT.md docs/ AUDIT_EXE.md
+git commit -m "docs(audit): méta-audit complet en 7 phases"
+
+git add README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CLAUDE.md PROJECT_OVERVIEW.html
+git commit -m "docs(repo): standards (README, CHANGELOG, CONTRIB, SECURITY) + fichiers vivants"
+
+git add LICENSE LICENSE-PRO pyproject.toml requirements.txt
+git commit -m "chore(license): Apache-2.0 (core) + LICENSE-PRO + pyproject pris à jour"
+
+git add src/photoorganizer_pro/ tests/functional/test_pro_license.py
+git commit -m "feat(pro): modules Pro V1 (batch CLI, watch-folder, license RSA-HMAC)"
+
+git add src/main.py src/ui/app.py src/core/metadata/exif_extractor.py src/core/operations/ build.py .gitignore .github/workflows/
+git commit -m "fix: bump version 2.2.0, bare except, CI pip-audit+bandit, build.py --pro"
+
+git add -A   # captures les renommages test/ -> test_data/ restants
+git commit -m "chore: nettoyage final (restructuration test_data, déplacements)"
+
+git add LAUNCH_CHECKLIST.html
+git commit -m "docs: LAUNCH_CHECKLIST.html (procédures restantes pour lancement public)"</pre>
+
+  <p><b>Push</b> (quand tu es prêt à exposer le travail) :</p>
+  <pre class="copyable">git push origin feat/v2.3-organize-tabview</pre>
+</div>
+
+<footer>
+  Généré le 2026-05-19 · Aucun script externe, aucune dépendance, ouvrable hors-ligne · Imprimable A4
+  <br>Cliquer sur un bloc <code>&lt;pre&gt;</code> avec curseur "copy" pour copier la commande automatiquement (JS minimal en bas).
+</footer>
+
+</div>
+
+<script>
+// Copy-to-clipboard sur les blocs <pre class="copyable">.
+// Le seul JS de la page, ~15 lignes.
+document.querySelectorAll('pre.copyable').forEach(function(pre) {
+  pre.addEventListener('click', function() {
+    var text = pre.innerText.trim();
+    navigator.clipboard.writeText(text).then(function() {
+      var original = pre.style.borderLeftColor;
+      pre.style.borderLeftColor = '#2f6a37';
+      pre.style.transition = 'border-left-color 0.2s';
+      setTimeout(function() { pre.style.borderLeftColor = original; }, 400);
+    }).catch(function() {
+      // Fallback : sélectionner le texte si clipboard API échoue.
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+    });
+  });
+});
+</script>
+
+</body>
+</html>

@@ -15,7 +15,7 @@ import argparse
 from pathlib import Path
 
 APP_NAME = "PhotoOrganizer"
-VERSION = "2.0.0"
+VERSION = "2.2.0"
 # L'icône réelle est dans resources/icons (cf. _install_icon dans ui/app.py)
 ICON_CANDIDATES = [
     "resources/icons/icon.ico",
@@ -96,14 +96,22 @@ def _resolve_icon(project_dir: Path) -> Path | None:
     return None
 
 
-def build(*, light: bool = False, debug: bool = False) -> Path:
+def build(*, light: bool = False, debug: bool = False, pro: bool = False) -> Path:
     """Build une variante de l'exécutable.
 
     - ``debug`` : ``--console --debug=all --log-level=DEBUG`` pour diagnostiquer
       au lancement. Inclut Pillow/HEIC pour ne pas s'auto-bloquer.
     - ``light`` : exclut les libs lourdes (cible : binaire min, suppose Python
       installé sur la machine cible — ou modules dynamiquement présents).
+    - ``pro`` : inclut le package ``src/photoorganizer_pro`` et change le nom
+      en ``PhotoOrganizerPro-X.Y.Z.exe``. À distribuer SÉPARÉMENT du build
+      gratuit (les deux peuvent coexister sur la même machine).
     - défaut : release windowed (pas de console).
+
+    Note Pro : ce script utilise le ``SECRET_KEY`` actuel de
+    ``photoorganizer_pro/license/validator.py``. Pour un build de
+    production, créer ``photoorganizer_pro/license/_secret.py`` (gitignored)
+    avec ``SECRET_KEY = b"<vraie clé>"`` avant de lancer le build.
     """
     project_dir = Path(__file__).parent
 
@@ -114,7 +122,8 @@ def build(*, light: bool = False, debug: bool = False) -> Path:
     else:
         suffix = ""
 
-    output_name = f"{APP_NAME}-{VERSION}{suffix}"
+    base_name = f"{APP_NAME}Pro" if pro else APP_NAME
+    output_name = f"{base_name}-{VERSION}{suffix}"
     dist_dir = project_dir / "dist"
     build_dir = project_dir / "build"
 
@@ -172,8 +181,17 @@ def build(*, light: bool = False, debug: bool = False) -> Path:
         for mod in EXCLUDE_MODULES + GLOBAL_EXCLUDES:
             cmd.extend(["--exclude-module", mod])
 
-    # Bundle assets/resources/src
-    for data_dir in ["assets", "resources", "src"]:
+    # Bundle datas — whitelist explicite des sous-dossiers d'assets.
+    # On ne bundle PAS `assets/tools/` (ExifTool Perl ~10 MB compressés) :
+    # le fallback subprocess n'est plus utilisé (méthodes primaires
+    # exifread / Pillow / pillow_heif suffisent), et la GPL d'ExifTool
+    # est incompatible avec la distribution Pro propriétaire.
+    # Si un utilisateur veut le fallback, il installe `exiftool` dans
+    # le PATH (winget install exiftool), le code de détection le trouve.
+    assets_icons = project_dir / "assets" / "icons"
+    if assets_icons.exists():
+        cmd.extend(["--add-data", f"{assets_icons}{os.pathsep}assets/icons"])
+    for data_dir in ["resources", "src"]:
         src_path = project_dir / data_dir
         if src_path.exists():
             cmd.extend(["--add-data", f"{src_path}{os.pathsep}{data_dir}"])
@@ -223,6 +241,11 @@ if __name__ == "__main__":
                        help="Light build (no heavy libs, smaller binary)")
     group.add_argument("--debug", action="store_true",
                        help="Debug build (console + verbose logging)")
+    parser.add_argument("--pro", action="store_true",
+                        help="Build Pro edition (bundles src/photoorganizer_pro/, "
+                             "renames output to PhotoOrganizerPro-X.Y.Z.exe). "
+                             "PRE-REQ: replace SECRET_KEY in license/validator.py "
+                             "via license/_secret.py (gitignored) before running.")
     parser.add_argument("--all", action="store_true",
                         help="Build debug + release (no light)")
     args = parser.parse_args()
@@ -231,4 +254,4 @@ if __name__ == "__main__":
         build(debug=True)
         build()
     else:
-        build(light=args.light, debug=args.debug)
+        build(light=args.light, debug=args.debug, pro=args.pro)

@@ -21,6 +21,7 @@ from core.operations import FileManager, OrganizationOptions, SmartOrganizer
 # Design system unifié — couleurs, espacements, factories de boutons.
 # Importe en absolu (ui.theme) pour rester compatible avec PyInstaller.
 from ui.theme import (
+    BTN_H_PRIMARY,
     BTN_H_STD,
     HINT_COLOR,
     LABEL_MUTED,
@@ -293,7 +294,8 @@ class OrganizeFrame(ctk.CTkFrame):
 
         # ---- Bursts S1 + Incremental S5 ----
         self.detect_bursts = ctk.BooleanVar(value=False)
-        self.burst_mode = ctk.StringVar(value="manual")  # "manual" | "auto"
+        # "manual" | "auto_mean" | "auto_stddev" — défaut manuel (legacy compat)
+        self.burst_mode = ctk.StringVar(value="manual")
         self.burst_threshold = ctk.IntVar(value=3)  # secondes
         self.burst_min_count = ctk.IntVar(value=3)
         # Bornes du clamp en mode auto (audit 2026-05-15 — option avancée).
@@ -346,59 +348,116 @@ class OrganizeFrame(ctk.CTkFrame):
         self.schedule_time.trace_add("write", lambda *_: self._on_schedule_time_change())
 
     def _create_ui(self):
-        """Crée l'interface utilisateur en 3 zones (refonte UI v3).
+        """Crée l'interface utilisateur (refonte v2.3 — Variante B : tabview interne).
 
         Layout :
           ┌──────────────────────────────────────────────────────┐
-          │ ZONE TOP (fixe)        Sources / Dest / Compteur     │  ~110 px
-          ├──────────────────────────────────────────────────────┤
-          │ ZONE CENTRE (scroll si nécessaire) 2 colonnes         │  weight=1
-          │   • Critères d'organisation  | Action + Types         │
-          │   • [▼ Avancé] (collapsible) — filtres + comportements│
-          │   • Renommage (1 ligne template + presets)            │
-          ├──────────────────────────────────────────────────────┤
-          │ ZONE BOTTOM (fixe)     Progression + boutons d'action │  ~80 px
+          │ ZONE TOP (compact, sticky)  Source → Dest + Compteur │  ~90 px
+          ├──────────────────────────────────────┬───────────────┤
+          │ TABVIEW INTERNE — 4 onglets          │ RIGHT RAIL    │
+          │   🔍 Filtrer    🗂️ Organiser          │  Preset       │  ~210 px
+          │   🛠️ Traiter    🏷️ Renommer           │  📊 Analyser   │  weight=1
+          │                                       │  👁 Aperçu     │
+          │                                       │  ❌ Annuler    │
+          │                                       │  🚀 Organiser  │
+          │                                       │  ─────         │
+          │                                       │  Cible: …      │
+          ├──────────────────────────────────────┴───────────────┤
+          │ ZONE BOTTOM (slim, sticky)    Progress bar + label    │  ~40 px
           └──────────────────────────────────────────────────────┘
 
-        Bénéfices vs v2 :
-          - Compteur fichiers et boutons toujours visibles
-          - Action principale "Organiser" à droite (convention desktop)
-          - Section Planification déplacée vers Paramètres (config persistante)
+        Bénéfices vs v2.2 :
+          - Plus de scroll vertical dans le cas nominal (tabview = onglets)
+          - Actions toujours accessibles dans le right rail (sticky)
+          - Densité par onglet beaucoup plus élevée
+          - Zone bottom réduite à la progress bar (libère ~120 px)
         """
-        # Layout root du frame OrganizeFrame : 3 lignes (top fixe / centre
-        # scrollable / bottom fixe). Seule la ligne du milieu prend du poids.
+        # Layout root : 3 lignes × 2 colonnes (top et bottom utilisent
+        # columnspan=2, le middle a col 0 expansif et col 1 fixe à 210 px).
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=0)  # top fixe
-        self.rowconfigure(1, weight=1)  # centre scrollable expansif
-        self.rowconfigure(2, weight=0)  # bottom fixe
+        self.columnconfigure(1, weight=0, minsize=210)
+        self.rowconfigure(0, weight=0)  # top compact
+        self.rowconfigure(1, weight=1)  # middle expansif
+        self.rowconfigure(2, weight=0)  # bottom slim
 
-        # ZONE TOP : Sources / Destination / Compteur fichiers (sticky)
+        # ZONE TOP : Source/Destination/Compteur (compact, columnspan=2)
         top = ctk.CTkFrame(self, fg_color="transparent")
-        top.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_M, 0))
+        top.grid(row=0, column=0, columnspan=2, sticky="ew", padx=PAD_M, pady=(PAD_M, 0))
         top.columnconfigure(0, weight=1)
         self._top_zone = top
 
-        # ZONE CENTRE : scrollable avec les options
+        # ZONE CENTRE COL 0 : scroll + tabview interne (4 onglets)
+        # Le tabview est imbriqué dans _scroll (un CTkScrollableFrame) pour
+        # garantir un fallback scroll au cas où un onglet déborde verticalement
+        # — usage nominal : aucun scroll nécessaire.
         self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self._scroll.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
-        self._scroll.columnconfigure(0, weight=1, minsize=280)
-        self._scroll.columnconfigure(1, weight=1, minsize=280)
+        self._scroll.grid(row=1, column=0, sticky="nsew", padx=(PAD_M, PAD_S), pady=PAD_S)
+        self._scroll.columnconfigure(0, weight=1)
 
-        # ZONE BOTTOM : compteur + progress + boutons (sticky bottom)
+        self._main_tabview = ctk.CTkTabview(self._scroll, anchor="nw")
+        self._main_tabview.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        # Espacement icône-titre (retour testeur 2026-05-17 itération 2) :
+        # « les icônes sont mal positionnées ». Utilisation de NBSP + espace
+        # standard qui rend mieux sur CTkTabview que les doubles espaces
+        # (qui ne sont pas affichés correctement par Tk).
+        TAB_FILTER = "🔍  Filtrer"
+        TAB_ORGANIZE = "🗂  Organiser"
+        TAB_PROCESS = "🛠  Traiter"
+        TAB_RENAME = "🏷  Renommer"
+        for tab_name in (TAB_FILTER, TAB_ORGANIZE, TAB_PROCESS, TAB_RENAME):
+            self._main_tabview.add(tab_name)
+        self._main_tabview.set(TAB_ORGANIZE)  # onglet par défaut
+
+        # Mapping : nom logique → frame de l'onglet (parent pour les sections)
+        self._tab_filter = self._main_tabview.tab(TAB_FILTER)
+        self._tab_organize = self._main_tabview.tab(TAB_ORGANIZE)
+        self._tab_process = self._main_tabview.tab(TAB_PROCESS)
+        self._tab_rename = self._main_tabview.tab(TAB_RENAME)
+
+        # ZONE CENTRE COL 1 : right rail (sticky vertical 210 px)
+        rail = ctk.CTkFrame(self)
+        rail.grid(row=1, column=1, sticky="nsew", padx=(PAD_S, PAD_M), pady=PAD_S)
+        rail.columnconfigure(0, weight=1)
+        self._right_rail = rail
+
+        # ZONE BOTTOM (slim, columnspan=2)
         bottom = ctk.CTkFrame(self, fg_color="transparent")
-        bottom.grid(row=2, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+        bottom.grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
         bottom.columnconfigure(0, weight=1)
         self._bottom_zone = bottom
 
-        # Création des sections dans leur zone respective
+        # Création des sections dans leur zone respective.
+        # Les _create_*_section grident désormais dans les onglets correspondants
+        # (cf. _tab_filter / _tab_organize / _tab_process / _tab_rename).
         self._create_folders_section()  # zone top
-        self._create_options_section()  # scroll row=0 (critères + types)
-        self._create_advanced_section()  # scroll row=1 (collapsible)
-        self._create_rename_section()  # scroll row=2 (1 ligne)
-        self._create_actions_section()  # zone bottom
+        self._create_options_section()  # Organiser (gauche) + Traiter (action/types)
+        self._create_advanced_section()  # Filtrer (filtres) + Traiter (comportements)
+        self._create_rename_section()  # Renommer
+        self._create_right_rail()  # right rail : presets + actions + Cible
+        self._create_actions_section()  # zone bottom : progress bar slim
 
-        # Section Planification déplacée vers SettingsFrame — l'attribut
-        # `schedule_status_var` reste utilisé par le scheduler.
+        # Layout responsive v2.2 : désormais piloté par le tabview lui-même
+        # (chaque onglet gère son propre flux 1 col / 2 col selon densité).
+        # Les hooks `_on_scroll_configure` / `_update_responsive_layout` sont
+        # conservés en tant que no-op pour préserver l'API existante.
+        self._layout_mode = "tabview"
+        self._responsive_debounce_id = None
+
+    # ------------------------------------------------------------------
+    # Layout responsive — refonte v2.3 (Variante B) : no-op
+    # ------------------------------------------------------------------
+    # Conservés pour préserver l'API publique (référencés dans
+    # `audit/RAPPORT_FINAL.md` et dans visual_audit). Le tabview interne
+    # gère désormais lui-même son flux ; pas besoin de bascule manuelle.
+    RESPONSIVE_BREAKPOINT = 1000  # px (gardé pour rétrocompat)
+
+    def _on_scroll_configure(self, event):
+        """No-op (refonte v2.3) : le tabview gère son propre layout."""
+        return
+
+    def _update_responsive_layout(self):
+        """No-op (refonte v2.3) : remplacé par le tabview interne."""
+        return
 
     def _create_folders_section(self):
         """Section de sélection des dossiers en zone top fixe (toujours visible).
@@ -410,6 +469,14 @@ class OrganizeFrame(ctk.CTkFrame):
         parent = self._top_zone
         folders = ctk.CTkFrame(parent)
         folders.grid(row=0, column=0, sticky="ew")
+        # Layout 3 colonnes :
+        #   col 0 = label (largeur fixe 90)
+        #   col 1 = contenu (entry, dest_row, file_count) — weight=1
+        #   col 2 = bouton à droite (📂, 📋) — colonne unique pour TOUS
+        # Cette uniformité (retour testeur 2026-05-17 it. 3 « aligne les
+        # boutons dossier et le reste au même niveau que le bouton pour
+        # afficher la liste des fichiers détectés ») assure que tous les
+        # boutons icône sont alignés verticalement à la même abscisse.
         folders.columnconfigure(1, weight=1)
 
         # Titre (refonte v5 — retours JSON 2026-05-13)
@@ -458,7 +525,7 @@ class OrganizeFrame(ctk.CTkFrame):
         ).grid(row=2, column=0, sticky="w", padx=(PAD_M, PAD_S), pady=PAD_S)
 
         # Sous-frame pour entry + bouton ↗ "Ouvrir dest" qui restent
-        # accessibles. Le bouton 📂 Parcourir occupe la colonne 2.
+        # accessibles. Le bouton 📂 Parcourir occupe la colonne 2 (cf. layout).
         dest_row = ctk.CTkFrame(folders, fg_color="transparent")
         dest_row.grid(row=2, column=1, sticky="ew", padx=PAD_S, pady=PAD_S)
         dest_row.columnconfigure(0, weight=1)
@@ -485,6 +552,9 @@ class OrganizeFrame(ctk.CTkFrame):
         self.browse_dest_btn.grid(row=2, column=2, padx=(PAD_S, PAD_M), pady=PAD_S)
 
         # Ligne Compteur fichiers (toujours visible — fix T-030..033)
+        # Refonte 2026-05-17 it. 3 : le compteur occupe col 0+1 (info avant
+        # le bouton) et le bouton 📋 est placé en col 2 — aligné avec les
+        # boutons 📂 ci-dessus.
         self.file_count_var = ctk.StringVar(value="Aucun dossier source sélectionné.")
         self.file_count_label = ctk.CTkLabel(
             folders,
@@ -496,15 +566,15 @@ class OrganizeFrame(ctk.CTkFrame):
         self.file_count_label.grid(
             row=3,
             column=0,
-            columnspan=3,
+            columnspan=2,
             sticky="ew",
             padx=PAD_M,
             pady=(0, PAD_M),
         )
 
         # Lot B audit 2026-05-14 (T-030..T-033) : bouton « 📋 » qui ouvre une
-        # modale listant les fichiers détectés. Réponse au retour testeur
-        # "je ne vois pas le titre/chemin des fichiers sélectionnés".
+        # modale listant les fichiers détectés. Aligné en col 2 (refonte
+        # 2026-05-17 it. 3) pour cohérence avec les 📂 ci-dessus.
         self.show_files_btn = icon_button(
             folders,
             text="📋",
@@ -512,8 +582,8 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.show_files_btn.grid(
             row=3,
-            column=3,
-            padx=(0, PAD_M),
+            column=2,
+            padx=(PAD_S, PAD_M),
             pady=(0, PAD_M),
         )
 
@@ -521,10 +591,19 @@ class OrganizeFrame(ctk.CTkFrame):
         # définie mais n'est plus appelée pour ne pas créer de bindings.
 
     def _create_options_section(self):
-        """Crée la section des options dans le scroll central (row=0)."""
-        # Frame gauche - Critères d'organisation
-        left_frame = ctk.CTkFrame(self._scroll)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=PAD_S)
+        """Crée la section des critères + options (refonte v2.3 Variante B).
+
+        Désormais répartie sur 2 onglets :
+        - Critères (gauche) → onglet 🗂️ Organiser
+        - Action / Types (droite) → onglet 🛠️ Traiter
+
+        Les attributs ``_options_left_frame`` et ``_options_right_frame``
+        sont conservés (rétrocompat) mais pointent vers les frames des
+        onglets et non vers ``_scroll``.
+        """
+        # Frame gauche - Critères d'organisation → onglet Organiser
+        self._options_left_frame = left_frame = ctk.CTkFrame(self._tab_organize)
+        left_frame.pack(fill="x", padx=0, pady=PAD_S)
 
         ctk.CTkLabel(
             left_frame, text="🗂️ Critères d'organisation", font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
@@ -551,10 +630,39 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.date_format_menu.pack(side="left", padx=5)
 
-        # Organiser par appareil
+        # Organiser par appareil + sous-option fusionnée Caméra (v2.2 étape 3)
+        # Refonte 2026-05-15 : la ligne « Caméra : [CSV] » du panneau Filtres
+        # a été déplacée ici comme sous-option de « Par appareil photo ».
+        # Sémantique : si l'utilisateur veut limiter aux caméras X,Y, on
+        # filtre AVANT d'organiser par appareil.
         _make_checkbox(left_frame, text="Par appareil photo", variable=self.organize_by_camera).pack(
             anchor="w", padx=20, pady=3
         )
+        self._camera_options_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+        cam_row = ctk.CTkFrame(self._camera_options_frame, fg_color="transparent")
+        cam_row.pack(fill="x", padx=20, pady=2)
+        ctk.CTkLabel(
+            cam_row,
+            text="Limiter aux marques :",
+            font=font_label(),
+        ).pack(side="left")
+        ctk.CTkEntry(
+            cam_row,
+            textvariable=self.filter_camera_make,
+            placeholder_text="CSV — ex. Sony,Canon  (vide = toutes)",
+            height=BTN_H_STD,
+        ).pack(side="left", padx=PAD_S, fill="x", expand=True)
+        # Bouton 💡 Exemples — panneau inline avec marques courantes + détectées
+        # (refonte 2026-05-18 retour testeur : aide au remplissage du champ)
+        self.brand_examples_btn = icon_button(
+            cam_row,
+            text="💡",
+            command=self._show_brand_examples_panel,
+        )
+        self.brand_examples_btn.pack(side="left", padx=(0, PAD_S))
+        # Affichage conditionnel selon organize_by_camera
+        self.organize_by_camera.trace_add("write", lambda *_: self._refresh_camera_options_visibility())
+        self._refresh_camera_options_visibility()
 
         # Organiser par localisation GPS
         # On garde une référence à la case pour positionner les sous-options
@@ -623,6 +731,31 @@ class OrganizeFrame(ctk.CTkFrame):
             anchor="w",
             font=ctk.CTkFont(size=LABEL_FONT_SIZE, weight="bold"),
         ).pack(side="left")
+
+        # Sous-option fusionnée GPS (v2.2 étape 3) : la ligne « GPS : [any/
+        # with/without] » du panneau Filtres devient ici une simple
+        # checkbox « Inclure les photos sans GPS ». Sémantique :
+        #   coché   → filter_gps_required = "any"  (toutes les photos)
+        #   décoché → filter_gps_required = "with" (uniquement GPS, les
+        #             non-GPS sont rejetées avant organisation)
+        # Le cas « without » (uniquement les photos SANS GPS) est rare et
+        # accessible via le filtre keywords / la sélection ailleurs.
+        gps_include_row = ctk.CTkFrame(self.gps_options_frame, fg_color="transparent")
+        gps_include_row.pack(fill="x", padx=20, pady=(2, 6))
+        self.include_no_gps = ctk.BooleanVar(
+            value=self.filter_gps_required.get() != "with"
+        )
+        _make_checkbox(
+            gps_include_row,
+            text="Inclure aussi les photos sans GPS (sinon : exclues du tri)",
+            variable=self.include_no_gps,
+        ).pack(side="left")
+        # Sync vers filter_gps_required à chaque toggle
+        def _sync_gps_required(*_):
+            self.filter_gps_required.set("any" if self.include_no_gps.get() else "with")
+        self.include_no_gps.trace_add("write", _sync_gps_required)
+        # Sync au démarrage (au cas où l'utilisateur ait sauvegardé "without")
+        _sync_gps_required()
 
         # Sync libellé initial + trace pour mise à jour live
         self._on_max_distance_change(self.max_distance.get())
@@ -698,9 +831,50 @@ class OrganizeFrame(ctk.CTkFrame):
             v.trace_add("write", lambda *_: self._render_criteria_order())
         self._update_criteria_visibility()
 
-        # Frame droite - Options de traitement
-        right_frame = ctk.CTkFrame(self._scroll)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=PAD_S)
+        # ----- Sous-section « 💥 Détection de rafales » comme critère
+        # (retour testeur 2026-05-17 : burst visible aussi dans Organiser).
+        # Toggle + sous-options miroir de ceux de l'onglet Traiter (les
+        # variables `detect_bursts`, `burst_mode`, `burst_threshold`,
+        # `burst_min_count` sont partagées : un seul état pour les deux UI).
+        ctk.CTkFrame(left_frame, height=2, fg_color=("gray70", "gray30")).pack(
+            fill="x", padx=10, pady=(12, 6)
+        )
+        ctk.CTkLabel(
+            left_frame,
+            text="💥 Détection de rafales (sous-dossier Burst_NN)",
+            font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold"),
+        ).pack(anchor="w", padx=10, pady=(0, 4))
+
+        burst_row = ctk.CTkFrame(left_frame, fg_color="transparent")
+        burst_row.pack(fill="x", padx=20, pady=(0, 4))
+        _make_checkbox(
+            burst_row,
+            text="Activer la détection de rafales (regroupe par moyenne de prise)",
+            variable=self.detect_bursts,
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            left_frame,
+            text=(
+                "    Photos prises à moins d'un seuil (auto = Δ moyen − σ, ou manuel "
+                "en secondes/minutes) regroupées dans un sous-dossier Burst_NN/."
+            ),
+            font=ctk.CTkFont(size=11),
+            text_color=("gray45", "gray65"),
+            anchor="w",
+            justify="left",
+            wraplength=400,
+        ).pack(fill="x", padx=20, pady=(0, 4))
+
+        # Sous-options burst (mode + seuil + min photos) — toujours visibles
+        self._burst_subopts_organize = ctk.CTkFrame(left_frame, fg_color="transparent")
+        self._burst_subopts_organize.pack(fill="x", padx=20, pady=(0, 6))
+        self._build_burst_subopts(self._burst_subopts_organize)
+
+        # Frame droite - Action + Types de fichiers → onglet Traiter
+        # Refonte v2.3 (Variante B) : repositionnée dans l'onglet 🛠️ Traiter
+        # au lieu de la colonne droite du scroll.
+        self._options_right_frame = right_frame = ctk.CTkFrame(self._tab_process)
+        right_frame.pack(fill="x", padx=0, pady=PAD_S)
 
         ctk.CTkLabel(
             right_frame, text="⚙️ Options de traitement", font=ctk.CTkFont(size=SECTION_TITLE_SIZE, weight="bold")
@@ -745,26 +919,23 @@ class OrganizeFrame(ctk.CTkFrame):
     # Sections "avancées" (filtres + comportements + renommage + presets)
     # =================================================================
     def _create_advanced_section(self):
-        """Section "Avancé" repliable (collapsed par défaut).
+        """Section Filtres + Comportements (refonte v2.3 — Variante B).
 
-        Regroupe en un seul panneau toutes les options secondaires :
-        filtres pré-traitement (R1), comportements (R2-R7), bursts (S1),
-        index, mode incrémental (S5).
+        Désormais répartie sur 2 onglets :
+        - 🔍 Filtres → onglet « 🔍 Filtrer »
+        - 🛠️ Comportements → onglet « 🛠️ Traiter » (sous Action/Types)
 
-        Le toggle texte ▶/▼ permet d'afficher/masquer le contenu — par
-        défaut masqué pour ne pas encombrer l'IHM ; les options gardent
-        leurs valeurs courantes même quand le panneau est replié.
+        L'attribut ``_adv_content`` est conservé (rétrocompat) et pointe
+        vers un container invisible — ``_adv_collapsed`` reste à False et
+        ``_toggle_advanced_section`` est un no-op fonctionnel.
         """
-        # Container externe : occupe les 2 colonnes du scroll
-        wrapper = ctk.CTkFrame(self._scroll)
-        wrapper.grid(row=1, column=0, columnspan=2, sticky="ew", padx=PAD_S, pady=PAD_S)
-        wrapper.columnconfigure(0, weight=1)
+        # État "déplié en permanence" (rétrocompat tests v2.2)
+        self._adv_collapsed = False
 
-        # En-tête cliquable : titre + flèche, occupe toute la largeur
-        self._adv_collapsed = True  # état initial
+        # Bouton toggle conservé (caché) — rétrocompat _attach_tooltips
         self._adv_toggle_btn = ctk.CTkButton(
-            wrapper,
-            text="▶  ⚙️ Options avancées (filtres, comportements, bursts, …)",
+            self._tab_filter,
+            text="⚙️ Filtres & Comportements",
             command=self._toggle_advanced_section,
             anchor="w",
             font=font_section(),
@@ -773,78 +944,104 @@ class OrganizeFrame(ctk.CTkFrame):
             hover_color=("gray85", "gray25"),
             height=BTN_H_STD,
         )
-        self._adv_toggle_btn.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
+        # Pas de grid() → invisible.
 
-        # Container interne (caché par défaut) — 2 colonnes (filtres / comportements)
-        self._adv_content = ctk.CTkFrame(wrapper, fg_color="transparent")
-        # Pas de grid() ici → le panneau démarre invisible
-        self._adv_content.columnconfigure(0, weight=1, uniform="adv")
-        self._adv_content.columnconfigure(1, weight=1, uniform="adv")
+        # Container _adv_content (rétrocompat) — contient désormais
+        # directement les filtres pour qu'ils s'affichent au plus haut
+        # du panneau Filtrer (retour testeur 2026-05-17 it. 2 :
+        # « le titre filtre et l'ensemble des champs soit en haut »).
+        self._adv_content = ctk.CTkFrame(self._tab_filter, fg_color="transparent")
+        self._adv_content.pack(fill="both", expand=True, padx=0, pady=0, anchor="n")
 
-        # ===== Colonne gauche : filtres pré-traitement =====
-        # Refactor 2026-05-15 : enveloppé dans un CTkScrollableFrame car
-        # la liste de filtres a doublé (extensions, dimensions, caméra,
-        # GPS, orientation). Hauteur fixée pour rester équilibré avec la
-        # colonne Comportement à droite (qui n'a plus Notif/Index).
-        filters = ctk.CTkScrollableFrame(
-            self._adv_content,
-            fg_color="transparent",
-            height=440,
-        )
-        filters.grid(row=0, column=0, sticky="nsew", padx=(0, PAD_S), pady=0)
+        # ===== Colonne gauche : filtres pré-traitement → onglet 🔍 Filtrer =====
+        # ``_adv_left_frame`` est désormais enfant direct de ``_adv_content``
+        # pour assurer un layout vertical propre, ancré au haut du panneau.
+        self._adv_left_frame = filters = ctk.CTkFrame(self._adv_content, fg_color="transparent")
+        filters.pack(fill="x", padx=0, pady=0, anchor="n")
 
+        # Titre + bouton 💡 « Exemples de filtres » (refonte 2026-05-19) —
+        # ouvre un panneau intégré avec des valeurs standards pour les filtres
+        # « non personnels » (extensions, dimensions, mots-clés, orientation,
+        # note). La date et la taille restent gérées par les chips inline car
+        # ces deux filtres sont propres à chaque utilisateur.
+        title_row = ctk.CTkFrame(filters, fg_color="transparent")
+        title_row.pack(fill="x", padx=PAD_S, pady=(PAD_S, PAD_S))
         ctk.CTkLabel(
-            filters,
+            title_row,
             text="🔍 Filtres",
             font=font_label(weight="bold"),
-        ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
+        ).pack(side="left")
+        self.filter_examples_btn = icon_button(
+            title_row,
+            text="💡",
+            command=self._show_filter_examples_panel,
+        )
+        self.filter_examples_btn.pack(side="left", padx=PAD_S)
+        ctk.CTkLabel(
+            title_row,
+            text="Cliquer 💡 pour voir des valeurs standards (extensions, dimensions, mots-clés…).",
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+        ).pack(side="left", padx=(PAD_S, 0))
 
-        # ---- Bloc Entrées texte (date, taille, dimensions, caméra, ext, mots-clés) ----
-        # W30-W35 (retour testeur 2026-05-13) : placeholders enrichis avec
-        # un exemple concret et le format attendu, plus une ligne grise
-        # sous chaque champ qui rappelle le format en clair.
-        # Refactor 2026-05-15 : nouveaux champs Extension, Dimensions, Caméra.
-        for label, var, placeholder, hint in [
-            ("Date min :", self.filter_date_min, "ex. 2024-06-01", "Format YYYY-MM-DD  ·  ex. 2024-06-01"),
-            (
-                "Date max :",
-                self.filter_date_max,
-                "ex. 2024-12-31",
-                "Format YYYY-MM-DD  ·  laisser vide = pas de limite",
-            ),
-            ("Taille min :", self.filter_size_min, "ex. 100KB", "Unités : B/KB/MB/GB  ·  ex. 100KB, 5MB"),
-            ("Taille max :", self.filter_size_max, "ex. 50MB", "Unités : B/KB/MB/GB  ·  vide = pas de limite"),
-            (
-                "Extension :",
-                self.filter_extensions,
-                "ex. jpg,raw,heic",
-                "Liste CSV  ·  match si l'extension du fichier est listée",
-            ),
-            ("Dim. min :", self.filter_dim_min, "ex. 1920x1080", "Format WxH  ·  ignore les photos plus petites"),
-            ("Dim. max :", self.filter_dim_max, "ex. 8000x6000", "Format WxH  ·  ignore les photos plus grandes"),
-            (
-                "Caméra :",
-                self.filter_camera_make,
-                "ex. Sony,Canon",
-                "Liste CSV  ·  match si EXIF Make contient l'un des noms",
-            ),
-        ]:
+        # ---- Bloc Entrées texte avec exemples cliquables sous chaque champ ----
+        # Refonte v2.3 (retour testeur 2026-05-17) : chaque filtre est
+        # accompagné d'une rangée de « chips » cliquables qui remplissent
+        # le champ en un clic. Permet d'expérimenter rapidement sans
+        # connaître la syntaxe.
+        filter_specs = [
+            ("Date min :",  self.filter_date_min,  "YYYY-MM-DD — ex. 2024-06-01",
+             ["2024-01-01", "2024-06-01", "2025-01-01"]),
+            ("Date max :",  self.filter_date_max,  "YYYY-MM-DD — vide = pas de limite",
+             ["2024-12-31", "2025-06-30", "2025-12-31"]),
+            ("Taille min :", self.filter_size_min, "B/KB/MB/GB — ex. 100KB",
+             ["100KB", "500KB", "1MB", "5MB"]),
+            ("Taille max :", self.filter_size_max, "B/KB/MB/GB — vide = pas de limite",
+             ["5MB", "20MB", "50MB", "1GB"]),
+            ("Extension :", self.filter_extensions, "Liste CSV — ex. jpg,raw,heic",
+             ["jpg", "jpg,png", "jpg,raw", "raw,heic,dng"]),
+            ("Dim. min :",  self.filter_dim_min,   "WxH — ex. 1920x1080",
+             ["800x600", "1920x1080", "3840x2160"]),
+            ("Dim. max :",  self.filter_dim_max,   "WxH — ex. 8000x6000",
+             ["1920x1080", "4096x2160", "8000x6000"]),
+        ]
+        # Liste des chips créés (utile aux tests + à la lecture programmatique)
+        self._filter_example_chips = []
+        for label, var, placeholder, examples in filter_specs:
             row = ctk.CTkFrame(filters, fg_color="transparent")
             row.pack(fill="x", padx=PAD_S, pady=(2, 0))
             ctk.CTkLabel(row, text=label, width=86, anchor="w", font=font_label()).pack(side="left")
             ctk.CTkEntry(row, textvariable=var, placeholder_text=placeholder, height=BTN_H_STD).pack(
                 side="left", padx=PAD_S, fill="x", expand=True
             )
-            # Hint format en italique gris sous le champ
+            # Ligne d'exemples cliquables (chips compacts)
+            ex_row = ctk.CTkFrame(filters, fg_color="transparent")
+            ex_row.pack(fill="x", padx=(94, PAD_S), pady=(0, PAD_S))
             ctk.CTkLabel(
-                filters,
-                text=f"    {hint}",
-                font=font_hint(),
-                text_color=HINT_COLOR,
-                anchor="w",
-            ).pack(fill="x", padx=PAD_S, pady=(0, 2))
+                ex_row, text="Exemples :", font=font_hint(),
+                text_color=HINT_COLOR, anchor="w",
+            ).pack(side="left", padx=(0, PAD_S))
+            for ex in examples:
+                chip = ctk.CTkButton(
+                    ex_row,
+                    text=ex,
+                    command=lambda v=var, val=ex: v.set(val),
+                    width=10,
+                    height=22,
+                    font=font_hint(),
+                    fg_color=("gray85", "gray25"),
+                    text_color=("gray15", "gray85"),
+                    hover_color=("gray75", "gray35"),
+                    corner_radius=11,
+                )
+                chip.pack(side="left", padx=2)
+                self._filter_example_chips.append(chip)
 
-        # Note EXIF
+        # Refonte v2.2 : hints inline supprimés ; le sens des valeurs est
+        # explicité dans le tooltip de l'OptionMenu (cf. _attach_tooltips).
+
+        # Note EXIF (0 = inactif)
         rating_row = ctk.CTkFrame(filters, fg_color="transparent")
         rating_row.pack(fill="x", padx=PAD_S, pady=2)
         ctk.CTkLabel(rating_row, text="Note ≥ :", width=86, anchor="w", font=font_label()).pack(side="left")
@@ -856,28 +1053,12 @@ class OrganizeFrame(ctk.CTkFrame):
             height=BTN_H_STD,
             command=lambda v: self.filter_rating_min.set(int(v)),
         ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(rating_row, text="(0 = inactif)", font=font_hint(), text_color=HINT_COLOR).pack(side="left")
 
-        # GPS présent / absent (refactor 2026-05-15) — OptionMenu 3 valeurs
-        gps_row = ctk.CTkFrame(filters, fg_color="transparent")
-        gps_row.pack(fill="x", padx=PAD_S, pady=2)
-        ctk.CTkLabel(gps_row, text="GPS :", width=86, anchor="w", font=font_label()).pack(side="left")
-        ctk.CTkOptionMenu(
-            gps_row,
-            variable=self.filter_gps_required,
-            values=["any", "with", "without"],
-            width=110,
-            height=BTN_H_STD,
-        ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(
-            filters,
-            text="    any = tous  ·  with = uniquement avec GPS  ·  without = uniquement sans GPS",
-            font=font_hint(),
-            text_color=HINT_COLOR,
-            anchor="w",
-        ).pack(fill="x", padx=PAD_S, pady=(0, 2))
+        # GPS filtre retiré — fusionné dans la section Critères >
+        # « ☑ Par localisation GPS » qui propose désormais d'inclure ou
+        # non les photos sans GPS (cf. étape 3 fusion conceptuelle).
 
-        # Orientation (refactor 2026-05-15) — OptionMenu 4 valeurs
+        # Orientation (any/landscape/portrait/square)
         ori_row = ctk.CTkFrame(filters, fg_color="transparent")
         ori_row.pack(fill="x", padx=PAD_S, pady=2)
         ctk.CTkLabel(ori_row, text="Orientation :", width=86, anchor="w", font=font_label()).pack(side="left")
@@ -888,35 +1069,29 @@ class OrganizeFrame(ctk.CTkFrame):
             width=120,
             height=BTN_H_STD,
         ).pack(side="left", padx=PAD_S)
-        ctk.CTkLabel(
-            filters,
-            text="    landscape = W>H  ·  portrait = H>W  ·  square = W==H",
-            font=font_hint(),
-            text_color=HINT_COLOR,
-            anchor="w",
-        ).pack(fill="x", padx=PAD_S, pady=(0, 2))
 
-        # Mots-clés — W35 : placeholder + hint format
+        # Mots-clés (CSV)
         kw_row = ctk.CTkFrame(filters, fg_color="transparent")
-        kw_row.pack(fill="x", padx=PAD_S, pady=(2, 0))
+        kw_row.pack(fill="x", padx=PAD_S, pady=2)
         ctk.CTkLabel(kw_row, text="Mots-clés :", width=86, anchor="w", font=font_label()).pack(side="left")
         ctk.CTkEntry(
             kw_row,
             textvariable=self.filter_keywords,
-            placeholder_text="ex. vacances, mariage, été",
+            placeholder_text="CSV — ex. vacances, mariage, été",
             height=BTN_H_STD,
         ).pack(side="left", padx=PAD_S, fill="x", expand=True)
-        ctk.CTkLabel(
-            filters,
-            text="    Séparateur : virgule  ·  match si AU MOINS UN mot-clé EXIF correspond",
-            font=font_hint(),
-            text_color=HINT_COLOR,
-            anchor="w",
-        ).pack(fill="x", padx=PAD_S, pady=(0, PAD_S))
 
-        # ===== Colonne droite : comportements + bursts + incremental + index =====
-        behaviors = ctk.CTkFrame(self._adv_content, fg_color="transparent")
-        behaviors.grid(row=0, column=1, sticky="nsew", padx=(PAD_S, 0), pady=0)
+        # ===== Comportements + bursts + incremental → onglet 🛠️ Traiter =====
+        # Refonte v2.3 (Variante B) : la colonne droite « Comportements »
+        # est désormais empilée sous Action/Types dans l'onglet Traiter
+        # (et non plus en parallèle des filtres).
+        self._adv_right_frame = behaviors = ctk.CTkFrame(self._tab_process, fg_color="transparent")
+        behaviors.pack(fill="x", padx=PAD_S, pady=(PAD_M, PAD_S))
+
+        # Séparateur visuel entre Action/Types et Comportements
+        ctk.CTkFrame(self._tab_process, height=1, fg_color=SEPARATOR_COLOR).pack(
+            fill="x", padx=PAD_M, pady=(0, PAD_S), before=behaviors,
+        )
 
         ctk.CTkLabel(
             behaviors,
@@ -970,11 +1145,9 @@ class OrganizeFrame(ctk.CTkFrame):
             (
                 "🔍 Détection / mode",
                 [
-                    (
-                        "Détection de rafales → sous-dossier Burst_NN/",
-                        self.detect_bursts,
-                        "ex : 5 photos prises en 2 s → Burst_01/",
-                    ),
+                    # Détection de rafales : DÉPLACÉE dans l'onglet Organiser
+                    # (retour testeur 2026-05-17) — burst = critère, pas juste
+                    # un comportement. Cf. _create_options_section / left_frame.
                     (
                         "Mode incrémental (skip déjà organisés)",
                         self.incremental_mode,
@@ -1003,25 +1176,10 @@ class OrganizeFrame(ctk.CTkFrame):
                     justify="left",
                 ).pack(fill="x", padx=(PAD_L, PAD_S), pady=(0, PAD_S))
 
-                # Fix bug bursts (audit 2026-05-15) : les sous-options
-                # bursts apparaissent IMMÉDIATEMENT sous la checkbox
-                # « Détection de rafales », plus en fin de panneau.
-                # Affichage dynamique (show/hide selon detect_bursts).
-                if var is self.detect_bursts:
-                    self._burst_subopts = ctk.CTkFrame(
-                        behaviors,
-                        fg_color="transparent",
-                    )
-                    self._build_burst_subopts(self._burst_subopts)
-                    # État initial : visible si detect_bursts est True.
-                    if self.detect_bursts.get():
-                        self._burst_subopts.pack(
-                            fill="x",
-                            padx=(PAD_L * 2, PAD_S),
-                            pady=(0, PAD_S),
-                        )
-                    # Trace pour show/hide dynamique au clic
-                    self.detect_bursts.trace_add("write", lambda *_: self._refresh_burst_subopts())
+        # Bursts ont été déplacés vers l'onglet Organiser (cf. _create_options_section).
+        # On garde une référence vide pour rétrocompat de _refresh_burst_subopts.
+        if not hasattr(self, "_burst_subopts"):
+            self._burst_subopts = self._burst_subopts_organize
 
     def _make_config_persist_cb(self, attr_name):
         """Renvoie un callback `trace_add("write", ...)` qui persiste
@@ -1051,6 +1209,8 @@ class OrganizeFrame(ctk.CTkFrame):
         ctk.CTkLabel(mode_row, text="Mode :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR).pack(
             side="left"
         )
+        # Refonte 2026-05-17 it. 2 : 3 modes au lieu de 2 (manuel, auto-mean,
+        # auto-stddev). L'utilisateur choisit la stratégie de calcul auto.
         _make_radio(
             mode_row,
             text="Manuel (seuil fixe)",
@@ -1060,9 +1220,16 @@ class OrganizeFrame(ctk.CTkFrame):
         ).pack(side="left", padx=(0, PAD_M))
         _make_radio(
             mode_row,
-            text="Auto (Δ moyen − σ)",
+            text="Auto moyenne (Δ < mean)",
             variable=self.burst_mode,
-            value="auto",
+            value="auto_mean",
+            command=lambda: self._refresh_burst_mode_ui(),
+        ).pack(side="left", padx=(0, PAD_M))
+        _make_radio(
+            mode_row,
+            text="Auto écart-type (Δ < mean − σ)",
+            variable=self.burst_mode,
+            value="auto_stddev",
             command=lambda: self._refresh_burst_mode_ui(),
         ).pack(side="left")
 
@@ -1114,14 +1281,16 @@ class OrganizeFrame(ctk.CTkFrame):
         ).pack(side="left", padx=(0, PAD_S))
         ctk.CTkLabel(self._burst_auto_row, text="s", font=font_hint(), text_color=HINT_COLOR).pack(side="left")
 
-        # Ligne 3 : Min photos par burst (visible dans les 2 modes)
-        min_row = ctk.CTkFrame(container, fg_color="transparent")
-        min_row.pack(fill="x")
-        ctk.CTkLabel(min_row, text="Min photos :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR).pack(
+        # Ligne 3 : Min photos par burst — visible UNIQUEMENT en mode manuel.
+        # Retour testeur 2026-05-17 it. 3 : en mode auto, le calcul est
+        # entièrement basé sur la stat des Δt — aucun bouton à exposer.
+        self._burst_min_row = ctk.CTkFrame(container, fg_color="transparent")
+        self._burst_min_row.pack(fill="x")
+        ctk.CTkLabel(self._burst_min_row, text="Min photos :", width=80, anchor="w", font=font_hint(), text_color=HINT_COLOR).pack(
             side="left"
         )
         ctk.CTkOptionMenu(
-            min_row,
+            self._burst_min_row,
             variable=self.burst_min_count,
             values=["2", "3", "4", "5", "8"],
             width=60,
@@ -1129,28 +1298,36 @@ class OrganizeFrame(ctk.CTkFrame):
             command=lambda v: self.burst_min_count.set(int(v)),
         ).pack(side="left", padx=PAD_S)
         ctk.CTkLabel(
-            min_row,
+            self._burst_min_row,
             text="par groupe",
             font=font_hint(),
             text_color=HINT_COLOR,
         ).pack(side="left")
 
+        # Hint dédié au mode auto (affiché en remplacement quand auto)
+        self._burst_auto_hint = ctk.CTkLabel(
+            container,
+            text=(
+                "Calcul automatique sur les Δt EXIF du dossier — "
+                "aucun paramètre à régler manuellement."
+            ),
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+            wraplength=400,
+        )
+        # Pas packé ici — affichage piloté par _refresh_burst_mode_ui.
+
         # État initial (manuel par défaut)
         self._refresh_burst_mode_ui()
 
     def _refresh_burst_subopts(self):
-        """Show/hide des sous-options bursts selon ``detect_bursts``."""
-        try:
-            if self.detect_bursts.get():
-                self._burst_subopts.pack(
-                    fill="x",
-                    padx=(PAD_L * 2, PAD_S),
-                    pady=(0, PAD_S),
-                )
-            else:
-                self._burst_subopts.pack_forget()
-        except (AttributeError, tk.TclError):
-            pass
+        """No-op (refonte v2.3 retour testeur 2026-05-17) : les sous-options
+        burst sont désormais toujours visibles dans l'onglet Organiser.
+        Conservé pour rétrocompat avec d'éventuels appels externes.
+        """
+        return
 
     def _toggle_advanced_section(self):
         """Bascule le panneau Avancé (collapse/expand)."""
@@ -1176,32 +1353,29 @@ class OrganizeFrame(ctk.CTkFrame):
         return  # intentionnel — voir docstring
 
     def _create_rename_section(self):
-        """Section "Renommage" repliable avec layout 2 colonnes.
+        """Section "Renommage" — single colonne + popover exemples (v2.2).
 
-        Layout :
-          ▼ 🏷️ Renommage & Presets   ← bouton de pliage / dépliage
-          ┌────────────────────────┬──────────────────────────────────┐
-          │ Exemples (cliquables)   │ Template [_____________________]│
-          │  • Garder nom origine   │ Aperçu :                         │
-          │  • Date YYYYMMDD        │   IMG_0001.jpg → 20260507_…      │
-          │  • Date + compteur      │                                  │
-          │  • …                    │ Tokens : {original}, {ext}, …    │
-          │                         │                                  │
-          │  [Réinitialiser]        │ Preset : […▼] [💾] [🗑]           │
-          └────────────────────────┴──────────────────────────────────┘
+        Audit 2026-05-15 — étape 2/5 : la liste statique de 10 exemples
+        occupait ~30 % de la largeur du panneau Renommage en permanence.
+        Refonte : un bouton « 📋 Exemples ▸ » à côté du champ Template
+        ouvre un popover modal listant les 10 templates cliquables. Gain
+        d'espace : ~250 px de largeur récupérés, layout single-column.
 
-        L'état (replié/déplié) est persisté dans AppConfig.rename_collapsed.
+        Garde ``_rename_collapsed = False`` et ``_rename_toggle_btn`` pour
+        rétrocompat avec ``_attach_tooltips`` (référence existante au btn).
         """
-        # Container externe — wrapper qui contient le toggle + le contenu
-        wrapper = ctk.CTkFrame(self._scroll)
-        wrapper.grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_S, pady=(PAD_S, 0))
+        # Container externe — refonte v2.3 (Variante B) : grid dans l'onglet Renommer
+        wrapper = ctk.CTkFrame(self._tab_rename)
+        wrapper.pack(fill="x", padx=0, pady=PAD_S)
         wrapper.columnconfigure(0, weight=1)
 
-        # En-tête cliquable — toggle ▼ / ▶
-        self._rename_collapsed = bool(getattr(get_config().config, "rename_collapsed", False))
+        # État "déplié en permanence" — flag conservé pour rétrocompat
+        self._rename_collapsed = False
+
+        # Bouton toggle gardé pour rétrocompat (référencé par _attach_tooltips)
         self._rename_toggle_btn = ctk.CTkButton(
             wrapper,
-            text=self._rename_toggle_label(),
+            text="🏷️ Renommage & Presets",
             command=self._toggle_rename_section,
             anchor="w",
             font=font_section(),
@@ -1210,66 +1384,40 @@ class OrganizeFrame(ctk.CTkFrame):
             hover_color=("gray85", "gray25"),
             height=BTN_H_STD,
         )
-        self._rename_toggle_btn.grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
+        # Pas de grid() → invisible.
 
-        # Content frame (2 colonnes) — affiché ou caché selon état
-        self._rename_content = ctk.CTkFrame(wrapper, fg_color="transparent")
-        self._rename_content.columnconfigure(0, weight=1, uniform="rn")
-        self._rename_content.columnconfigure(1, weight=2, uniform="rn")
-
-        # ===== Colonne gauche : exemples cliquables =====
-        examples_box = ctk.CTkFrame(self._rename_content)
-        examples_box.grid(row=0, column=0, sticky="nsew", padx=(PAD_M, PAD_S), pady=(0, PAD_M))
-
+        # Titre de section visible (statique).
         ctk.CTkLabel(
-            examples_box,
-            text="📋 Exemples cliquables",
-            font=font_label(weight="bold"),
-        ).pack(anchor="w", padx=PAD_S, pady=(PAD_S, PAD_S))
+            wrapper,
+            text="🏷️ Renommage & Presets",
+            font=font_section(),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
 
-        # Scrollable list (les 10 exemples, ~28 px par ligne)
+        # Content frame — single colonne (refonte v2.2)
+        self._rename_content = ctk.CTkFrame(wrapper, fg_color="transparent")
+        self._rename_content.columnconfigure(1, weight=1)
+
+        # Liste des templates RENAME_TEMPLATES (chargée pour le popover et
+        # pour la rétrocompat de ``self._rename_example_btns``).
         from ui.prompt_examples import RENAME_TEMPLATES
+        self._rename_templates = list(RENAME_TEMPLATES)
 
-        examples_scroll = ctk.CTkScrollableFrame(
-            examples_box,
-            height=180,
-            fg_color="transparent",
-        )
-        examples_scroll.pack(fill="both", expand=True, padx=PAD_S, pady=(0, PAD_S))
+        # Rétrocompat : conserver `_rename_example_btns` (référencé par les
+        # tests UX_V4). Les boutons sont créés à la volée dans le popover ;
+        # ici on alimente la liste avec des références placeholder = None
+        # qui seront remplacées à chaque ouverture du popover.
+        self._rename_example_btns = [(None, tpl) for tpl in self._rename_templates]
 
-        self._rename_example_btns = []
-        for tpl in RENAME_TEMPLATES:
-            row = ctk.CTkFrame(examples_scroll, fg_color="transparent")
-            row.pack(fill="x", pady=1)
-            btn = ctk.CTkButton(
-                row,
-                text=f"• {tpl.label}",
-                anchor="w",
-                fg_color="transparent",
-                hover_color=("gray85", "gray25"),
-                text_color=("gray10", "#DCE4EE"),
-                command=lambda t=tpl.template: self._apply_rename_example(t),
-                height=24,
-                font=font_label(),
-            )
-            btn.pack(fill="x")
-            self._rename_example_btns.append((btn, tpl))
-
-        # Bouton Réinitialiser
-        ctk.CTkButton(
-            examples_box,
-            text="🔄 Réinitialiser",
-            command=lambda: self._apply_rename_example(""),
-            height=BTN_H_STD,
-            font=font_label(),
-        ).pack(fill="x", padx=PAD_S, pady=(PAD_S, PAD_S))
-
-        # ===== Colonne droite : zone d'édition + presets =====
+        # ===== Single colonne : édition + presets =====
         edit_box = ctk.CTkFrame(self._rename_content)
-        edit_box.grid(row=0, column=1, sticky="nsew", padx=(0, PAD_M), pady=(0, PAD_M))
+        edit_box.grid(row=0, column=0, sticky="nsew", padx=PAD_M, pady=(0, PAD_M))
         edit_box.columnconfigure(1, weight=1)
 
-        # Template entry (la "textbox" demandée par le prompt)
+        # Template entry — refonte v2.3 (retour testeur 2026-05-17) :
+        # le bouton popover « 📋 Exemples ▸ » a été supprimé au profit
+        # d'une liste inline scrollable plus bas. Le bouton est conservé
+        # caché pour rétrocompat (références tooltips / autres).
         ctk.CTkLabel(edit_box, text="Template :", font=font_label()).grid(
             row=0, column=0, sticky="w", padx=PAD_M, pady=(PAD_M, PAD_S)
         )
@@ -1281,6 +1429,13 @@ class OrganizeFrame(ctk.CTkFrame):
             font=font_label(),
         )
         self.rename_entry.grid(row=0, column=1, sticky="ew", padx=(0, PAD_M), pady=(PAD_M, PAD_S))
+
+        # Bouton popover caché (rétrocompat — pas grid() → invisible).
+        self._rename_examples_btn = neutral_button(
+            edit_box, text="📋 Exemples ▸",
+            command=self._show_rename_examples_popover,
+            width=140,
+        )
 
         # Aperçu live
         self.rename_preview_var = ctk.StringVar(value="(aucun template)")
@@ -1321,22 +1476,99 @@ class OrganizeFrame(ctk.CTkFrame):
             justify="left",
         ).grid(row=3, column=0, columnspan=2, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
 
-        # Séparateur entre Renommage et Presets
+        # ----- Liste inline des exemples (refonte v2.3 it. 2) -----------
+        # Retour testeur 2026-05-17 it. 2 : « les exemples doivent prendre
+        # toute la place du panneau pour éviter de perdre de l'espace et
+        # avoir une scroll bar pour rien ». Utilisation d'un Frame normal
+        # (pas de scrollbar interne) qui s'étend verticalement (sticky=nsew).
+        # Si l'onglet est trop court, le scroll global de la zone centre
+        # prend le relais — pas de scrollbar imbriquée.
+        ctk.CTkLabel(
+            edit_box,
+            text="📋 Exemples (cliquer pour appliquer) :",
+            font=font_label(weight="bold"),
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        # Frame normal sans height fixe — prend toute la place dispo.
+        examples_box = ctk.CTkFrame(
+            edit_box, fg_color=("gray95", "gray18"),
+        )
+        examples_box.grid(
+            row=5, column=0, columnspan=2, sticky="nsew",
+            padx=PAD_M, pady=(0, PAD_S),
+        )
+        # Permet à edit_box row=5 de s'étendre verticalement
+        edit_box.rowconfigure(5, weight=1)
+
+        # On reconstruit _rename_example_btns avec les vrais boutons inline
+        # (les tests UX_V4 vérifient len(self._rename_example_btns) >= 5).
+        self._rename_example_btns = []
+        for tpl in self._rename_templates:
+            row = ctk.CTkFrame(examples_box, fg_color="transparent")
+            row.pack(fill="x", padx=PAD_S, pady=4)
+            btn = ctk.CTkButton(
+                row,
+                text=f"• {tpl.label}",
+                anchor="w",
+                fg_color="transparent",
+                hover_color=("gray80", "gray28"),
+                text_color=("gray10", "#DCE4EE"),
+                command=lambda t=tpl.template: self._apply_rename_example(t),
+                height=28,
+                font=font_label(weight="bold"),
+            )
+            btn.pack(fill="x")
+            self._rename_example_btns.append((btn, tpl))
+            # Refonte v2.3 it. 4 (retour testeur 2026-05-18) : élargir les
+            # exemples pour montrer le template regex ET son explication
+            # côte à côte. wraplength est passé à une valeur très grande
+            # (1600 px) — le label utilise toute la largeur dispo grâce
+            # à fill="x" / anchor="w".
+            template_str = getattr(tpl, "template", "") or "(vide)"
+            description = getattr(tpl, "description", None) or template_str
+            preview = getattr(tpl, "preview", None)
+
+            # Ligne 1 : le template (regex) en monospace-like
+            ctk.CTkLabel(
+                row,
+                text=f"    Template : {template_str}",
+                font=font_hint(),
+                text_color=("#1565C0", "#64B5F6"),  # bleu — visuel "code"
+                anchor="w",
+                justify="left",
+                wraplength=1600,
+            ).pack(fill="x", padx=(0, 0))
+
+            # Ligne 2 : description + aperçu rendu
+            sub_text = f"    → {description}"
+            if preview:
+                sub_text += f"   ·   ex : {preview}"
+            ctk.CTkLabel(
+                row,
+                text=sub_text,
+                font=font_hint(),
+                text_color=HINT_COLOR,
+                anchor="w",
+                justify="left",
+                wraplength=1600,
+            ).pack(fill="x", padx=(0, 0))
+
+        # Séparateur entre Exemples et Presets
         ctk.CTkFrame(edit_box, height=1, fg_color=SEPARATOR_COLOR).grid(
-            row=4,
+            row=6,
             column=0,
             columnspan=2,
             sticky="ew",
             padx=PAD_M,
-            pady=(0, PAD_S),
+            pady=(PAD_S, PAD_S),
         )
 
         # Ligne Presets
         ctk.CTkLabel(edit_box, text="Preset :", font=font_label()).grid(
-            row=5, column=0, sticky="w", padx=PAD_M, pady=(0, PAD_M)
+            row=7, column=0, sticky="w", padx=PAD_M, pady=(0, PAD_M)
         )
         preset_row = ctk.CTkFrame(edit_box, fg_color="transparent")
-        preset_row.grid(row=5, column=1, sticky="ew", padx=(0, PAD_M), pady=(0, PAD_M))
+        preset_row.grid(row=7, column=1, sticky="ew", padx=(0, PAD_M), pady=(0, PAD_M))
         self._preset_menu = ctk.CTkOptionMenu(
             preset_row,
             variable=self.preset_name,
@@ -1349,9 +1581,99 @@ class OrganizeFrame(ctk.CTkFrame):
         icon_button(preset_row, text="💾", command=self._save_preset_dialog).pack(side="left", padx=(0, PAD_S))
         icon_button(preset_row, text="🗑", command=self._delete_preset).pack(side="left")
 
-        # État initial
-        if not self._rename_collapsed:
-            self._rename_content.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
+        # Toujours visible (refonte v2.2) — plus de pliage conditionnel.
+        self._rename_content.grid(row=1, column=0, sticky="ew", padx=0, pady=0)
+
+    def _show_rename_examples_popover(self):
+        """Modale flottante listant les 10 templates de renommage cliquables.
+
+        Refonte v2.2 (étape 2/5) : remplace la liste statique permanente
+        (colonne gauche du Renommage qui prenait ~30 % de la largeur).
+        Cette modale s'ouvre au clic sur « 📋 Exemples ▸ », l'utilisateur
+        choisit un template (clic) ou réinitialise (bouton bas), puis la
+        modale se ferme automatiquement.
+        """
+        from ui.theme import add_logo_to_modal
+
+        win = ctk.CTkToplevel(self)
+        win.title("Exemples de renommage")
+        win.geometry("520x460")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
+
+        # Logo + titre (helper centralisé)
+        add_logo_to_modal(win, size=40, text="📋 Exemples de renommage")
+
+        # Sous-titre explicatif
+        ctk.CTkLabel(
+            win,
+            text=("Cliquez sur un exemple pour l'appliquer au champ Template. "
+                  "La modale se ferme automatiquement."),
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+            wraplength=480,
+        ).pack(fill="x", padx=PAD_L, pady=(PAD_S, PAD_M))
+
+        # Liste scrollable des exemples cliquables (refait à chaque ouverture
+        # — les références sont stockées dans _rename_example_btns pour
+        # rétrocompat avec les tests).
+        listbox = ctk.CTkScrollableFrame(win, fg_color="transparent")
+        listbox.pack(fill="both", expand=True, padx=PAD_L, pady=PAD_S)
+
+        self._rename_example_btns = []
+        for tpl in self._rename_templates:
+            row = ctk.CTkFrame(listbox, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            # Label du template (Titre + description en dessous)
+            btn = ctk.CTkButton(
+                row,
+                text=f"• {tpl.label}",
+                anchor="w",
+                fg_color="transparent",
+                hover_color=("gray85", "gray25"),
+                text_color=("gray10", "#DCE4EE"),
+                command=lambda t=tpl.template, w=win: (
+                    self._apply_rename_example(t), w.destroy()
+                ),
+                height=28,
+                font=font_label(),
+            )
+            btn.pack(fill="x")
+            self._rename_example_btns.append((btn, tpl))
+            # Description en sous-ligne grise pour comprendre le rendu
+            description = getattr(tpl, "description", None) or getattr(tpl, "template", "")
+            ctk.CTkLabel(
+                row,
+                text=f"    → {description}",
+                font=font_hint(),
+                text_color=HINT_COLOR,
+                anchor="w",
+                justify="left",
+            ).pack(fill="x")
+
+        # Boutons bas : Réinitialiser (gauche) + Fermer (droite)
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=PAD_L, pady=(PAD_S, PAD_L))
+        btn_row.columnconfigure(1, weight=1)
+
+        neutral_button(
+            btn_row,
+            text="🔄 Réinitialiser",
+            command=lambda: (self._apply_rename_example(""), win.destroy()),
+            width=140,
+        ).grid(row=0, column=0, sticky="w")
+
+        neutral_button(
+            btn_row,
+            text="Fermer",
+            command=win.destroy,
+            width=100,
+        ).grid(row=0, column=2, sticky="e")
+
+        # Raccourci Echap pour fermer
+        win.bind("<Escape>", lambda _e: win.destroy())
 
     def _rename_toggle_label(self) -> str:
         return "▶  🏷️ Renommage & Presets" if self._rename_collapsed else "▼  🏷️ Renommage & Presets"
@@ -1359,20 +1681,25 @@ class OrganizeFrame(ctk.CTkFrame):
     def _refresh_burst_mode_ui(self):
         """Affiche/cache les sous-options bursts selon le mode actif.
 
-        Mode manuel → ``_burst_manual_row`` (Écart max) visible,
-                      ``_burst_auto_row`` (bornes auto) caché.
-        Mode auto   → l'inverse : on cache l'Écart max et on expose les
-                      bornes du clamp auto (min/max) pour permettre à
-                      l'utilisateur d'ajuster la sensibilité (audit
-                      2026-05-15 élargissement).
+        Refonte 2026-05-17 it. 3 :
+        - Mode manuel : Écart max + Min photos affichés (paramétrables).
+        - Modes auto_mean / auto_stddev : tout est masqué — seul un hint
+          indique que le calcul est entièrement automatique sur les Δt
+          EXIF. L'utilisateur n'a aucun bouton à régler.
         """
         try:
-            if self.burst_mode.get() == "manual":
+            mode = self.burst_mode.get()
+            is_manual = (mode == "manual")
+            if is_manual:
                 self._burst_manual_row.pack(fill="x", pady=(0, 2))
                 self._burst_auto_row.pack_forget()
+                self._burst_min_row.pack(fill="x")
+                self._burst_auto_hint.pack_forget()
             else:
                 self._burst_manual_row.pack_forget()
-                self._burst_auto_row.pack(fill="x", pady=(0, 2))
+                self._burst_auto_row.pack_forget()
+                self._burst_min_row.pack_forget()
+                self._burst_auto_hint.pack(fill="x", pady=(PAD_S, 0))
         except AttributeError:
             # Pas encore créé (appel pendant l'init)
             pass
@@ -1396,32 +1723,144 @@ class OrganizeFrame(ctk.CTkFrame):
         self.rename_template.set(template_str)
         # Le trace_add appelle automatiquement _refresh_rename_preview
 
+    def _create_right_rail(self):
+        """Right rail (refonte v2.3 — Variante B) : actions + presets.
+
+        Layout vertical sticky (210 px de large, hauteur = middle row) :
+          ─────────────
+          Preset ▼  💾  🗑
+          ─────────────
+          📊 Analyser  (height=40)
+          👁 Aperçu    (height=40)
+          ❌ Annuler   (height=32)
+          🚀 Organiser (height=40, primary)
+          ─────────────
+          ▼ Cible
+          • N fichiers
+          • M dossiers
+
+        Les attributs ``self.analyze_button`` / ``self.preview_button`` /
+        ``self.cancel_button`` / ``self.organize_button`` sont conservés
+        (les méthodes _organize_files etc. y font référence partout).
+        """
+        rail = self._right_rail
+        rail.columnconfigure(0, weight=1)
+
+        # ===== Section Preset (en haut du rail) =====
+        ctk.CTkLabel(
+            rail, text="📦 Preset", font=font_label(weight="bold"), anchor="w"
+        ).pack(fill="x", padx=PAD_M, pady=(PAD_M, PAD_S))
+
+        preset_box = ctk.CTkFrame(rail, fg_color="transparent")
+        preset_box.pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
+        preset_box.columnconfigure(0, weight=1)
+
+        # On crée un OptionMenu rail mais sans variable (la vraie variable
+        # `self.preset_name` est créée par _create_rename_section). On
+        # synchronisera l'affichage via une trace après init.
+        self._rail_preset_menu = ctk.CTkOptionMenu(
+            preset_box,
+            variable=self.preset_name,
+            values=self._list_preset_names() if hasattr(self, "_list_preset_names") else ["—"],
+            command=self._on_preset_selected if hasattr(self, "_on_preset_selected") else None,
+            height=BTN_H_STD,
+        )
+        self._rail_preset_menu.grid(row=0, column=0, sticky="ew")
+        icon_button(preset_box, text="💾", command=self._save_preset_dialog).grid(
+            row=0, column=1, padx=(PAD_S, 0)
+        )
+        icon_button(preset_box, text="🗑", command=self._delete_preset).grid(
+            row=0, column=2, padx=(PAD_S, 0)
+        )
+
+        # Séparateur
+        ctk.CTkFrame(rail, height=1, fg_color=SEPARATOR_COLOR).pack(
+            fill="x", padx=PAD_M, pady=PAD_S,
+        )
+
+        # ===== Actions (verticales, sticky) =====
+        # Refonte v2.3 (Variante B) : les 4 boutons sont empilés
+        # verticalement dans le right rail au lieu de la zone bottom
+        # horizontale. Cliquables sans bouger les yeux du contenu.
+        actions_box = ctk.CTkFrame(rail, fg_color="transparent")
+        actions_box.pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
+        actions_box.columnconfigure(0, weight=1)
+
+        self.analyze_button = neutral_button(
+            actions_box,
+            text="📊 Analyser",
+            command=self._analyze_files,
+            height=BTN_H_PRIMARY,
+            font=font_label(weight="bold"),
+        )
+        self.analyze_button.pack(fill="x", pady=(0, PAD_S))
+
+        self.preview_button = neutral_button(
+            actions_box,
+            text="👁 Aperçu",
+            command=self._show_dry_run_preview,
+            height=BTN_H_PRIMARY,
+            font=font_label(weight="bold"),
+        )
+        self.preview_button.pack(fill="x", pady=(0, PAD_S))
+
+        self.cancel_button = danger_button(
+            actions_box,
+            text="❌ Annuler",
+            command=self._cancel_operation,
+            state="disabled",
+        )
+        self.cancel_button.pack(fill="x", pady=(0, PAD_S))
+
+        self.organize_button = primary_button(
+            actions_box,
+            text="🚀 Organiser",
+            command=self._organize_files,
+        )
+        self.organize_button.pack(fill="x")
+
+        # Séparateur
+        ctk.CTkFrame(rail, height=1, fg_color=SEPARATOR_COLOR).pack(
+            fill="x", padx=PAD_M, pady=PAD_S,
+        )
+
+        # ===== Cible (résumé dynamique) =====
+        ctk.CTkLabel(
+            rail, text="🎯 Cible", font=font_label(weight="bold"), anchor="w"
+        ).pack(fill="x", padx=PAD_M, pady=(0, PAD_S))
+
+        # Variable affichant le résumé. Sera mise à jour par _refresh_file_count
+        # une fois le scan terminé (cf. Variante B point « right rail Cible »).
+        self._target_summary_var = ctk.StringVar(
+            value="Sélectionnez une source pour voir la cible."
+        )
+        ctk.CTkLabel(
+            rail,
+            textvariable=self._target_summary_var,
+            font=font_hint(),
+            text_color=HINT_COLOR,
+            anchor="w",
+            justify="left",
+            wraplength=180,
+        ).pack(fill="x", padx=PAD_M, pady=(0, PAD_M))
+
     def _create_actions_section(self):
-        """Section actions en zone bottom fixe (toujours visible).
+        """Section actions en zone bottom slim (refonte v2.3 — Variante B).
 
-        Layout :
-          ProgressBar (row 0)
-          Label progression (row 1)
-          [📊 Analyser] [👁 Aperçu]   <-spacer->   [❌ Annuler] [🚀 Organiser]
-                                                              (action principale à droite)
-
-        Le compteur fichiers est en zone TOP (sous Source/Destination), pas
-        ici — l'utilisateur le voit avant même de regarder les boutons.
+        Désormais réduite à la progress bar uniquement (~40 px). Les boutons
+        d'action sont passés dans le right rail (cf. ``_create_right_rail``).
         """
         parent = self._bottom_zone
         parent.columnconfigure(0, weight=1)
 
-        # Lot B (audit 2026-05-14, T-036) : progress bar plus visible.
-        # height 14 → 20 ; ajout d'une bordure matérialisant la track à 0 % ;
-        # label numérique « 0 % » toujours présent à droite pour qu'on
-        # repère immédiatement où est l'indicateur.
+        # Progress bar + pourcentage + label sur 1 ligne (slim)
         progress_row = ctk.CTkFrame(parent, fg_color="transparent")
-        progress_row.grid(row=0, column=0, sticky="ew", pady=(0, PAD_S))
+        progress_row.grid(row=0, column=0, sticky="ew", pady=0)
         progress_row.columnconfigure(0, weight=1)
 
         self.progress_bar = ctk.CTkProgressBar(
             progress_row,
-            height=20,
+            height=18,
             border_width=1,
             border_color=("gray60", "gray40"),
         )
@@ -1435,54 +1874,18 @@ class OrganizeFrame(ctk.CTkFrame):
             font=font_label(weight="bold"),
             width=44,
             anchor="e",
-        ).grid(row=0, column=1, sticky="e")
+        ).grid(row=0, column=1, sticky="e", padx=(0, PAD_S))
 
-        # Label de progression
+        # Label de progression (slim — collé à la même ligne)
         self.progress_label = ctk.CTkLabel(
-            parent,
+            progress_row,
             text="Prêt",
             font=font_label(),
             anchor="w",
             text_color=LABEL_MUTED,
+            width=200,
         )
-        self.progress_label.grid(row=1, column=0, sticky="ew", pady=(0, PAD_S))
-
-        # Rangée de boutons : actions secondaires à gauche, principales à droite
-        buttons = ctk.CTkFrame(parent, fg_color="transparent")
-        buttons.grid(row=2, column=0, sticky="ew")
-        # 4 colonnes : 2 boutons gauche, expanding spacer, 2 boutons droite
-        buttons.columnconfigure(2, weight=1)
-
-        # GAUCHE : actions secondaires (analyse, preview)
-        self.analyze_button = neutral_button(
-            buttons,
-            text="📊 Analyser",
-            command=self._analyze_files,
-        )
-        self.analyze_button.grid(row=0, column=0, padx=(0, PAD_S), sticky="w")
-
-        self.preview_button = neutral_button(
-            buttons,
-            text="👁 Aperçu",
-            command=self._show_dry_run_preview,
-        )
-        self.preview_button.grid(row=0, column=1, padx=(0, PAD_S), sticky="w")
-
-        # DROITE : annuler (destructif) + action principale
-        self.cancel_button = danger_button(
-            buttons,
-            text="❌ Annuler",
-            command=self._cancel_operation,
-            state="disabled",
-        )
-        self.cancel_button.grid(row=0, column=3, padx=(0, PAD_S), sticky="e")
-
-        self.organize_button = primary_button(
-            buttons,
-            text="🚀 Organiser",
-            command=self._organize_files,
-        )
-        self.organize_button.grid(row=0, column=4, sticky="e")
+        self.progress_label.grid(row=0, column=2, sticky="e")
 
     # ------------------------------------------------------------------
     # Ordre des critères en mode multicouche
@@ -1499,11 +1902,14 @@ class OrganizeFrame(ctk.CTkFrame):
     }
 
     def _update_criteria_visibility(self):
-        """Affiche/masque le panneau d'ordre selon le toggle multicouche."""
-        if self.multilayer.get():
-            self.criteria_order_frame.pack(fill="x", padx=20, pady=(0, 6))
-        else:
-            self.criteria_order_frame.pack_forget()
+        """Affiche le panneau d'ordre des critères (multicouche).
+
+        Refonte v2.3 (retour testeur 2026-05-17) : toujours visible.
+        L'ordre est ignoré au runtime quand ``multilayer`` est False
+        (cf. core/organizer.py), mais l'utilisateur voit en permanence
+        l'ordre actuel et peut le réarranger même hors mode multicouche.
+        """
+        self.criteria_order_frame.pack(fill="x", padx=20, pady=(0, 6))
 
     def _render_criteria_order(self):
         """Recrée les lignes de l'ordre des critères.
@@ -1621,21 +2027,37 @@ class OrganizeFrame(ctk.CTkFrame):
         self._on_max_distance_change(new_val)
 
     def _refresh_gps_options_visibility(self):
-        """Affiche/masque les sous-options GPS sous la case correspondante.
+        """Affiche les sous-options GPS sous la case correspondante.
 
-        Refonte W17/W18 : pack(after=self._gps_checkbox) pour que les
-        sous-options apparaissent DIRECTEMENT sous « Par localisation GPS »
-        et non en bas du panneau (après Organisation avancée).
+        Refonte v2.3 (retour testeur 2026-05-17) : les sous-options sont
+        désormais TOUJOURS visibles, peu importe l'état de la checkbox
+        « Par localisation GPS ». L'utilisateur voit en permanence les
+        paramètres disponibles (géocodage, distance max) et peut les
+        configurer même si le critère n'est pas (encore) activé.
         """
-        if self.organize_by_location.get():
+        # Toujours visible — pas de pack_forget conditionnel.
+        # ``after=`` reste pour positionner sous le checkbox.
+        try:
             self.gps_options_frame.pack(
                 fill="x",
                 padx=40,
                 pady=(0, 4),
                 after=self._gps_checkbox,
             )
-        else:
-            self.gps_options_frame.pack_forget()
+        except (tk.TclError, AttributeError):
+            # Si _gps_checkbox n'est pas encore créé, pack standard.
+            self.gps_options_frame.pack(fill="x", padx=40, pady=(0, 4))
+
+    def _refresh_camera_options_visibility(self):
+        """Affiche la sous-option « Limiter aux marques » sous « Par appareil ».
+
+        Refonte v2.3 (retour testeur 2026-05-17) : toujours visible.
+        L'utilisateur peut renseigner les marques même si le critère
+        principal n'est pas activé — le champ est ignoré quand
+        ``organize_by_camera`` est False (cf. core/organizer.py).
+        """
+        # Toujours visible — plus de logique conditionnelle.
+        self._camera_options_frame.pack(fill="x", padx=20, pady=(0, 4))
 
     def _browse_source(self):
         """Ouvre le dialogue de sélection du dossier source."""
@@ -1803,66 +2225,15 @@ class OrganizeFrame(ctk.CTkFrame):
         logger.info(f"Preset '{name}' charge")
 
     def _save_preset_dialog(self):
-        """Modale de sauvegarde de preset (audit 2026-05-15).
+        """Panneau inline « Sauvegarder un preset » (refonte 2026-05-18).
 
-        Remplace l'ancien ``simpledialog.askstring`` (trop petit, illisible)
-        par une vraie modale 520×360 avec :
-        - Logo PhotoOrganizer en haut-gauche
-        - Champ Nom (entry)
-        - Récap synthétique de ce qui sera sauvegardé (label scrollable)
-        - Boutons Annuler / Enregistrer
+        Remplace l'ancienne modale CTkToplevel par un panneau intégré
+        (logo + champ Nom + récap + boutons Annuler/Enregistrer). La
+        validation est faite dans la callback ``_on_save`` ; en cas de
+        succès, le panneau se ferme et le status bar est mis à jour.
         """
-        from ui.theme import BTN_H_PRIMARY, add_logo_to_modal
-
-        win = ctk.CTkToplevel(self)
-        win.title("Sauvegarder un preset")
-        win.geometry("520x360")
-        win.transient(self.winfo_toplevel())
-        win.grab_set()
-        win.columnconfigure(1, weight=1)
-        win.rowconfigure(3, weight=1)
-
-        # Logo + titre (row 0)
-        add_logo_to_modal(win, size=40, text="Sauvegarder un preset")
-
-        # Champ Nom (row 1)
-        ctk.CTkLabel(
-            win,
-            text="Nom du preset :",
-            font=font_label(weight="bold"),
-        ).grid(row=1, column=0, sticky="w", padx=PAD_L, pady=(PAD_M, PAD_S))
         name_var = ctk.StringVar()
-        name_entry = ctk.CTkEntry(
-            win,
-            textvariable=name_var,
-            height=BTN_H_STD,
-            placeholder_text="ex : vacances-ete-2026",
-        )
-        name_entry.grid(row=1, column=1, sticky="ew", padx=(0, PAD_L), pady=(PAD_M, PAD_S))
-        name_entry.focus_set()
-
-        # Hint nom (row 2)
-        ctk.CTkLabel(
-            win,
-            text="    Caractères autorisés : lettres, chiffres, tirets, soulignés. Pas d'espace.",
-            font=font_hint(),
-            text_color=HINT_COLOR,
-            anchor="w",
-            justify="left",
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_S))
-
-        # Récap des options sauvegardées (row 3, expand)
-        recap_frame = ctk.CTkFrame(win)
-        recap_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=PAD_L, pady=PAD_S)
-        ctk.CTkLabel(
-            recap_frame,
-            text="📋 Contenu du preset",
-            font=font_label(weight="bold"),
-            anchor="w",
-        ).pack(fill="x", padx=PAD_M, pady=(PAD_S, 2))
-        recap_box = ctk.CTkTextbox(recap_frame, height=140, font=font_hint())
-        recap_box.pack(fill="both", expand=True, padx=PAD_M, pady=(0, PAD_M))
-        # Construction du récap textuel
+        error_var = ctk.StringVar(value="")
         recap_lines = [
             f"• Organisation : date={self.organize_by_date.get()}, "
             f"camera={self.organize_by_camera.get()}, "
@@ -1880,93 +2251,99 @@ class OrganizeFrame(ctk.CTkFrame):
             f"note ≥ {self.filter_rating_min.get()}",
             f"• Renommage : {self.rename_template.get() or '(nom d origine)'}",
         ]
-        recap_box.insert("end", "\n".join(recap_lines))
-        recap_box.configure(state="disabled")
 
-        # Boutons (row 4)
-        btn_row = ctk.CTkFrame(win, fg_color="transparent")
-        btn_row.grid(row=4, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_L))
-        btn_row.columnconfigure(1, weight=1)
+        def build(body):
+            body.columnconfigure(1, weight=1)
+            body.rowconfigure(3, weight=1)
+            # Champ Nom
+            ctk.CTkLabel(
+                body, text="Nom du preset :", font=font_label(weight="bold"),
+            ).grid(row=0, column=0, sticky="w", padx=PAD_L, pady=(PAD_S, PAD_S))
+            name_entry = ctk.CTkEntry(
+                body, textvariable=name_var, height=BTN_H_STD,
+                placeholder_text="ex : vacances-ete-2026",
+            )
+            name_entry.grid(row=0, column=1, sticky="ew", padx=(0, PAD_L), pady=(PAD_S, PAD_S))
+            name_entry.focus_set()
+            # Hint
+            ctk.CTkLabel(
+                body,
+                text="    Caractères autorisés : lettres, chiffres, tirets, soulignés. Pas d'espace.",
+                font=font_hint(), text_color=HINT_COLOR, anchor="w", justify="left",
+            ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_S))
+            # Erreur de validation inline (visible quand error_var non vide)
+            ctk.CTkLabel(
+                body, textvariable=error_var,
+                text_color=("#c0392b", "#e74c3c"),
+                anchor="w", justify="left", font=font_hint(),
+            ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=PAD_L, pady=(0, PAD_S))
+            # Récap des options
+            recap_frame = ctk.CTkFrame(body)
+            recap_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=PAD_L, pady=PAD_S)
+            ctk.CTkLabel(
+                recap_frame, text="📋 Contenu du preset",
+                font=font_label(weight="bold"), anchor="w",
+            ).pack(fill="x", padx=PAD_M, pady=(PAD_S, 2))
+            recap_box = ctk.CTkTextbox(recap_frame, height=140, font=font_hint())
+            recap_box.pack(fill="both", expand=True, padx=PAD_M, pady=(0, PAD_M))
+            recap_box.insert("end", "\n".join(recap_lines))
+            recap_box.configure(state="disabled")
 
-        result = {"name": None}
+        close_holder = {}
 
         def _on_save():
             n = name_var.get().strip()
             if not n:
-                messagebox.showerror(
-                    "Preset",
-                    "Le nom est obligatoire.",
-                    parent=win,
-                )
+                error_var.set("⚠️ Le nom est obligatoire.")
                 return
             if any(c in n for c in r' /\:*?"<>|'):
-                messagebox.showerror(
-                    "Preset",
-                    "Caractères interdits dans le nom (espace, /, \\, etc).",
-                    parent=win,
-                )
+                error_var.set("⚠️ Caractères interdits dans le nom (espace, /, \\, etc).")
                 return
-            result["name"] = n
-            win.destroy()
+            error_var.set("")
+            data = {
+                "organize_by_date": self.organize_by_date.get(),
+                "organize_by_camera": self.organize_by_camera.get(),
+                "multilayer": self.multilayer.get(),
+                "copy_not_move": self.copy_not_move.get(),
+                "date_format": self.date_format.get(),
+                "recursive": self.recursive.get(),
+                "include_images": self.include_images.get(),
+                "include_raw": self.include_raw.get(),
+                "include_videos": self.include_videos.get(),
+                "criteria_order": list(self._criteria_order),
+                "filter_date_min": self.filter_date_min.get(),
+                "filter_date_max": self.filter_date_max.get(),
+                "filter_size_min": self.filter_size_min.get(),
+                "filter_size_max": self.filter_size_max.get(),
+                "filter_rating_min": self.filter_rating_min.get(),
+                "filter_keywords": self.filter_keywords.get(),
+                "skip_if_identical": self.skip_if_identical.get(),
+                "keep_raw_jpeg_pairs": self.keep_raw_jpeg_pairs.get(),
+                "cleanup_empty_source": self.cleanup_empty_source.get(),
+                "validate_disk_space": self.validate_disk_space.get(),
+                "export_index_csv": self.export_index_csv.get(),
+                "export_index_json": self.export_index_json.get(),
+                "notify_on_finish": self.notify_on_finish.get(),
+                "rename_template": self.rename_template.get(),
+            }
+            try:
+                get_config().save_preset(n, data)
+                self._refresh_preset_menu(select=n)
+                self.status_callback(f"Preset « {n} » enregistré.", None)
+                close = close_holder.get("close")
+                if close:
+                    close()
+            except Exception as exc:
+                error_var.set(f"⚠️ Sauvegarde échouée : {exc}")
 
-        ctk.CTkButton(
-            btn_row,
-            text="Annuler",
-            command=win.destroy,
-            height=BTN_H_STD,
-            fg_color=("gray70", "gray30"),
-            hover_color=("gray60", "gray40"),
-        ).grid(row=0, column=0, sticky="w")
-
-        ctk.CTkButton(
-            btn_row,
-            text="💾 Enregistrer",
-            command=_on_save,
-            height=BTN_H_PRIMARY,
-            font=font_label(weight="bold"),
-        ).grid(row=0, column=2, sticky="e")
-
-        # Raccourci Enter = enregistrer, Echap = annuler
-        win.bind("<Return>", lambda _e: _on_save())
-        win.bind("<Escape>", lambda _e: win.destroy())
-
-        win.wait_window()
-
-        name = result["name"]
-        if not name:
-            return
-        data = {
-            "organize_by_date": self.organize_by_date.get(),
-            "organize_by_camera": self.organize_by_camera.get(),
-            "multilayer": self.multilayer.get(),
-            "copy_not_move": self.copy_not_move.get(),
-            "date_format": self.date_format.get(),
-            "recursive": self.recursive.get(),
-            "include_images": self.include_images.get(),
-            "include_raw": self.include_raw.get(),
-            "include_videos": self.include_videos.get(),
-            "criteria_order": list(self._criteria_order),
-            "filter_date_min": self.filter_date_min.get(),
-            "filter_date_max": self.filter_date_max.get(),
-            "filter_size_min": self.filter_size_min.get(),
-            "filter_size_max": self.filter_size_max.get(),
-            "filter_rating_min": self.filter_rating_min.get(),
-            "filter_keywords": self.filter_keywords.get(),
-            "skip_if_identical": self.skip_if_identical.get(),
-            "keep_raw_jpeg_pairs": self.keep_raw_jpeg_pairs.get(),
-            "cleanup_empty_source": self.cleanup_empty_source.get(),
-            "validate_disk_space": self.validate_disk_space.get(),
-            "export_index_csv": self.export_index_csv.get(),
-            "export_index_json": self.export_index_json.get(),
-            "notify_on_finish": self.notify_on_finish.get(),
-            "rename_template": self.rename_template.get(),
-        }
-        try:
-            get_config().save_preset(name, data)
-            self._refresh_preset_menu(select=name)
-            messagebox.showinfo("Preset", f"Preset '{name}' enregistré.")
-        except Exception as exc:
-            messagebox.showerror("Preset", f"Sauvegarde échouée : {exc}")
+        close_holder["close"] = self._show_inline_panel(
+            title="💾 Sauvegarder un preset",
+            builder=build,
+            footer_buttons=[
+                ("Annuler", "__close__"),
+                ("💾 Enregistrer", _on_save),
+            ],
+        )
 
     def _delete_preset(self):
         name = self.preset_name.get()
@@ -2166,6 +2543,10 @@ class OrganizeFrame(ctk.CTkFrame):
                 self.show_files_btn,
                 "Affiche la liste détaillée des fichiers détectés (jusqu'à 500) avec les filtres actuels.",
             )
+        if hasattr(self, "brand_examples_btn"):
+            attach_tooltip(self.brand_examples_btn, TIPS["brand_examples_btn"])
+        if hasattr(self, "filter_examples_btn"):
+            attach_tooltip(self.filter_examples_btn, TIPS["filter_examples_btn"])
 
         # Cases / radios des critères et types
         # On cherche par nom de variable plutôt que par référence directe
@@ -2246,65 +2627,158 @@ class OrganizeFrame(ctk.CTkFrame):
             yield child
             yield from OrganizeFrame._iter_descendants(child)
 
-    def _show_files_list(self):
-        """Modal listant les fichiers détectés dans la source (T-030..T-033).
+    # ------------------------------------------------------------------
+    # Panneau inline (refonte 2026-05-18) — remplace les CTkToplevel
+    # ------------------------------------------------------------------
+    def _show_inline_panel(self, title, builder, footer_buttons=None):
+        """Affiche un panneau d'information *dans* la fenêtre principale.
 
-        Affiche jusqu'à 500 chemins triés. Permet à l'utilisateur de vérifier
-        VISUELLEMENT quels fichiers seront traités. Si > 500, affiche un
-        message « ... et N de plus » pour rester réactif.
+        Refonte 2026-05-18 — l'utilisateur ne veut plus de nouvelles fenêtres
+        (Toplevel) pour Aperçu / Organisation terminée / Save preset /
+        Fichiers détectés / Exemples marques. Le panneau remplace
+        temporairement le tabview interne (zone centre), avec :
+          • Titre du panneau (row 0)
+          • Corps construit par ``builder(body)``
+          • Pied avec boutons (Fermer par défaut)
 
-        Logo PhotoOrganizer en haut-gauche (audit 2026-05-15).
+        Note : le logo PhotoOrganizer n'est PAS répété ici — il est déjà
+        visible dans la barre de titre de la fenêtre principale
+        (cf. retour utilisateur 2026-05-18 : « le logo est déjà rappelé
+        dans file explorer en haut à gauche »).
+
+        Args:
+            title: Titre affiché en haut du panneau.
+            builder: Callback ``builder(body_frame)`` qui peuple le corps.
+            footer_buttons: Liste de ``(label, command)``. Si ``command`` vaut
+                la sentinelle ``"__close__"`` ou ``None``, le bouton ferme le
+                panneau. Si ``footer_buttons`` est ``None``, un bouton
+                « Fermer » seul est ajouté.
+
+        Returns:
+            La fonction ``close`` permettant de fermer le panneau par
+            programme (utile pour les actions qui valident puis ferment).
         """
-        from ui.theme import add_logo_to_modal
+        # Masquer le tabview pour libérer la zone centrale
+        try:
+            self._main_tabview.grid_remove()
+        except (tk.TclError, AttributeError):
+            pass
 
-        files = self._get_files()
-        win = ctk.CTkToplevel(self)
-        win.title("Fichiers détectés")
-        win.geometry("700x540")
-        win.transient(self.winfo_toplevel())
-        win.grab_set()
+        # Détruire un éventuel panneau encore présent
+        prev = getattr(self, "_inline_panel", None)
+        if prev is not None:
+            try:
+                prev.destroy()
+            except tk.TclError:
+                pass
+            self._inline_panel = None
 
-        # Logo haut-gauche
-        add_logo_to_modal(
-            win,
-            size=40,
-            text=f"📋 {len(files)} fichier(s) détecté(s) avec les filtres actuels",
-        )
+        panel = ctk.CTkFrame(self._scroll)
+        panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        panel.columnconfigure(0, weight=1)
+        panel.rowconfigure(1, weight=1)
+        self._inline_panel = panel
 
-        # Container pour le reste
-        body = ctk.CTkFrame(win, fg_color="transparent")
-        body.pack(fill="both", expand=True)
+        # Header : titre seul, sans logo (le logo est déjà dans la barre de
+        # titre Windows — retour utilisateur 2026-05-18).
+        ctk.CTkLabel(
+            panel,
+            text=title,
+            font=font_section(),
+            anchor="w",
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=PAD_M)
 
-        if not files:
+        # Body : construit par l'appelant
+        body = ctk.CTkFrame(panel, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew", padx=PAD_S, pady=PAD_S)
+        try:
+            builder(body)
+        except Exception as exc:
+            logger.warning(f"_show_inline_panel builder a echoue : {exc}")
             ctk.CTkLabel(
                 body,
-                text="Aucun fichier trouvé.",
-                text_color=LABEL_MUTED,
-            ).pack(padx=PAD_L, pady=PAD_M)
-        else:
+                text=f"Erreur d'affichage : {exc}",
+                text_color=("red", "red"),
+            ).pack(padx=PAD_M, pady=PAD_M)
+
+        # Footer : boutons (au moins « Fermer »)
+        footer = ctk.CTkFrame(panel, fg_color="transparent")
+        footer.grid(row=2, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+
+        def _close():
+            try:
+                panel.destroy()
+            except tk.TclError:
+                pass
+            self._inline_panel = None
+            try:
+                self._main_tabview.grid()
+            except (tk.TclError, AttributeError):
+                pass
+
+        buttons = footer_buttons if footer_buttons else [("Fermer", "__close__")]
+        for label, cmd in buttons:
+            real_cmd = _close if cmd in (None, "__close__") else cmd
+            ctk.CTkButton(
+                footer,
+                text=label,
+                command=real_cmd,
+                height=BTN_H_STD,
+            ).pack(side="right", padx=PAD_S)
+
+        return _close
+
+    def _show_files_list(self):
+        """Liste les fichiers détectés (T-030..T-033) — panneau inline.
+
+        Refonte 2026-05-18 : remplace la modale CTkToplevel par un panneau
+        intégré qui remplace temporairement le tabview interne. Affiche
+        jusqu'à 500 chemins ; au-delà, mention « … et N de plus ».
+        """
+        files = self._get_files()
+
+        def build(body):
+            body.columnconfigure(0, weight=1)
+            body.rowconfigure(0, weight=1)
+            if not files:
+                ctk.CTkLabel(
+                    body,
+                    text="Aucun fichier trouvé.",
+                    text_color=LABEL_MUTED,
+                ).grid(row=0, column=0, padx=PAD_L, pady=PAD_M, sticky="w")
+                return
             box = ctk.CTkTextbox(body, font=font_hint())
-            box.pack(fill="both", expand=True, padx=PAD_L, pady=PAD_S)
+            box.grid(row=0, column=0, sticky="nsew", padx=PAD_L, pady=PAD_S)
             for i, f in enumerate(files[:500], 1):
                 box.insert("end", f"{i:>4}.  {f}\n")
             if len(files) > 500:
                 box.insert("end", f"\n… et {len(files) - 500} fichier(s) supplémentaire(s)")
             box.configure(state="disabled")
 
-        ctk.CTkButton(
-            body,
-            text="Fermer",
-            command=win.destroy,
-            height=BTN_H_STD,
-        ).pack(pady=PAD_M)
+        self._show_inline_panel(
+            title=f"📋 {len(files)} fichier(s) détecté(s) avec les filtres actuels",
+            builder=build,
+        )
 
     def _refresh_file_count(self):
-        """Met à jour le compteur de fichiers détectés sous les boutons.
+        """Met à jour le compteur enrichi de fichiers détectés (v2.2 étape 4).
 
-        Affiche un état clair même quand aucun dossier n'est sélectionné
-        (T-030..T-033). Limite intentionnellement le scan : utilise les
-        mêmes filtres que `_get_files`. Pour les dossiers volumineux le
-        comptage peut prendre quelques secondes — on l'execute en tâche
-        de fond pour ne pas geler l'UI.
+        Refonte 2026-05-15 : le compteur affiche désormais des stats EXIF
+        agrégées sur un échantillon des fichiers détectés :
+          • Plage de dates (DateTimeOriginal min/max)
+          • Nombre de caméras distinctes (EXIF Make)
+          • Pourcentage de photos avec GPS
+
+        Pour les dossiers volumineux, le scan EXIF complet peut prendre
+        plusieurs secondes. Stratégie :
+          ≤ 200 fichiers : scan complet
+          > 200          : échantillon stratifié (50 premiers + 50 milieu
+                           + 50 derniers, total ~150 fichiers)
+
+        Affichage en 2 lignes :
+          📂 D:/Photos/2026 — 1247 fichier(s) détecté(s)
+          📅 2024-06-01 → 2024-12-31  ·  📷 8 caméras  ·  🌍 78 % avec GPS
         """
         source = self.source_var.get().strip()
         if not source:
@@ -2319,9 +2793,7 @@ class OrganizeFrame(ctk.CTkFrame):
 
         def count_thread():
             # D-06 (audit 2026-05-14) : sortir immédiatement si le frame a
-            # été détruit pendant que le thread démarrait — évite le
-            # `RuntimeError: main thread is not in main loop` lors de
-            # l'accès aux StringVar via `_get_files()`.
+            # été détruit pendant que le thread démarrait.
             if getattr(self, "_destroyed", False):
                 return
             try:
@@ -2332,8 +2804,26 @@ class OrganizeFrame(ctk.CTkFrame):
                 shown = source if len(source) <= 70 else "…" + source[-67:]
                 if count == 0:
                     msg = f"📂 {shown} — aucun fichier détecté avec les filtres actuels."
-                else:
-                    msg = f"📂 {shown} — {count} fichier(s) prêt(s) à être organisé(s)."
+                    self._safe_after(0, lambda m=msg: self.file_count_var.set(m))
+                    return
+
+                # Ligne 1 : compteur basique (affichée immédiatement)
+                line1 = f"📂 {shown} — {count} fichier(s) détecté(s)"
+                self._safe_after(0, lambda m=line1: self.file_count_var.set(m))
+
+                # Ligne 2 : stats EXIF (calculées sur échantillon)
+                stats = self._compute_exif_stats(files)
+                if stats is None:
+                    return  # frame détruit pendant le scan
+                if not stats:
+                    return  # pas de stats utiles (pas d'EXIF lisibles)
+
+                line2 = (
+                    f"📅 {stats['date_range']}  ·  "
+                    f"📷 {stats['cameras_text']}  ·  "
+                    f"🌍 {stats['gps_pct']} % avec GPS"
+                )
+                msg = f"{line1}\n{line2}"
                 self._safe_after(0, lambda m=msg: self.file_count_var.set(m))
             except RuntimeError:
                 # Tk mainloop disparue (frame détruit pendant un get).
@@ -2344,6 +2834,487 @@ class OrganizeFrame(ctk.CTkFrame):
                 self._safe_after(0, lambda m=err: self.file_count_var.set(f"Erreur de comptage : {m}"))
 
         threading.Thread(target=count_thread, daemon=True).start()
+
+    def _compute_exif_stats(self, files: List[str]) -> Optional[dict]:
+        """Calcule date_range / cameras / gps_pct sur un échantillon.
+
+        ≤ 200 fichiers : scan complet
+        > 200          : 50 premiers + 50 milieu + 50 derniers
+
+        Retourne dict {date_range, cameras_text, gps_pct} ou None si
+        frame détruit, ou {} si pas d'EXIF lisible.
+        """
+        from core.metadata import extract_date, get_camera_info, get_exif_data, get_gps_coordinates
+
+        n = len(files)
+        if n <= 200:
+            sample = files
+        else:
+            third = 50
+            mid = n // 2
+            sample = files[:third] + files[mid : mid + third] + files[-third:]
+
+        dates = []
+        cameras = set()
+        gps_count = 0
+        scanned = 0
+
+        for fp in sample:
+            if getattr(self, "_destroyed", False):
+                return None
+            try:
+                exif = get_exif_data(fp)
+                d = extract_date(fp, exif)
+                if d is not None:
+                    dates.append(d)
+                make, model = get_camera_info(exif, fp)
+                if make and make != "Unknown":
+                    cameras.add(f"{make} {model}".strip())
+                lat, lon = get_gps_coordinates(fp)
+                if lat is not None and lon is not None:
+                    gps_count += 1
+                scanned += 1
+            except Exception:
+                continue
+
+        if scanned == 0:
+            return {}
+
+        # Date range — affiche min → max au format YYYY-MM-DD
+        if dates:
+            date_range = f"{min(dates).strftime('%Y-%m-%d')} → {max(dates).strftime('%Y-%m-%d')}"
+        else:
+            date_range = "dates inconnues"
+
+        # Caméras — nombre + liste tronquée si beaucoup
+        if not cameras:
+            cameras_text = "appareil inconnu"
+        elif len(cameras) == 1:
+            cameras_text = next(iter(cameras))
+        else:
+            cameras_text = f"{len(cameras)} caméras"
+
+        gps_pct = int(round(gps_count / scanned * 100))
+
+        return {
+            "date_range": date_range,
+            "cameras_text": cameras_text,
+            "gps_pct": gps_pct,
+            "scanned": scanned,
+            "sampled": scanned < n,
+        }
+
+    # ------------------------------------------------------------------
+    # Exemples de marques — bouton 💡 (refonte 2026-05-18)
+    # ------------------------------------------------------------------
+    # Marques courantes ordonnées par diffusion grand public. L'utilisateur
+    # peut en cliquer une dans le panneau pour l'ajouter au champ
+    # ``filter_camera_make``.
+    COMMON_CAMERA_MAKES = (
+        "Apple", "Canon", "DJI", "Fujifilm", "GoPro", "Huawei",
+        "Leica", "Nikon", "Olympus", "Panasonic", "Pentax", "Ricoh",
+        "Samsung", "Sigma", "Sony", "Xiaomi",
+    )
+
+    def _detect_camera_makes(self) -> List[str]:
+        """Détecte les marques EXIF (`Make`) dans un échantillon de la source.
+
+        Scanne au plus 50 fichiers pour rester rapide. Retourne la liste
+        triée des marques uniques rencontrées. Liste vide si aucun dossier
+        source ou aucun fichier EXIF lisible.
+        """
+        if not self.source_var.get().strip():
+            return []
+        try:
+            files = self._get_files()
+        except Exception as exc:
+            logger.debug(f"_detect_camera_makes _get_files : {exc}")
+            return []
+        if not files:
+            return []
+        sample = files[:50]
+        makes: set = set()
+        for fp in sample:
+            try:
+                exif = get_exif_data(fp)
+                make, _model = get_camera_info(exif, fp)
+                if make and make != "Unknown":
+                    makes.add(make.strip())
+            except Exception:
+                continue
+        return sorted(makes)
+
+    def _show_brand_examples_panel(self):
+        """Panneau inline « Exemples de marques » (refonte 2026-05-18).
+
+        Liste les marques courantes + celles détectées dans la source. Un
+        clic sur une marque l'ajoute au champ « Limiter aux marques »
+        (déduplication automatique).
+        """
+        detected = self._detect_camera_makes()
+        current_var = self.filter_camera_make  # alias pratique
+
+        def add_make(m: str):
+            current = current_var.get().strip()
+            existing = [x.strip() for x in current.split(",") if x.strip()]
+            if m in existing:
+                return
+            existing.append(m)
+            current_var.set(",".join(existing))
+
+        def clear_field():
+            current_var.set("")
+
+        def build(body):
+            body.columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(
+                body,
+                text="Cliquez sur une marque pour l'ajouter au champ « Limiter aux marques ».\n"
+                     "Les marques sont ajoutées en CSV — laissez vide pour tout inclure.",
+                font=font_hint(), text_color=HINT_COLOR, anchor="w", justify="left",
+            ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_M))
+
+            row_idx = 1
+
+            # Section : marques détectées dans la source (si dossier choisi)
+            if detected:
+                ctk.CTkLabel(
+                    body,
+                    text=f"📷 Détectées dans la source ({len(detected)})",
+                    font=font_label(weight="bold"), anchor="w",
+                ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+                row_idx += 1
+                detected_frame = ctk.CTkFrame(body, fg_color="transparent")
+                detected_frame.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+                cols = 4
+                for c in range(cols):
+                    detected_frame.columnconfigure(c, weight=1)
+                for i, m in enumerate(detected):
+                    r, c = i // cols, i % cols
+                    ctk.CTkButton(
+                        detected_frame, text=m, height=BTN_H_STD,
+                        command=lambda mm=m: add_make(mm),
+                    ).grid(row=r, column=c, padx=PAD_S, pady=PAD_S, sticky="ew")
+                row_idx += 1
+            else:
+                ctk.CTkLabel(
+                    body,
+                    text="(Aucune marque détectée — sélectionnez d'abord un dossier source.)",
+                    font=font_hint(), text_color=HINT_COLOR, anchor="w", justify="left",
+                ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+                row_idx += 1
+
+            # Section : marques courantes (toujours visible)
+            ctk.CTkLabel(
+                body, text="📦 Marques courantes",
+                font=font_label(weight="bold"), anchor="w",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            row_idx += 1
+            common_frame = ctk.CTkFrame(body, fg_color="transparent")
+            common_frame.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            cols = 4
+            for c in range(cols):
+                common_frame.columnconfigure(c, weight=1)
+            for i, m in enumerate(self.COMMON_CAMERA_MAKES):
+                r, c = i // cols, i % cols
+                ctk.CTkButton(
+                    common_frame, text=m, height=BTN_H_STD,
+                    command=lambda mm=m: add_make(mm),
+                ).grid(row=r, column=c, padx=PAD_S, pady=PAD_S, sticky="ew")
+            row_idx += 1
+
+            # Récap : valeur actuelle du champ
+            ctk.CTkLabel(
+                body, text="✏️ Champ actuel",
+                font=font_label(weight="bold"), anchor="w",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            row_idx += 1
+            value_row = ctk.CTkFrame(body, fg_color="transparent")
+            value_row.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            value_row.columnconfigure(0, weight=1)
+            ctk.CTkLabel(
+                value_row, textvariable=current_var,
+                font=font_hint(), anchor="w", justify="left", wraplength=520,
+            ).grid(row=0, column=0, sticky="ew")
+            ctk.CTkButton(
+                value_row, text="🗑 Vider", width=80, height=BTN_H_STD,
+                command=clear_field,
+            ).grid(row=0, column=1, padx=(PAD_S, 0))
+
+        self._show_inline_panel(
+            title="💡 Exemples de marques (cliquer pour ajouter)",
+            builder=build,
+        )
+
+    # ------------------------------------------------------------------
+    # Exemples de filtres — bouton 💡 onglet Filtrer (refonte 2026-05-19)
+    # ------------------------------------------------------------------
+    # Listes de valeurs standards pour les filtres non personnels. Les
+    # constantes sont des tuples (immuables) pour rester triables et
+    # testables. Date et taille sont volontairement absentes car propres
+    # à chaque utilisateur.
+    COMMON_KEYWORDS = (
+        "animaux", "anniversaire", "architecture", "concert", "famille",
+        "fête", "mariage", "montagne", "nature", "noël", "nuit", "paysage",
+        "plage", "portrait", "ski", "sport", "ville", "vacances", "voyage",
+    )
+    COMMON_EXTENSIONS_IMAGES = (
+        "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif",
+    )
+    COMMON_EXTENSIONS_RAW = (
+        "arw", "cr2", "cr3", "dng", "nef", "orf", "pef", "raf", "rw2", "srw",
+    )
+    COMMON_EXTENSIONS_VIDEOS = (
+        "mp4", "mov", "avi", "mkv", "m4v", "mpg", "mpeg", "webm",
+    )
+    # (libellé, valeur WxH) — du plus petit au plus grand
+    COMMON_DIMENSIONS = (
+        ("SD (640×480)",          "640x480"),
+        ("VGA (800×600)",         "800x600"),
+        ("HD (1280×720)",         "1280x720"),
+        ("Full HD (1920×1080)",   "1920x1080"),
+        ("QHD/2K (2560×1440)",    "2560x1440"),
+        ("4K UHD (3840×2160)",    "3840x2160"),
+        ("6K (6144×3160)",        "6144x3160"),
+        ("8K UHD (7680×4320)",    "7680x4320"),
+    )
+    # (libellé affiché, valeur stockée)
+    COMMON_ORIENTATIONS = (
+        ("Toutes",   "any"),
+        ("Paysage",  "landscape"),
+        ("Portrait", "portrait"),
+        ("Carré",    "square"),
+    )
+
+    def _show_filter_examples_panel(self):
+        """Panneau intégré « Exemples de filtres » (refonte 2026-05-19).
+
+        Propose des valeurs standards pour les filtres non personnels :
+        - Mots-clés EXIF/XMP courants (CSV cumulatif)
+        - Extensions image / RAW / vidéos (CSV cumulatif)
+        - Dimensions courantes (Full HD, 4K, etc.) → applicable à
+          ``filter_dim_min`` ou ``filter_dim_max`` au choix
+        - Orientation (toutes / paysage / portrait / carré)
+        - Note minimale (0 à 5)
+
+        La date et la taille en octets sont volontairement absentes : ce sont
+        des valeurs propres à chaque utilisateur (cf. consigne 2026-05-19).
+        """
+        # Helpers de manipulation CSV (ajout déduplicaté / clear)
+        def csv_add(var: ctk.StringVar, value: str):
+            current = var.get().strip()
+            existing = [x.strip() for x in current.split(",") if x.strip()]
+            if value in existing:
+                return
+            existing.append(value)
+            var.set(",".join(existing))
+
+        def csv_clear(var: ctk.StringVar):
+            var.set("")
+
+        def build(body):
+            body.columnconfigure(0, weight=1)
+
+            ctk.CTkLabel(
+                body,
+                text="Cliquez une valeur pour l'ajouter au champ correspondant.\n"
+                     "Les CSV s'enrichissent (déduplication automatique). 🗑 vide le champ.",
+                font=font_hint(), text_color=HINT_COLOR,
+                anchor="w", justify="left",
+            ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_M))
+
+            row_idx = 1
+
+            # ====== Section : Mots-clés ======
+            row_idx = self._build_filter_section_csv(
+                body, row_idx,
+                title="🏷️ Mots-clés courants",
+                var=self.filter_keywords,
+                items=self.COMMON_KEYWORDS,
+                add_fn=csv_add, clear_fn=csv_clear,
+                cols=5,
+            )
+
+            # ====== Section : Extensions images ======
+            row_idx = self._build_filter_section_csv(
+                body, row_idx,
+                title="🖼️ Extensions — images standards",
+                var=self.filter_extensions,
+                items=self.COMMON_EXTENSIONS_IMAGES,
+                add_fn=csv_add, clear_fn=csv_clear,
+                cols=5,
+            )
+
+            # ====== Section : Extensions RAW ======
+            row_idx = self._build_filter_section_csv(
+                body, row_idx,
+                title="📷 Extensions — RAW (formats bruts d'appareils)",
+                var=self.filter_extensions,
+                items=self.COMMON_EXTENSIONS_RAW,
+                add_fn=csv_add, clear_fn=csv_clear,
+                cols=5, show_value=False,  # même champ que ci-dessus
+            )
+
+            # ====== Section : Extensions vidéos ======
+            row_idx = self._build_filter_section_csv(
+                body, row_idx,
+                title="🎬 Extensions — vidéos",
+                var=self.filter_extensions,
+                items=self.COMMON_EXTENSIONS_VIDEOS,
+                add_fn=csv_add, clear_fn=csv_clear,
+                cols=5, show_value=False,
+            )
+
+            # ====== Section : Dimensions ======
+            ctk.CTkLabel(
+                body, text="📐 Dimensions courantes",
+                font=font_label(weight="bold"), anchor="w",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            row_idx += 1
+            ctk.CTkLabel(
+                body,
+                text="Pour chaque dimension, cliquez « min » pour la borne basse ou « max » pour la borne haute.",
+                font=font_hint(), text_color=HINT_COLOR,
+                anchor="w", justify="left",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_S))
+            row_idx += 1
+            dim_frame = ctk.CTkFrame(body, fg_color="transparent")
+            dim_frame.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            dim_frame.columnconfigure(0, weight=1)
+            for r, (label, value) in enumerate(self.COMMON_DIMENSIONS):
+                ctk.CTkLabel(
+                    dim_frame, text=label, anchor="w", font=font_hint(),
+                ).grid(row=r, column=0, sticky="ew", padx=PAD_S, pady=2)
+                ctk.CTkButton(
+                    dim_frame, text="↧ min", width=80, height=BTN_H_STD,
+                    command=lambda v=value: self.filter_dim_min.set(v),
+                ).grid(row=r, column=1, padx=PAD_S, pady=2)
+                ctk.CTkButton(
+                    dim_frame, text="↥ max", width=80, height=BTN_H_STD,
+                    command=lambda v=value: self.filter_dim_max.set(v),
+                ).grid(row=r, column=2, padx=PAD_S, pady=2)
+            # Récap valeurs courantes des champs Dim min/max
+            dim_recap = ctk.CTkFrame(body, fg_color="transparent")
+            dim_recap.grid(row=row_idx + 1, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            dim_recap.columnconfigure(1, weight=1)
+            ctk.CTkLabel(dim_recap, text="Dim. min :", font=font_label()).grid(row=0, column=0, sticky="w")
+            ctk.CTkLabel(
+                dim_recap, textvariable=self.filter_dim_min,
+                font=font_hint(), anchor="w",
+            ).grid(row=0, column=1, sticky="ew", padx=PAD_S)
+            ctk.CTkButton(
+                dim_recap, text="🗑", width=40, height=BTN_H_STD,
+                command=lambda: self.filter_dim_min.set(""),
+            ).grid(row=0, column=2)
+            ctk.CTkLabel(dim_recap, text="Dim. max :", font=font_label()).grid(row=1, column=0, sticky="w", pady=(PAD_S, 0))
+            ctk.CTkLabel(
+                dim_recap, textvariable=self.filter_dim_max,
+                font=font_hint(), anchor="w",
+            ).grid(row=1, column=1, sticky="ew", padx=PAD_S, pady=(PAD_S, 0))
+            ctk.CTkButton(
+                dim_recap, text="🗑", width=40, height=BTN_H_STD,
+                command=lambda: self.filter_dim_max.set(""),
+            ).grid(row=1, column=2, pady=(PAD_S, 0))
+            row_idx += 2
+
+            # ====== Section : Orientation ======
+            ctk.CTkLabel(
+                body, text="📐 Orientation",
+                font=font_label(weight="bold"), anchor="w",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            row_idx += 1
+            ori_frame = ctk.CTkFrame(body, fg_color="transparent")
+            ori_frame.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            for i, (label, value) in enumerate(self.COMMON_ORIENTATIONS):
+                ori_frame.columnconfigure(i, weight=1)
+                ctk.CTkButton(
+                    ori_frame, text=label, height=BTN_H_STD,
+                    command=lambda v=value: self.filter_orientation.set(v),
+                ).grid(row=0, column=i, padx=PAD_S, pady=PAD_S, sticky="ew")
+            ctk.CTkLabel(
+                body, text="Valeur courante :", font=font_label(),
+            ).grid(row=row_idx + 1, column=0, sticky="w", padx=PAD_M, pady=(0, 0))
+            ctk.CTkLabel(
+                body, textvariable=self.filter_orientation,
+                font=font_hint(), anchor="w",
+            ).grid(row=row_idx + 2, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            row_idx += 3
+
+            # ====== Section : Note ======
+            ctk.CTkLabel(
+                body, text="⭐ Note minimale (0 = pas de filtre, 5 = uniquement les meilleures)",
+                font=font_label(weight="bold"), anchor="w",
+            ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            row_idx += 1
+            rating_frame = ctk.CTkFrame(body, fg_color="transparent")
+            rating_frame.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            for i in range(6):
+                rating_frame.columnconfigure(i, weight=1)
+                ctk.CTkButton(
+                    rating_frame,
+                    text=("0 (toutes)" if i == 0 else "★" * i),
+                    height=BTN_H_STD,
+                    command=lambda n=i: self.filter_rating_min.set(n),
+                ).grid(row=0, column=i, padx=PAD_S, pady=PAD_S, sticky="ew")
+            row_idx += 1
+
+        self._show_inline_panel(
+            title="💡 Exemples de filtres (cliquer pour appliquer)",
+            builder=build,
+        )
+
+    def _build_filter_section_csv(self, body, row_idx, *, title, var, items,
+                                    add_fn, clear_fn, cols=5, show_value=True):
+        """Construit une section « clic = ajout au CSV » dans le panneau filtres.
+
+        Args:
+            body: frame parent.
+            row_idx: ligne grid de départ.
+            title: titre de la section (avec emoji).
+            var: ``ctk.StringVar`` à mettre à jour.
+            items: itérable de valeurs (str) à proposer en boutons.
+            add_fn: callback ``add_fn(var, value)`` qui ajoute en CSV.
+            clear_fn: callback ``clear_fn(var)`` qui vide le champ.
+            cols: nombre de colonnes pour la grille de boutons.
+            show_value: afficher le récap « Champ actuel » sous la section.
+
+        Returns:
+            Nouvelle valeur de ``row_idx`` après la section.
+        """
+        ctk.CTkLabel(
+            body, text=title,
+            font=font_label(weight="bold"), anchor="w",
+        ).grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+        row_idx += 1
+        chips = ctk.CTkFrame(body, fg_color="transparent")
+        chips.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_S))
+        for c in range(cols):
+            chips.columnconfigure(c, weight=1)
+        for i, item in enumerate(items):
+            r, c = i // cols, i % cols
+            ctk.CTkButton(
+                chips, text=item, height=BTN_H_STD,
+                command=lambda v=var, val=item: add_fn(v, val),
+            ).grid(row=r, column=c, padx=PAD_S, pady=2, sticky="ew")
+        row_idx += 1
+        if show_value:
+            value_row = ctk.CTkFrame(body, fg_color="transparent")
+            value_row.grid(row=row_idx, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
+            value_row.columnconfigure(1, weight=1)
+            ctk.CTkLabel(
+                value_row, text="Champ actuel :", font=font_label(),
+            ).grid(row=0, column=0, sticky="w")
+            ctk.CTkLabel(
+                value_row, textvariable=var,
+                font=font_hint(), anchor="w", justify="left", wraplength=480,
+            ).grid(row=0, column=1, sticky="ew", padx=PAD_S)
+            ctk.CTkButton(
+                value_row, text="🗑 Vider", width=80, height=BTN_H_STD,
+                command=lambda v=var: clear_fn(v),
+            ).grid(row=0, column=2)
+            row_idx += 1
+        return row_idx
 
     def _analyze_files(self):
         """Analyse les fichiers du dossier source."""
@@ -2669,41 +3640,30 @@ Distribution par appareil:
         self._update_progress("Organisation terminée", 1)
 
     def _show_results_modal(self, message: str, dest: str):
-        """Modal résumé custom (au lieu de messagebox basique) avec un
-        bouton « 📂 Ouvrir destination » qui ouvre l'explorateur natif.
+        """Panneau inline « Organisation terminée » (refonte 2026-05-18).
 
-        Logo PhotoOrganizer en haut-gauche (audit 2026-05-15).
+        Remplace l'ancienne modale CTkToplevel par un panneau intégré qui
+        prend la place du tabview, avec logo + titre + récap + bouton
+        « 📂 Ouvrir destination » et « Fermer ».
         """
-        from ui.theme import add_logo_to_modal
+        def build(body):
+            body.columnconfigure(0, weight=1)
+            body.rowconfigure(0, weight=1)
+            textbox = ctk.CTkTextbox(body, height=200)
+            textbox.grid(row=0, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
+            textbox.insert("end", message)
+            textbox.configure(state="disabled")
 
-        win = ctk.CTkToplevel(self)
-        win.title("Organisation terminée")
-        win.geometry("520x360")
-        win.transient(self.winfo_toplevel())
-        win.grab_set()
-
-        # Logo haut-gauche (audit 2026-05-15)
-        add_logo_to_modal(win, size=40, text="✅ Organisation terminée")
-
-        # Container pour le reste (sous le logo)
-        body = ctk.CTkFrame(win, fg_color="transparent")
-        body.pack(fill="both", expand=True)
-
-        textbox = ctk.CTkTextbox(body, height=180)
-        textbox.pack(fill="both", expand=True, padx=12, pady=4)
-        textbox.insert("end", message)
-        textbox.configure(state="disabled")
-
-        btn_row = ctk.CTkFrame(body, fg_color="transparent")
-        btn_row.pack(fill="x", padx=12, pady=(4, 12))
-
+        footer = []
         if dest:
-            ctk.CTkButton(
-                btn_row,
-                text="📂 Ouvrir destination",
-                command=lambda: _open_folder(dest),
-            ).pack(side="left", padx=4, expand=True, fill="x")
-        ctk.CTkButton(btn_row, text="Fermer", command=win.destroy).pack(side="left", padx=4, expand=True, fill="x")
+            footer.append(("📂 Ouvrir destination", lambda d=dest: _open_folder(d)))
+        footer.append(("Fermer", "__close__"))
+
+        self._show_inline_panel(
+            title="✅ Organisation terminée",
+            builder=build,
+            footer_buttons=footer,
+        )
 
     def _show_dry_run_preview(self):
         """Q2 — Aperçu dry-run : applique les options pour les 100 premiers
@@ -2796,37 +3756,32 @@ Distribution par appareil:
 
             tree.setdefault(path, []).append(fname)
 
-        # Modale d'affichage — logo haut-gauche (audit 2026-05-15)
-        from ui.theme import add_logo_to_modal
-
-        win = ctk.CTkToplevel(self)
-        win.title("Aperçu dry-run (sans modification disque)")
-        win.geometry("760x580")
-        win.transient(self.winfo_toplevel())
-        win.grab_set()
-
-        add_logo_to_modal(win, size=40, text="Aperçu (dry-run)")
-
-        body = ctk.CTkFrame(win, fg_color="transparent")
-        body.pack(fill="both", expand=True)
-
+        # Header textuel + arbo cible (refonte 2026-05-18 — panneau inline)
         header_text = f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
         if options.keep_raw_jpeg_pairs and pairs:
             header_text += f"  •  {len(pairs)} paire(s) RAW+JPEG détectée(s)"
         header_text += f"\n📁 Destination : {dest}"
         if len(eligible) > 100:
             header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
-        ctk.CTkLabel(body, text=header_text, justify="left", anchor="w").pack(fill="x", padx=12, pady=(12, 4))
 
-        textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
-        textbox.pack(fill="both", expand=True, padx=12, pady=4)
-        for folder in sorted(tree.keys()):
-            rel = os.path.relpath(folder, dest) if dest in folder else folder
-            textbox.insert("end", f"\n📁 {rel}/  ({len(tree[folder])} fichiers)\n")
-            for f in tree[folder][:10]:
-                textbox.insert("end", f"   • {f}\n")
-            if len(tree[folder]) > 10:
-                textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
-        textbox.configure(state="disabled")
+        def build(body):
+            body.columnconfigure(0, weight=1)
+            body.rowconfigure(1, weight=1)
+            ctk.CTkLabel(
+                body, text=header_text, justify="left", anchor="w",
+            ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+            textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
+            textbox.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
+            for folder in sorted(tree.keys()):
+                rel = os.path.relpath(folder, dest) if dest in folder else folder
+                textbox.insert("end", f"\n📁 {rel}/  ({len(tree[folder])} fichiers)\n")
+                for f in tree[folder][:10]:
+                    textbox.insert("end", f"   • {f}\n")
+                if len(tree[folder]) > 10:
+                    textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
+            textbox.configure(state="disabled")
 
-        ctk.CTkButton(body, text="Fermer", command=win.destroy).pack(padx=12, pady=(4, 12))
+        self._show_inline_panel(
+            title="👁 Aperçu (dry-run, sans modification disque)",
+            builder=build,
+        )

@@ -60,7 +60,11 @@ class TestTooltipsFr:
         # Au moins les clés essentielles
         for key in ['btn_organize', 'btn_cancel', 'btn_analyze', 'btn_preview',
                     'source_entry', 'dest_entry', 'rename_template',
-                    'multilayer', 'advanced_toggle']:
+                    'multilayer', 'advanced_toggle',
+                    # Refonte 2026-05-18 — bouton 💡 et champ marques
+                    'filter_camera_make', 'brand_examples_btn',
+                    # Refonte 2026-05-19 — bouton 💡 Exemples de filtres
+                    'filter_examples_btn']:
             assert key in ORGANIZE, f"Clé manquante : {key!r}"
             assert ORGANIZE[key], f"Tooltip vide pour : {key!r}"
 
@@ -145,17 +149,47 @@ class TestRenameSectionV4:
         # Reset
         of._apply_rename_example(prev)
 
-    def test_toggle_persists_state(self, app):
+    def test_rename_section_always_visible(self, app):
+        """Refonte v2.3 (Variante B) : Renommage accessible dans son onglet.
+
+        Le panneau Renommage est déplacé dans l'onglet interne
+        « 🏷️ Renommer ». ``_rename_content`` est créé et géré par grid
+        dans son onglet ; il est mappé dès que l'onglet est activé.
+        ``_rename_collapsed`` reste à False (rétrocompat).
+        """
         of = app.organize_frame
-        initial = of._rename_collapsed
-        of._toggle_rename_section()
-        assert of._rename_collapsed != initial
-        # Vérifier que get_config a bien été mis à jour
-        from utils.config import get_config
-        cfg = get_config().config
-        assert cfg.rename_collapsed == of._rename_collapsed
-        # Reset
-        of._toggle_rename_section()
+        assert of._rename_collapsed is False, (
+            "Refonte v2.3 : pas de toggle collapsible Renommage (Variante B)"
+        )
+        # Vérifier que _rename_content est bien créé et géré par grid.
+        # L'invariant Variante B est : « le contenu existe, est dans le bon
+        # onglet, et son master est la wrapper de l'onglet Renommer ».
+        # winfo_ismapped() est trop dépendant de l'ordre d'activation des
+        # onglets et n'est PAS un invariant fiable cross-test (CTkTabview
+        # n'applique pas immédiatement le mapping côté Tcl).
+        assert of._rename_content.grid_info(), (
+            "Refonte v2.3 : _rename_content doit être managé par grid"
+        )
+        # Vérifier la chaîne de parents : _rename_content → wrapper → _tab_rename
+        parent = of._rename_content.master
+        assert parent is not None
+        grandparent = parent.master
+        if hasattr(of, "_tab_rename"):
+            assert grandparent is of._tab_rename, (
+                f"Refonte v2.3 : _rename_content doit être dans le tab "
+                f"Renommer (trouvé : {grandparent})"
+            )
+
+    def test_toggle_rename_method_still_callable(self, app):
+        """Rétrocompat : ``_toggle_rename_section`` reste appelable sans crash
+        même si le bouton n'est plus affiché (refonte v2.2)."""
+        of = app.organize_frame
+        try:
+            of._toggle_rename_section()
+        except Exception as exc:
+            raise AssertionError(
+                f"_toggle_rename_section ne doit pas crasher : {exc}"
+            )
 
 
 # =============================================================================
@@ -201,7 +235,11 @@ class TestTooltipsAttachedToKeyWidgets:
                      'analyze_button', 'preview_button',
                      'source_entry', 'dest_entry',
                      'file_count_label', 'multilayer_switch',
-                     '_adv_toggle_btn'):
+                     '_adv_toggle_btn',
+                     # Refonte 2026-05-18 — bouton 💡 Exemples de marques
+                     'brand_examples_btn',
+                     # Refonte 2026-05-19 — bouton 💡 Exemples de filtres
+                     'filter_examples_btn'):
             widget = getattr(of, name)
             assert has_tooltip(widget), \
                 f"organize_frame.{name} sans tooltip"
@@ -228,3 +266,378 @@ class TestTooltipsAttachedToKeyWidgets:
         sf = app.settings_frame
         assert has_tooltip(sf.schedule_switch), \
             "settings_frame.schedule_switch sans tooltip"
+
+
+# =============================================================================
+# Refonte 2026-05-18 — invariant « pas de nouvelles fenêtres »
+# =============================================================================
+
+class TestNoToplevelInOrganizePanels:
+    """Invariant utilisateur : les actions du panneau Organisation
+    (Aperçu, Fichiers détectés, Exemples de marques, Sauvegarder preset,
+    Organisation terminée) ne créent PAS de fenêtre CTkToplevel — elles
+    affichent un panneau inline qui remplace temporairement le tabview.
+
+    On vérifie ici les méthodes qui n'ont pas d'effet de bord disque
+    (les autres demandent un dossier source/destination valide).
+    """
+
+    @staticmethod
+    def _count_toplevels(app):
+        """Compte les CTkToplevel actifs sous la fenêtre principale."""
+        import customtkinter as ctk_local
+        return sum(
+            1 for w in app.winfo_children()
+            if isinstance(w, ctk_local.CTkToplevel)
+        )
+
+    def test_brand_examples_panel_does_not_create_toplevel(self, app):
+        of = app.organize_frame
+        before = self._count_toplevels(app)
+        of._show_brand_examples_panel()
+        for _ in range(2):
+            app.update_idletasks()
+            app.update()
+        try:
+            after = self._count_toplevels(app)
+            assert after == before, (
+                f"_show_brand_examples_panel doit utiliser un panneau "
+                f"inline, pas un Toplevel (avant={before}, après={after})"
+            )
+            # Et un panneau inline doit avoir été créé
+            assert of._inline_panel is not None
+        finally:
+            # Fermer le panneau pour ne pas polluer les tests suivants
+            if of._inline_panel is not None:
+                try:
+                    of._inline_panel.destroy()
+                except Exception:
+                    pass
+                of._inline_panel = None
+            try:
+                of._main_tabview.grid()
+            except Exception:
+                pass
+
+    def test_files_list_panel_does_not_create_toplevel(self, app):
+        """`_show_files_list` (déclenché par le bouton 📋) doit aussi
+        utiliser le panneau inline — même quand la source est vide."""
+        of = app.organize_frame
+        prev_source = of.source_var.get()
+        of.source_var.set("")  # cas « aucun fichier trouvé »
+        before = self._count_toplevels(app)
+        try:
+            of._show_files_list()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            after = self._count_toplevels(app)
+            assert after == before, (
+                f"_show_files_list doit utiliser un panneau inline "
+                f"(avant={before}, après={after})"
+            )
+            assert of._inline_panel is not None
+        finally:
+            if of._inline_panel is not None:
+                try:
+                    of._inline_panel.destroy()
+                except Exception:
+                    pass
+                of._inline_panel = None
+            try:
+                of._main_tabview.grid()
+            except Exception:
+                pass
+            of.source_var.set(prev_source)
+
+
+# =============================================================================
+# Refonte 2026-05-18 — bouton 💡 ajoute / déduplique les marques
+# =============================================================================
+
+class TestBrandExamplesPanelBehavior:
+    """Tests fonctionnels sur le panneau « Exemples de marques » :
+       - un clic sur une marque met à jour `filter_camera_make`
+       - la déduplication empêche d'ajouter 2× la même marque
+       - le bouton 🗑 Vider remet le champ à vide
+    """
+
+    def test_panel_renders_common_brands_buttons(self, app):
+        of = app.organize_frame
+        prev = of.filter_camera_make.get()
+        of.filter_camera_make.set("")
+        try:
+            of._show_brand_examples_panel()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of._inline_panel is not None
+
+            from ui.frames.organize_frame import OrganizeFrame
+            labels = {
+                w.cget('text')
+                for w in OrganizeFrame._iter_descendants(of._inline_panel)
+                if hasattr(w, 'cget') and 'text' in w.keys()
+            }
+            # Au moins 3 marques courantes doivent être présentes
+            common = set(OrganizeFrame.COMMON_CAMERA_MAKES)
+            present = labels & common
+            assert len(present) >= 3, (
+                f"Marques courantes manquantes dans le panneau (trouvées : {present})"
+            )
+        finally:
+            if of._inline_panel is not None:
+                try:
+                    of._inline_panel.destroy()
+                except Exception:
+                    pass
+                of._inline_panel = None
+            try:
+                of._main_tabview.grid()
+            except Exception:
+                pass
+            of.filter_camera_make.set(prev)
+
+    def test_filter_examples_panel_does_not_create_toplevel(self, app):
+        """Le panneau 💡 Exemples de filtres est intégré (refonte 2026-05-19)."""
+        of = app.organize_frame
+        before = TestNoToplevelInOrganizePanels._count_toplevels(app)
+        of._show_filter_examples_panel()
+        for _ in range(2):
+            app.update_idletasks()
+            app.update()
+        try:
+            after = TestNoToplevelInOrganizePanels._count_toplevels(app)
+            assert after == before, (
+                f"_show_filter_examples_panel doit utiliser un panneau intégré, "
+                f"pas une nouvelle fenêtre (avant={before}, après={after})"
+            )
+            assert of._inline_panel is not None
+        finally:
+            if of._inline_panel is not None:
+                try:
+                    of._inline_panel.destroy()
+                except Exception:
+                    pass
+                of._inline_panel = None
+            try:
+                of._main_tabview.grid()
+            except Exception:
+                pass
+
+    def test_clicking_brand_button_appends_to_csv(self, app):
+        """Cliquer un bouton de marque ajoute son label au champ CSV
+        `filter_camera_make`. Le doublon est ignoré."""
+        of = app.organize_frame
+        prev = of.filter_camera_make.get()
+        of.filter_camera_make.set("")
+        try:
+            of._show_brand_examples_panel()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+
+            import customtkinter as ctk_local
+            from ui.frames.organize_frame import OrganizeFrame
+            # Trouver le bouton « Sony » (présent dans COMMON_CAMERA_MAKES).
+            # Filtrer sur CTkButton car le panneau contient aussi des Labels
+            # avec le même texte (récap « ✏️ Champ actuel ») qui ne sont pas
+            # cliquables.
+            sony_btn = None
+            for w in OrganizeFrame._iter_descendants(of._inline_panel):
+                if not isinstance(w, ctk_local.CTkButton):
+                    continue
+                try:
+                    if w.cget('text') == "Sony":
+                        sony_btn = w
+                        break
+                except Exception:
+                    continue
+            assert sony_btn is not None, "Bouton « Sony » introuvable dans le panneau"
+
+            # 1er clic : ajoute Sony
+            sony_btn.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_camera_make.get() == "Sony", (
+                f"Attendu 'Sony', trouvé : {of.filter_camera_make.get()!r}"
+            )
+            # 2e clic : pas de doublon
+            sony_btn.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_camera_make.get() == "Sony", (
+                "La déduplication n'a pas fonctionné — "
+                f"trouvé : {of.filter_camera_make.get()!r}"
+            )
+        finally:
+            if of._inline_panel is not None:
+                try:
+                    of._inline_panel.destroy()
+                except Exception:
+                    pass
+                of._inline_panel = None
+            try:
+                of._main_tabview.grid()
+            except Exception:
+                pass
+            of.filter_camera_make.set(prev)
+
+
+# =============================================================================
+# Refonte 2026-05-19 — panneau 💡 Exemples de filtres (comportement)
+# =============================================================================
+
+class TestFilterExamplesPanelBehavior:
+    """Tests fonctionnels sur le panneau « Exemples de filtres » :
+       - un clic sur un mot-clé met à jour `filter_keywords` (CSV cumulatif)
+       - un clic sur une extension cumule dans `filter_extensions`
+       - les boutons ↧ min / ↥ max appliquent une dimension au bon champ
+       - les boutons d'orientation et de note appliquent la bonne valeur
+    """
+
+    @staticmethod
+    def _open_panel_and_get_buttons(app):
+        """Ouvre le panneau filtres et retourne ses boutons cliquables."""
+        import customtkinter as ctk_local
+        from ui.frames.organize_frame import OrganizeFrame
+        of = app.organize_frame
+        of._show_filter_examples_panel()
+        for _ in range(2):
+            app.update_idletasks()
+            app.update()
+        assert of._inline_panel is not None
+        buttons = [
+            w for w in OrganizeFrame._iter_descendants(of._inline_panel)
+            if isinstance(w, ctk_local.CTkButton)
+        ]
+        return of, buttons
+
+    @staticmethod
+    def _find_button(buttons, text):
+        for b in buttons:
+            try:
+                if b.cget('text') == text:
+                    return b
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _close_panel(of):
+        if of._inline_panel is not None:
+            try:
+                of._inline_panel.destroy()
+            except Exception:
+                pass
+            of._inline_panel = None
+        try:
+            of._main_tabview.grid()
+        except Exception:
+            pass
+
+    def test_clicking_keyword_appends_to_csv(self, app):
+        of = app.organize_frame
+        prev = of.filter_keywords.get()
+        of.filter_keywords.set("")
+        try:
+            of, buttons = self._open_panel_and_get_buttons(app)
+            btn = self._find_button(buttons, "vacances")
+            assert btn is not None, "Bouton « vacances » introuvable"
+            btn.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_keywords.get() == "vacances"
+            # 2e clic : pas de doublon
+            btn.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_keywords.get() == "vacances"
+        finally:
+            self._close_panel(of)
+            of.filter_keywords.set(prev)
+
+    def test_clicking_extension_appends_to_csv(self, app):
+        of = app.organize_frame
+        prev = of.filter_extensions.get()
+        of.filter_extensions.set("")
+        try:
+            of, buttons = self._open_panel_and_get_buttons(app)
+            jpg = self._find_button(buttons, "jpg")
+            cr2 = self._find_button(buttons, "cr2")
+            assert jpg is not None and cr2 is not None
+            jpg.invoke()
+            cr2.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            # CSV cumule jpg + cr2 (sections images puis RAW partagent le champ)
+            assert of.filter_extensions.get() == "jpg,cr2"
+        finally:
+            self._close_panel(of)
+            of.filter_extensions.set(prev)
+
+    def test_clicking_dimension_min_max(self, app):
+        of = app.organize_frame
+        prev_min = of.filter_dim_min.get()
+        prev_max = of.filter_dim_max.get()
+        of.filter_dim_min.set("")
+        of.filter_dim_max.set("")
+        try:
+            of, buttons = self._open_panel_and_get_buttons(app)
+            mins = [b for b in buttons if b.cget('text') == "↧ min"]
+            maxs = [b for b in buttons if b.cget('text') == "↥ max"]
+            assert len(mins) == len(of.COMMON_DIMENSIONS), (
+                f"Nombre de boutons ↧ min ({len(mins)}) ≠ COMMON_DIMENSIONS ({len(of.COMMON_DIMENSIONS)})"
+            )
+            assert len(maxs) == len(of.COMMON_DIMENSIONS)
+            # Premier min (la plus petite dimension) puis dernier max (8K)
+            mins[0].invoke()
+            maxs[-1].invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_dim_min.get() == of.COMMON_DIMENSIONS[0][1]
+            assert of.filter_dim_max.get() == of.COMMON_DIMENSIONS[-1][1]
+        finally:
+            self._close_panel(of)
+            of.filter_dim_min.set(prev_min)
+            of.filter_dim_max.set(prev_max)
+
+    def test_clicking_orientation_sets_value(self, app):
+        of = app.organize_frame
+        prev = of.filter_orientation.get()
+        of.filter_orientation.set("any")
+        try:
+            of, buttons = self._open_panel_and_get_buttons(app)
+            btn = self._find_button(buttons, "Portrait")
+            assert btn is not None, "Bouton « Portrait » introuvable"
+            btn.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_orientation.get() == "portrait"
+        finally:
+            self._close_panel(of)
+            of.filter_orientation.set(prev)
+
+    def test_clicking_rating_sets_value(self, app):
+        of = app.organize_frame
+        prev = of.filter_rating_min.get()
+        of.filter_rating_min.set(0)
+        try:
+            of, buttons = self._open_panel_and_get_buttons(app)
+            btn4 = self._find_button(buttons, "★" * 4)
+            assert btn4 is not None, "Bouton 4 étoiles introuvable"
+            btn4.invoke()
+            for _ in range(2):
+                app.update_idletasks()
+                app.update()
+            assert of.filter_rating_min.get() == 4
+        finally:
+            self._close_panel(of)
+            of.filter_rating_min.set(prev)

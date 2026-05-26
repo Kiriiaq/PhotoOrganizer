@@ -15,8 +15,20 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FileOperation:
-    """Représente une opération sur un fichier."""
-    operation_type: str  # 'copy', 'move', 'rename', 'delete'
+    """Représente une opération sur un fichier.
+
+    Types supportés et leur réversibilité :
+    - ``copy``   : copie. Rollback = supprime la copie.
+    - ``move``   : déplacement. Rollback = remet à la source.
+    - ``rename`` : renommage. Rollback = renomme à l'envers.
+    - ``trash``  : envoi en **quarantaine interne** (cf. duplicate_manager).
+                   Rollback = `shutil.move(destination → source)`. C'est ce
+                   qui distingue ``trash`` (récupérable) de ``delete``.
+    - ``delete`` : suppression définitive irréversible (mode DELETE des
+                   doublons). Conservée pour traçabilité — rollback
+                   impossible, retourne False avec message clair.
+    """
+    operation_type: str  # 'copy', 'move', 'rename', 'trash', 'delete'
     source: str
     destination: str
     timestamp: datetime = field(default_factory=datetime.now)
@@ -250,6 +262,54 @@ class FileManager:
         """Retourne l'historique des opérations."""
         return self._operations_history.copy()
 
+    def record_operation(
+        self,
+        *,
+        operation_type: str,
+        source: str,
+        destination: str,
+        success: bool = True,
+        error: Optional[str] = None,
+    ) -> FileOperation:
+        """API publique pour enregistrer une opération externe dans l'historique.
+
+        Utilisée par les modules qui font leurs propres mouvements de fichiers
+        (typiquement ``duplicate_manager`` avec la quarantaine) mais qui
+        veulent quand même être visibles dans « Annuler dernière / tout ».
+
+        Args:
+            operation_type: 'copy', 'move', 'rename', 'trash', 'delete'.
+                            Voir docstring ``FileOperation`` pour la sémantique
+                            de chaque type.
+            source: chemin du fichier AVANT l'opération (origine).
+            destination: chemin APRÈS (quarantaine pour 'trash',
+                         emplacement final pour 'move', etc.).
+                         Pour ``delete`` cela peut être vide (irréversible).
+            success: True si l'opération a réussi côté OS. Une opération en
+                     échec est conservée pour traçabilité mais ne sera pas
+                     candidate au rollback.
+            error: message d'erreur éventuel.
+
+        Returns:
+            L'objet ``FileOperation`` enregistré (utile pour les tests et
+            pour permettre à l'appelant de modifier l'erreur après coup).
+
+        Notes:
+            Si ``rollback_enabled`` est False, l'opération est ignorée.
+            Cette méthode ne touche jamais aux fichiers — c'est purement
+            de la traçabilité.
+        """
+        op = FileOperation(
+            operation_type=operation_type,
+            source=source,
+            destination=destination,
+            success=success,
+            error=error,
+        )
+        if self.rollback_enabled:
+            self._operations_history.append(op)
+        return op
+
     def rollback_last(self) -> bool:
         """Annule la dernière opération réversible.
 
@@ -275,7 +335,13 @@ class FileManager:
                 self._cleanup_empty_dir(operation.destination)
                 return True
 
-            if operation.operation_type == 'move':
+            # ``move``, ``rename`` et ``trash`` partagent la même logique de
+            # rollback : le fichier a été déplacé de ``source`` vers
+            # ``destination``, il suffit de le remettre. ``trash`` correspond
+            # à un déplacement vers la quarantaine interne — c'est précisément
+            # ce qui le rend récupérable contrairement à un envoi direct en
+            # corbeille système (cf. duplicate_manager.quarantine).
+            if operation.operation_type in ('move', 'rename', 'trash'):
                 if not os.path.exists(operation.destination):
                     return True
                 source_dir = os.path.dirname(operation.source)
@@ -284,6 +350,16 @@ class FileManager:
                 shutil.move(operation.destination, operation.source)
                 self._cleanup_empty_dir(operation.destination)
                 return True
+
+            if operation.operation_type == 'delete':
+                # Suppression définitive : irrécupérable côté app. Conservée
+                # pour traçabilité mais on remet en pile avec message clair.
+                logger.warning(
+                    f"Rollback impossible : suppression definitive de {operation.source}"
+                )
+                operation.error = "suppression definitive irreversible"
+                self._operations_history.append(operation)
+                return False
 
             logger.warning(f"Rollback non supporte pour: {operation.operation_type}")
             operation.error = f"rollback non supporte pour {operation.operation_type}"
@@ -334,7 +410,10 @@ class FileManager:
                         os.remove(op.destination)
                     self._cleanup_empty_dir(op.destination)
                     success += 1
-                elif op.operation_type == 'move':
+                elif op.operation_type in ('move', 'rename', 'trash'):
+                    # Trois types partagent la logique « déplace destination
+                    # vers source ». ``trash`` = retour depuis la quarantaine
+                    # interne (récupérable). Cf. rollback_last pour le détail.
                     if not os.path.exists(op.destination):
                         success += 1
                     else:
@@ -344,6 +423,12 @@ class FileManager:
                         shutil.move(op.destination, op.source)
                         self._cleanup_empty_dir(op.destination)
                         success += 1
+                elif op.operation_type == 'delete':
+                    # Suppression définitive : on ne peut pas annuler.
+                    # On la compte en « skipped » plutôt qu'en « failed »
+                    # car ce n'est pas une erreur d'exécution mais une
+                    # propriété intrinsèque de l'opération.
+                    skipped += 1
                 else:
                     logger.warning(
                         f"Rollback non supporte pour: {op.operation_type}"

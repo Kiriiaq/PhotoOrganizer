@@ -133,6 +133,23 @@ ORGANIZE = {
         "Mots-clés EXIF ou XMP à chercher (séparés par ,). "
         "Match si AU MOINS UN mot-clé est trouvé. Ex. : vacances, mariage."
     ),
+    "filter_camera_make": (
+        "Limite l'organisation aux photos prises avec ces marques. "
+        "CSV — ex. : Sony,Canon. Vide = toutes les marques. "
+        "Le bouton 💡 ouvre un panneau avec marques courantes et celles "
+        "détectées dans le dossier source."
+    ),
+    "brand_examples_btn": (
+        "Ouvre un panneau d'exemples : marques courantes + celles détectées "
+        "dans la source. Un clic sur une marque l'ajoute au champ."
+    ),
+    "filter_examples_btn": (
+        "Ouvre un panneau d'exemples standards pour les filtres : mots-clés "
+        "EXIF courants, extensions images/RAW/vidéos, dimensions classiques "
+        "(Full HD, 4K…), orientation et note. Un clic = remplit le champ "
+        "correspondant. La date et la taille restent à saisir librement "
+        "(valeurs propres à chaque utilisateur)."
+    ),
 
     # ---- Comportements avancés ----
     "skip_if_identical": (
@@ -342,6 +359,13 @@ DUPLICATES = {
     "btn_cancel":  (
         "Annule le scan ou l'exécution coopérativement : le worker s'arrête "
         "entre 2 fichiers (latence ≤ 1 s en général). Patientez avant de relancer."
+    ),
+    "btn_empty_quarantine": (
+        "Vide la quarantaine interne en envoyant les fichiers vers la corbeille "
+        "du système. Avant cette action, les fichiers placés en quarantaine via "
+        "le mode « Corbeille (récupérable) » peuvent être restaurés par "
+        "« ↩️ Annuler dernière » dans l'onglet Historique. Après vidage, ils "
+        "passent en corbeille Windows : récupérables uniquement via l'Explorateur."
     ),
 }
 

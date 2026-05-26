@@ -28,10 +28,12 @@ from src.core.operations.duplicate_finder import (
     DuplicateGroup,
     DuplicateResult,
 )
+from src.core.operations.file_manager import get_manager as _get_file_manager
+from src.core.operations.quarantine import QuarantineManager
 
 # Try to import send2trash for trash support
 try:
-    from send2trash import send2trash
+    from send2trash import send2trash  # noqa: F401  (availability sentinel)
     TRASH_AVAILABLE = True
 except ImportError:
     TRASH_AVAILABLE = False
@@ -61,6 +63,12 @@ class DuplicateManager:
         self.config = config
         self._cancel_requested = False
         self._finder = None
+        # Quarantaine interne pour le mode TRASH — assure la réversibilité
+        # via le panneau Historique. Une instance par DuplicateManager =
+        # une session unique horodatée. L'utilisateur peut ensuite vider
+        # définitivement via la méthode ``empty_quarantine`` (qui appelle
+        # send2trash). Voir src/core/operations/quarantine.py.
+        self.quarantine: QuarantineManager = QuarantineManager()
 
     def _get_finder(self) -> DuplicateFinder:
         """Get or create the duplicate finder instance."""
@@ -673,10 +681,26 @@ class DuplicateManager:
         if not os.access(file_path, os.W_OK):
             return False, "Permission denied"
 
+        # Référence vers le file_manager global pour enregistrer chaque
+        # opération dans l'historique unifié (visible dans le panneau
+        # Historique + « Annuler dernière / tout »). Refonte 2026-05-19 :
+        # avant cette date, duplicate_manager faisait ses opérations
+        # « en aveugle » sans laisser de trace → impossible de défaire.
+        fm = _get_file_manager()
+
         try:
             if decision.action == FileAction.DELETE:
+                # Suppression DEFINITIVE — on enregistre quand même pour
+                # traçabilité, mais le rollback de file_manager renvoie
+                # explicitement False sur ce type d'opération.
                 os.remove(file_path)
-                logger.info(f"Deleted: {file_path}")
+                fm.record_operation(
+                    operation_type="delete",
+                    source=file_path,
+                    destination="",
+                    success=True,
+                )
+                logger.info(f"Deleted (definitive): {file_path}")
                 return True, None
 
             elif decision.action == FileAction.MOVE:
@@ -694,15 +718,33 @@ class DuplicateManager:
 
                 shutil.move(file_path, str(target))
                 decision.target_path = str(target)
+                fm.record_operation(
+                    operation_type="move",
+                    source=file_path,
+                    destination=str(target),
+                    success=True,
+                )
                 logger.info(f"Moved: {file_path} -> {target}")
                 return True, None
 
             elif decision.action == FileAction.TRASH:
-                if not TRASH_AVAILABLE:
-                    return False, "send2trash not available"
-
-                send2trash(file_path)
-                logger.info(f"Trashed: {file_path}")
+                # Refonte 2026-05-19 : remplacer l'envoi direct en corbeille
+                # système (irréversible côté Python) par un déplacement vers
+                # la quarantaine interne (récupérable via « Annuler »).
+                # L'utilisateur vide définitivement plus tard via le bouton
+                # « 🗑 Vider quarantaine ».
+                entry = self.quarantine.quarantine_file(
+                    file_path, reason="duplicate"
+                )
+                fm.record_operation(
+                    operation_type="trash",
+                    source=entry.source,
+                    destination=entry.destination,
+                    success=True,
+                )
+                logger.info(
+                    f"Trashed (quarantine): {file_path} -> {entry.destination}"
+                )
                 return True, None
 
             else:
@@ -712,6 +754,32 @@ class DuplicateManager:
             return False, "Permission denied"
         except OSError as e:
             return False, str(e)
+
+    # ------------------------------------------------------------------
+    # Gestion de la quarantaine (refonte 2026-05-19)
+    # ------------------------------------------------------------------
+    def empty_quarantine(self) -> Dict[str, int]:
+        """Vide la quarantaine interne en envoyant tout en corbeille système.
+
+        L'utilisateur appelle cette méthode via le bouton « 🗑 Vider
+        quarantaine » de l'IHM quand il est sûr de ne plus vouloir
+        restaurer les doublons. Une fois cette action exécutée, les
+        fichiers passent de la quarantaine interne (récupérable depuis
+        l'app) à la corbeille système (récupérable depuis l'Explorateur
+        Windows uniquement, jusqu'au vidage manuel).
+
+        Returns:
+            dict détaillé : voir ``QuarantineManager.empty_to_system_trash``.
+        """
+        return self.quarantine.empty_to_system_trash()
+
+    def quarantine_size_bytes(self) -> int:
+        """Taille totale occupée par la quarantaine de cette session."""
+        return self.quarantine.total_size_bytes()
+
+    def quarantine_count(self) -> int:
+        """Nombre de fichiers actuellement en quarantaine."""
+        return len(self.quarantine.list_entries())
 
     def _get_unique_path(self, path: Path) -> Path:
         """Generate a unique path if target already exists."""
