@@ -329,6 +329,14 @@ class OrganizeFrame(ctk.CTkFrame):
             v.trace_add("write", lambda *_: self._refresh_file_count())
         self._refresh_file_count()
 
+        # Bandeau warning trial — synchronisation initiale après création
+        # de tous les widgets (notamment self.trial_warning_banner et
+        # self.organize_button qui doivent exister).
+        try:
+            self._refresh_trial_warning_banner()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"Bandeau warning trial init failed (ignoré) : {exc}")
+
         # ---- Initialiser le scheduler E5 ----
         # Lazy import pour ne pas tirer la dépendance si la feature n'est
         # jamais activée (et garder le démarrage rapide).
@@ -1813,6 +1821,26 @@ class OrganizeFrame(ctk.CTkFrame):
         )
         self.cancel_button.pack(fill="x", pady=(0, PAD_S))
 
+        # Bandeau warning trial (pivot 2026-05-26)
+        # Affiché de manière persistante au-dessus du bouton Organiser quand
+        # l'utilisateur est aux seuils 8/10 ou 9/10 SANS licence active.
+        # Hors warning : grid_remove() le masque sans le détruire.
+        self.trial_warning_banner = ctk.CTkLabel(
+            actions_box,
+            text="",
+            font=font_label(weight="bold"),
+            text_color=("#8a5a10", "#f3c876"),
+            fg_color=("#f7e7c4", "#3a2e16"),
+            corner_radius=6,
+            anchor="w",
+            justify="left",
+            wraplength=380,
+        )
+        # NB : on utilise pack(...) ailleurs dans ce conteneur — pack_forget()
+        # est l'équivalent de grid_remove pour le pack manager.
+        self.trial_warning_banner.pack(fill="x", pady=(0, PAD_S))
+        self.trial_warning_banner.pack_forget()  # masqué tant qu'on n'est pas en warning
+
         self.organize_button = primary_button(
             actions_box,
             text="🚀 Organiser",
@@ -2818,7 +2846,7 @@ class OrganizeFrame(ctk.CTkFrame):
             feedback.grid(row=4, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_M))
             ui_refs["feedback"] = feedback
 
-            # Bouton "Acheter" (séparé du footer)
+            # Bouton "Acheter" + lien "Comment ça marche ?" (séparés du footer)
             buy_row = ctk.CTkFrame(body, fg_color="transparent")
             buy_row.grid(row=5, column=0, sticky="ew", padx=PAD_M, pady=PAD_S)
             ctk.CTkLabel(
@@ -2832,6 +2860,23 @@ class OrganizeFrame(ctk.CTkFrame):
                 text="🛒 Acheter une licence (10 €)",
                 command=self._open_purchase_page,
             ).pack(side="left")
+
+            # Lien tertiaire "Comment ça marche ?" — ouvre docs/PRO_UNLOCK.md
+            # sur GitHub via le navigateur par défaut. On utilise un CTkButton
+            # sans fg_color pour qu'il ressemble à un lien.
+            help_row = ctk.CTkFrame(body, fg_color="transparent")
+            help_row.grid(row=6, column=0, sticky="ew", padx=PAD_M, pady=(0, PAD_S))
+            help_link = ctk.CTkButton(
+                help_row,
+                text="ℹ️  Comment ça marche ?",
+                command=self._open_help_page,
+                fg_color="transparent",
+                hover_color=("gray85", "gray25"),
+                text_color=("#2b5fa1", "#6ba0e0"),
+                anchor="w",
+                height=BTN_H_STD,
+            )
+            help_link.pack(side="left")
 
         def do_activate():
             entry = ui_refs["entry"]
@@ -2895,12 +2940,34 @@ class OrganizeFrame(ctk.CTkFrame):
                 f"Va sur :\n{url}\n\nPour 10 € à vie sur un PC.",
             )
 
+    def _open_help_page(self):
+        """Ouvre la page d'explication du modèle trial+unlock.
+
+        Lien GitHub direct vers ``docs/PRO_UNLOCK.md`` (page utilisateur
+        courte, accessible publiquement, versionnée avec le projet).
+        """
+        import webbrowser
+
+        url = "https://github.com/Kiriiaq/PhotoOrganizer/blob/main/docs/PRO_UNLOCK.md"
+        try:
+            webbrowser.open(url)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Impossible d'ouvrir le navigateur : {exc}")
+            messagebox.showinfo(
+                "Comment ça marche ?",
+                f"Va sur :\n{url}",
+            )
+
     def _refresh_license_badge(self):
         """Demande à l'app parent de rafraîchir le badge d'état licence.
 
         Méthode tolérante : si l'app n'expose pas ``refresh_license_badge()``
-        (ex. dans un contexte de test), on log et on continue.
+        (ex. dans un contexte de test), on log et on continue. On rafraîchit
+        AUSSI le bandeau warning local (effet de bord cohérent).
         """
+        # Bandeau warning local (toujours rafraîchi, même si pas d'app parent)
+        self._refresh_trial_warning_banner()
+
         try:
             top = self.winfo_toplevel()
         except tk.TclError:
@@ -2911,6 +2978,56 @@ class OrganizeFrame(ctk.CTkFrame):
                 refresher()
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"refresh_license_badge: {exc}")
+
+    def _refresh_trial_warning_banner(self):
+        """Affiche ou masque le bandeau jaune au-dessus du bouton Organiser.
+
+        Visible uniquement si :
+        - aucune licence active, ET
+        - le compteur de tris est à 8 (avant-dernier) ou 9 (dernier).
+
+        Sinon (essai normal, déjà bloqué, ou licence active), le bandeau est
+        masqué via ``pack_forget()``.
+        """
+        banner = getattr(self, "trial_warning_banner", None)
+        if banner is None:
+            return  # widget pas encore créé (cas d'appel précoce)
+
+        try:
+            state = licensing.get_state()
+        except Exception as exc:  # noqa: BLE001 — l'UI ne doit jamais crash sur la crypto
+            logger.warning(f"_refresh_trial_warning_banner: get_state a échoué : {exc}")
+            try:
+                banner.pack_forget()
+            except tk.TclError:
+                pass
+            return
+
+        if state.has_valid_license or not state.should_warn:
+            try:
+                banner.pack_forget()
+            except tk.TclError:
+                pass
+            return
+
+        # Compteur dans WARNING_THRESHOLDS = (8, 9)
+        if state.trial_count == licensing.TRIAL_LIMIT - 1:  # 9
+            text = (
+                f"⚠️  Dernier tri gratuit avant blocage  ({state.trial_remaining}/{licensing.TRIAL_LIMIT})"
+            )
+        else:  # 8
+            text = (
+                f"⚠️  Avant-dernier tri gratuit  ({state.trial_remaining}/{licensing.TRIAL_LIMIT})"
+            )
+
+        try:
+            banner.configure(text=text)
+            # Le label doit être réinséré DEVANT (au-dessus de) le bouton
+            # Organiser. Comme tous les widgets utilisent .pack() dans
+            # actions_box, on repack devant organize_button.
+            banner.pack(fill="x", pady=(0, PAD_S), before=self.organize_button)
+        except tk.TclError as exc:
+            logger.debug(f"trial_warning_banner refresh failed: {exc}")
 
     def _show_files_list(self):
         """Liste les fichiers détectés (T-030..T-033) — panneau inline.

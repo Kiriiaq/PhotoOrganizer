@@ -1,148 +1,216 @@
-PHOTOORGANIZER PRO — END USER LICENSE AGREEMENT
-=================================================
+PHOTOORGANIZER — END USER LICENSE AGREEMENT
+=============================================
 
-Version 1.0 — effective 2026-05-19
+Version 2.0 — effective 2026-05-26 (post-pivot trial+unlock)
 Copyright (c) 2025-2026 Kiriiaq (Emmanuel Grolleau)
 Contact : manugrolleau48@gmail.com
 
 
-IMPORTANT — READ BEFORE INSTALLING OR USING.
+IMPORTANT — READ BEFORE ACTIVATING.
 
 This End User License Agreement ("Agreement") is a legal contract
 between you ("Licensee", "You") and Kiriiaq (Emmanuel Grolleau)
-("Licensor", "We"), governing your use of the software product known
-as "PhotoOrganizer Pro" ("Software").
+("Licensor", "We"), governing your purchase and activation of the
+"PhotoOrganizer" application ("Software"), specifically the unlock
+license that removes the ten (10) free trial runs limit.
 
-By installing, activating, or using the Software, You agree to be
-bound by the terms of this Agreement. If You do not agree, do not
-install, activate, or use the Software, and request a refund within
-14 days of purchase.
+The free trial use of the Software (up to 10 successful organize
+runs) is covered by §2. Purchased unlock licenses are covered by §3
+onwards.
+
+By activating an unlock key, You agree to be bound by the terms of
+this Agreement. If You do not agree, do not activate, and request a
+refund within fourteen (14) days of purchase.
 
 
 1. SCOPE
 --------
 
-This Agreement covers ONLY the proprietary modules distributed as part
-of "PhotoOrganizer Pro", located in the source tree under
-``src/photoorganizer_pro/`` (when distributed in source form) or
-bundled in the "PhotoOrganizer Pro" executable (when distributed as
-binary).
+This Agreement covers ONLY the unlock mechanism that grants unlimited
+use of the Software on a single machine after the free trial expires.
 
-The free open-source GUI ("PhotoOrganizer Core"), distributed under
-the Apache License 2.0 (see LICENSE), is NOT covered by this
-Agreement and remains governed by its own terms.
+The Software's source code is published under the Apache License 2.0
+(see LICENSE in the source repository). This Agreement does NOT
+restrict any right granted by the Apache-2.0 license to the source
+code itself. You may always compile your own binary from source.
+
+This Agreement governs the binary distributed by Licensor and the
+unlock key issued to You upon purchase.
 
 
-2. LICENSE GRANT
------------------
+2. FREE TRIAL
+-------------
+
+The Software is distributed with a free trial of ten (10) successful
+"organize" runs. The trial counter is stored locally on Your computer
+in ``%LOCALAPPDATA%\PhotoOrganizer\usage.dat`` and is signed with
+HMAC-SHA256 to detect tampering.
+
+The trial may be reset by deleting ``usage.dat`` — this is a known
+limitation of offline DRM that Licensor accepts as a trade-off at the
+price point. Licensor reserves the right to make the counter more
+tamper-resistant in future versions (e.g. by mirroring it in the
+Windows registry).
+
+The trial requires no purchase, no email, and no account creation.
+
+
+3. UNLOCK LICENSE GRANT
+-----------------------
 
 Subject to Your compliance with this Agreement and full payment of
-the applicable license fee, Licensor grants You a limited,
-non-exclusive, non-transferable, non-sublicensable license to install
-and use the Software according to the edition You purchased:
+the unlock fee (currently 10 EUR), Licensor grants You a limited,
+non-exclusive, non-transferable, non-sublicensable, perpetual license
+to use the Software without any trial limit, ON ONE (1) SINGLE
+COMPUTER ONLY.
 
-  - PERSONAL edition : install and use on up to one (1) personal
-    computer simultaneously, for personal or single-user professional
-    purposes.
+The license is "lifetime" in the sense that:
+  - it has no expiration date for the version You purchase and all
+    future versions of the Software;
+  - all future minor AND major updates are included at no additional
+    cost.
 
-  - STUDIO edition : install and use on up to three (3) personal
-    computers simultaneously, within a single small business, freelance
-    studio, or household.
-
-  - LIFETIME edition : same scope as STUDIO, with perpetual right to
-    receive all minor AND major updates of the Software at no
-    additional cost.
+This is a "shareware-style" license, comparable to Sublime Text or
+WinRAR's commercial model.
 
 
-3. RESTRICTIONS
-----------------
+4. ONE-COMPUTER BINDING (CRITICAL)
+-----------------------------------
+
+The unlock license is permanently bound to the FIRST computer on
+which You activate it. This binding is technically enforced by:
+
+  - hashing Your computer's ``MachineGuid`` (Windows registry) and
+    Volume Serial Number of the system drive (C:) into a stable
+    machine identifier;
+  - storing this identifier inside the HMAC-signed
+    ``license.dat`` file at the moment of first activation;
+  - rejecting the license on any subsequent computer whose machine
+    identifier does not match.
+
+The license CANNOT be transferred to another computer by copying
+``license.dat`` — it will be rejected by the signature/binding check.
+
+
+5. NO RE-ISSUANCE POLICY
+-------------------------
+
+The unlock license is bound to ONE computer for life. You are NOT
+entitled to a free re-issuance in the following situations:
+
+  (a) You change computer (new PC, laptop replacement, work to home);
+  (b) You reinstall Windows (the MachineGuid is regenerated by
+      Windows during reinstallation, breaking the binding);
+  (c) You replace the system drive (C:) (the Volume Serial Number
+      changes, breaking the binding);
+  (d) You restore a disk image from a different machine.
+
+In each of these cases, You must purchase a new unlock license at
+the then-current price.
+
+Licensor may, at its sole and absolute discretion, grant a courtesy
+re-issuance in exceptional circumstances (e.g. a documented hardware
+failure within the first months of purchase), but no such gesture is
+ever guaranteed or implied. This courtesy policy is not part of this
+Agreement and creates no legal obligation on Licensor.
+
+Cases where the binding IS preserved (no re-issuance needed):
+  - The Software is updated to a new version on the same machine;
+  - The full system drive is cloned to a new drive of the same
+    computer (the Volume Serial Number is preserved by the cloning
+    tool, in most cases).
+
+
+6. RESTRICTIONS
+---------------
 
 You may NOT:
 
   (a) copy, distribute, sublicense, rent, lease, sell, or otherwise
-      transfer the Software to any third party;
+      transfer the unlock key or the activated binary to any third
+      party;
   (b) remove, alter, or obscure any copyright, trademark, license
-      key, or other proprietary notice contained in the Software;
-  (c) reverse-engineer, decompile, disassemble, or otherwise attempt
-      to derive the source code of the Software, except to the extent
-      such activity is expressly permitted by applicable law
-      notwithstanding this limitation;
-  (d) circumvent or attempt to circumvent the license validation
+      key, or other proprietary notice contained in the binary
+      distributed by Licensor;
+  (c) circumvent, attempt to circumvent, or publicly distribute tools
+      that circumvent the trial counter or the license validation
       mechanism;
-  (e) use the Software to provide commercial photo-organization
-      services to third parties as a primary business activity
-      (consultancy, agency offering) without obtaining a separate
-      commercial agreement from Licensor.
+  (d) share Your unlock key with other users; the key is tied to Your
+      email address at issuance and traceable.
 
-You MAY:
+You MAY (these are explicitly permitted):
 
-  (a) install on a backup machine and a working machine within the
-      seat limit of Your edition;
-  (b) use the Software for Your own client deliverables (e.g. a
-      photographer organizing a client wedding shoot);
-  (c) re-download the Software from Licensor's official channels at
-      any time during Your license term.
-
-
-4. UPDATES
------------
-
-  - PERSONAL : minor updates (2.x.y → 2.x.z) free for 12 months from
-    purchase date. Major updates (2.x → 3.x) at 50% off.
-  - STUDIO : minor updates free for 24 months. Major updates at 50%
-    off.
-  - LIFETIME : all minor AND major updates free, perpetually.
-
-Updates are delivered via Licensor's official channels (initially
-github.com/Kiriiaq/PhotoOrganizer/releases and the email associated
-with Your license key).
+  (a) compile Your own binary from the open-source code under the
+      Apache-2.0 license — that compiled binary is yours to use
+      without any trial limit. This Agreement governs ONLY the binary
+      we distribute and the unlock key we issue.
+  (b) re-download Your unlock email at any time by contacting
+      Licensor with Your order ID;
+  (c) use the Software for Your own client deliverables (e.g. a
+      photographer organizing client wedding shoots).
 
 
-5. SUPPORT
------------
+7. UPDATES
+----------
+
+All future updates of the Software (minor 2.x.y → 2.x.z AND major
+2.x → 3.x) are included at no additional cost, perpetually, for
+licenses purchased under this Agreement.
+
+Updates are delivered via Licensor's official channels (currently
+``github.com/Kiriiaq/PhotoOrganizer/releases``).
+
+
+8. SUPPORT
+----------
 
 Email support is provided on a best-effort basis at
 manugrolleau48@gmail.com. Response time target : 5 business days. No
-phone support. No on-site support. STUDIO edition receives priority
-queueing for support tickets.
+phone support. No on-site support.
+
+For support requests related to license issues, please include Your
+short machine identifier (visible in the activation modal as
+``MAC-XXXX-XXXX``) and Your order ID from Lemon Squeezy.
 
 
-6. INTELLECTUAL PROPERTY
--------------------------
+9. INTELLECTUAL PROPERTY
+------------------------
 
-The Software is licensed, not sold. Licensor retains all right, title,
-and interest in and to the Software, including all intellectual
-property rights. This Agreement does not transfer ownership of any
-portion of the Software to You.
+The source code of the Software is open under the Apache License 2.0
+(see LICENSE) and copyrighted by Licensor. This Agreement does NOT
+transfer ownership of the source code or the trademark
+"PhotoOrganizer" to You.
 
-The license key You receive is personal to You and tied to the email
+The unlock key You receive is personal to You and tied to the email
 address provided at purchase.
 
 
-7. PRIVACY
+10. PRIVACY
 -----------
 
 The Software operates entirely offline. Licensor does NOT collect any
 telemetry, usage data, or personal data from Your use of the Software
-beyond what is required for license validation (which is local to Your
-machine).
+beyond what is required for license validation (which is local to
+Your machine).
 
-License validation is performed offline by signature verification
-against a key embedded in the Software. No license server is
-contacted.
+License validation is performed offline by HMAC signature verification
+against a key embedded in the binary. No license server is contacted.
 
-The email address used to generate Your license key is processed by
+The email address used to generate Your unlock key is processed by
 the payment platform (currently Lemon Squeezy, acting as Merchant of
 Record) and by Licensor solely for the purposes of:
-  - generating Your license key;
-  - communicating updates and security notices.
+  - generating Your unlock key;
+  - communicating transactional notices (security advisory, etc.).
 
 You may request deletion of Your email from Licensor's records at any
-time by emailing manugrolleau48@gmail.com (this revokes Your right to
-receive update notices).
+time by emailing manugrolleau48@gmail.com. This revokes Your right to
+receive transactional notices but does NOT invalidate Your already-
+activated license, which is validated locally.
+
+Full privacy details : ``docs/PRIVACY.md`` in the source repository.
 
 
-8. WARRANTY DISCLAIMER
+11. WARRANTY DISCLAIMER
 -----------------------
 
 THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
@@ -152,12 +220,12 @@ PURPOSE, NON-INFRINGEMENT, OR THAT THE SOFTWARE WILL BE ERROR-FREE OR
 UNINTERRUPTED.
 
 You assume the entire risk arising out of the use or performance of
-the Software, including the risk of data loss. You are strongly
+the Software, including the risk of data loss. You are STRONGLY
 encouraged to keep backups of Your photo collection before using ANY
 file-management software, including this one.
 
 
-9. LIMITATION OF LIABILITY
+12. LIMITATION OF LIABILITY
 ---------------------------
 
 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
@@ -170,31 +238,43 @@ SUCH DAMAGES.
 
 LICENSOR'S TOTAL CUMULATIVE LIABILITY UNDER OR IN CONNECTION WITH
 THIS AGREEMENT SHALL NOT EXCEED THE AMOUNT YOU PAID FOR THE
-SOFTWARE LICENSE.
+SOFTWARE LICENSE (currently 10 EUR).
 
 
-10. REFUND
------------
+13. REFUND
+----------
 
 In accordance with European consumer law and Licensor's policy, You
 may request a full refund within FOURTEEN (14) DAYS of Your purchase
 date, for any reason, by contacting manugrolleau48@gmail.com.
 
-Upon refund, Your license is terminated and You must cease using the
-Software and destroy all copies in Your possession.
+Upon refund, Your unlock license is terminated and You must cease
+using the activated binary and destroy Your unlock key.
+
+NOTE — by activating Your unlock key before the 14-day period
+expires, You expressly request immediate performance of the contract
+and acknowledge that this MAY waive Your statutory right of
+withdrawal under article L221-28-13° of the French Code de la
+consommation, EXCEPT in cases of demonstrated technical defect of the
+Software. Licensor will nonetheless process refund requests filed
+within 14 days of purchase as a courtesy, regardless of activation.
 
 
-11. TERMINATION
-----------------
+14. TERMINATION
+---------------
 
 This Agreement is effective until terminated. Your rights under this
 Agreement terminate automatically and immediately if You fail to
 comply with any term of this Agreement. Upon termination, You must
-cease all use of the Software and destroy all copies.
+cease all use of the activated binary and destroy Your unlock key.
+
+This Agreement does NOT terminate Your right to use the Apache-2.0
+licensed source code or to compile Your own binary from it. Only the
+unlock license is terminated.
 
 
-12. GOVERNING LAW
-------------------
+15. GOVERNING LAW
+-----------------
 
 This Agreement is governed by the laws of France. Any dispute arising
 from or related to this Agreement shall be subject to the exclusive
@@ -202,12 +282,13 @@ jurisdiction of the courts of Licensor's place of residence, unless
 otherwise required by applicable consumer protection law.
 
 
-13. ENTIRE AGREEMENT
----------------------
+16. ENTIRE AGREEMENT
+--------------------
 
 This Agreement constitutes the entire agreement between You and
-Licensor concerning the Software and supersedes all prior or
-contemporaneous communications, proposals, and representations.
+Licensor concerning the unlock license for the Software and
+supersedes all prior or contemporaneous communications, proposals,
+and representations.
 
 If any provision of this Agreement is held invalid or unenforceable,
 the remaining provisions shall remain in full force and effect.

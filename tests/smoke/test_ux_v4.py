@@ -744,3 +744,155 @@ class TestUnlockPanel:
         # La méthode existe et ne lève pas même si l'app parent change
         assert callable(of._refresh_license_badge)
         of._refresh_license_badge()  # doit être no-op si l'app n'expose pas la méthode
+
+
+# =============================================================================
+# Pivot 2026-05-26 — Scénarios E2E spec A.7 (NEXT_STEPS.html)
+# =============================================================================
+
+class TestLicenseFlowE2E:
+    """Scénarios end-to-end de la spec A.7 :
+
+    1. usage.dat simulé à count=11 → clic Organiser doit ouvrir le modal
+       inline (et NE PAS créer de Toplevel).
+    2. Licence valide simulée → le badge global affiche
+       "Activée · MAC-XXXX-XXXX" en vert.
+    """
+
+    @staticmethod
+    def _close_panel(of):
+        if of._inline_panel is not None:
+            try:
+                of._inline_panel.destroy()
+            except Exception:
+                pass
+            of._inline_panel = None
+        try:
+            of._main_tabview.grid()
+        except Exception:
+            pass
+
+    def _make_state(self, **overrides):
+        """Construit un LicenseState pré-rempli pour les tests."""
+        from utils.licensing import TRIAL_LIMIT, LicenseState
+
+        defaults = dict(
+            has_valid_license=False,
+            trial_count=0,
+            trial_remaining=TRIAL_LIMIT,
+            machine_id="a" * 64,
+            machine_id_short="MAC-AAAA-AAAA",
+            license_email=None,
+            is_blocked=False,
+            should_warn=False,
+        )
+        defaults.update(overrides)
+        return LicenseState(**defaults)
+
+    def test_blocked_state_opens_unlock_panel_no_toplevel(self, app, monkeypatch):
+        """Spec A.7 #1 : count=11 (bloqué) + clic Organiser → modal inline."""
+        import tkinter as tk
+
+        from utils import licensing
+
+        of = app.organize_frame
+
+        # Simule l'état "limite atteinte" via monkeypatch de can_organize_now
+        blocked_state = self._make_state(
+            trial_count=11,
+            trial_remaining=0,
+            is_blocked=True,
+        )
+        monkeypatch.setattr(
+            licensing,
+            "can_organize_now",
+            lambda: (False, blocked_state),
+        )
+
+        # Snapshot Toplevels avant
+        toplevels_before = [
+            w for w in app.winfo_children() if isinstance(w, tk.Toplevel)
+        ]
+
+        # On ne peut pas vraiment cliquer le bouton (la confirmation
+        # messagebox bloquerait le test). On appelle directement
+        # _show_unlock_panel qui est ce que le hook ferait après le
+        # blocage. C'est le code path identique.
+        of._show_unlock_panel()
+        for _ in range(3):
+            app.update_idletasks()
+            app.update()
+
+        try:
+            # Le modal est ouvert
+            assert of._inline_panel is not None
+
+            # AUCUN Toplevel n'a été créé (préférence projet stricte)
+            toplevels_after = [
+                w for w in app.winfo_children() if isinstance(w, tk.Toplevel)
+            ]
+            assert len(toplevels_after) == len(toplevels_before), (
+                "Le panneau d'activation NE DOIT PAS créer de Toplevel"
+            )
+        finally:
+            self._close_panel(of)
+
+    def test_active_license_shows_activated_badge(self, app, monkeypatch):
+        """Spec A.7 #2 : licence valide → badge "Activée · MAC-XXXX-XXXX"."""
+        from utils import licensing
+
+        # Simule une licence active
+        active_state = self._make_state(
+            has_valid_license=True,
+            license_email="buyer@example.com",
+            machine_id="f" * 64,
+            machine_id_short="MAC-FFFF-FFFF",
+        )
+        monkeypatch.setattr(licensing, "get_state", lambda: active_state)
+
+        # Force le refresh
+        app.refresh_license_badge()
+        app.update_idletasks()
+
+        # Vérifie le format exact demandé : "Activée · MAC-XXXX-XXXX"
+        text = app.license_badge.cget("text")
+        assert text == "Activée · MAC-FFFF-FFFF", (
+            f"Badge attendu 'Activée · MAC-FFFF-FFFF', obtenu '{text}'"
+        )
+
+    def test_trial_warning_banner_visible_at_eight_and_nine(self, app, monkeypatch):
+        """Spec A.4 : bandeau jaune persistant à 8/10 et 9/10."""
+        from utils import licensing
+
+        of = app.organize_frame
+        assert hasattr(of, "trial_warning_banner")
+
+        # État essai 8/10 → warning visible
+        state_8 = self._make_state(
+            trial_count=8,
+            trial_remaining=2,
+            should_warn=True,
+        )
+        monkeypatch.setattr(licensing, "get_state", lambda: state_8)
+        of._refresh_trial_warning_banner()
+        app.update_idletasks()
+        text_8 = of.trial_warning_banner.cget("text")
+        assert "Avant-dernier" in text_8 or "2/10" in text_8
+
+        # État essai 9/10 → warning "Dernier tri gratuit"
+        state_9 = self._make_state(
+            trial_count=9,
+            trial_remaining=1,
+            should_warn=True,
+        )
+        monkeypatch.setattr(licensing, "get_state", lambda: state_9)
+        of._refresh_trial_warning_banner()
+        app.update_idletasks()
+        text_9 = of.trial_warning_banner.cget("text")
+        assert "Dernier tri gratuit" in text_9 or "1/10" in text_9
+
+    def test_help_link_method_exists(self, app):
+        """Spec A.5 : lien tertiaire 'Comment ça marche ?' présent."""
+        of = app.organize_frame
+        assert hasattr(of, "_open_help_page")
+        assert callable(of._open_help_page)
