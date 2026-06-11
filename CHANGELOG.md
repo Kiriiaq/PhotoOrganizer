@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — 2.3.0-dev
 
+### Fixed — Audit complet (2026-06-11, branche `audit/2026-06-11`)
+
+- **B-01 (bloquant)** : le worker d'organisation testait `result.success` (attribut inexistant sur `OrganizationResult`) → AttributeError silencieuse après chaque tri réussi : le compteur trial ne s'incrémentait jamais et le panneau « Organisation terminée » ne s'affichait jamais. Corrigé en `result.processed` + test E2E du worker réel (`tests/smoke/test_organize_e2e.py`).
+- **B-02** : handler d'exception piégé (`except X if False else Exception`) dans l'activation de clé → `except Exception` propre.
+- **B-03** : workers `analyze()` / `organize()` / aperçu dry-run entièrement sous `try/except/finally` — une exception précoce ne laisse plus les boutons morts jusqu'au redémarrage.
+- **B-04** : `FileManager.start_session()` ne purge plus l'historique partagé — les opérations précédentes (dont les quarantaines doublons) restent visibles et annulables dans l'Historique.
+- **B-05 / Lot F** : la validation de licence vit désormais dans `src/utils/license_validator.py` ; `photoorganizer_pro` n'est plus importé par la v2.x (l'ancien `validator.py` est un shim de ré-export pour `keygen.py`). Secret HMAC : `src/utils/_secret.py`.
+- **Lot D** : `DuplicateManager` reçoit le FileManager partagé injecté par l'UI (avant : singleton jamais affiché → opérations doublons invisibles dans l'Historique). Suppression des helpers morts `get_organizer()`, `organize_files()`, `get_manager()`, `copy_file()`, `move_file()`.
+- **Mineurs (Lot C)** : aperçu dry-run prend en compte le critère « lieu » et tourne dans un worker thread ; type `trash` affiché « Quarantaine » dans l'Historique ; purge du cache EXIF au démarrage + `max_size_mb` réellement appliqué ; `APP_VERSION` lue depuis `src/__init__.py` ; bandeau trial `wraplength` adapté au rail ; chemin ExifTool mort retiré ; badges/docs mis à jour (207 tests).
+- **Lot E** : racine épurée — `NEXT_STEPS.html`, `PROJECT_OVERVIEW.html` → `docs/`, `LINKEDIN_DRAFTS.md` → `docs/marketing/` (liens corrigés).
+
 ### Pivot stratégique (2026-05-26)
 
 PhotoOrganizer abandonne le modèle "édition Pro séparée" (19/49/99 € avec batch CLI / watch-folder / plugins) au profit d'un modèle **trial + unlock** type Sublime Text :
