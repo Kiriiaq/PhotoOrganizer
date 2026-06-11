@@ -28,7 +28,7 @@ from src.core.operations.duplicate_finder import (
     DuplicateGroup,
     DuplicateResult,
 )
-from src.core.operations.file_manager import get_manager as _get_file_manager
+from src.core.operations.file_manager import FileManager
 from src.core.operations.quarantine import QuarantineManager
 
 # Try to import send2trash for trash support
@@ -53,14 +53,21 @@ class DuplicateManager:
     - Detailed result reporting
     """
 
-    def __init__(self, config: DuplicateManagerConfig):
+    def __init__(self, config: DuplicateManagerConfig, file_manager: Optional[FileManager] = None):
         """
         Initialize the duplicate manager.
 
         Args:
             config: Configuration for the manager
+            file_manager: FileManager partagé pour historiser les opérations
+                (trash/move/delete) dans l'onglet Historique. Lot D (audit
+                2026-06-11) : avant, les opérations étaient enregistrées dans
+                un singleton module-level jamais affiché par l'UI — le
+                « FileManager partagé » documenté ne l'était pas réellement.
+                Si None (CLI, tests), une instance privée est créée.
         """
         self.config = config
+        self.file_manager = file_manager or FileManager()
         self._cancel_requested = False
         self._finder = None
         # Quarantaine interne pour le mode TRASH — assure la réversibilité
@@ -681,12 +688,12 @@ class DuplicateManager:
         if not os.access(file_path, os.W_OK):
             return False, "Permission denied"
 
-        # Référence vers le file_manager global pour enregistrer chaque
-        # opération dans l'historique unifié (visible dans le panneau
-        # Historique + « Annuler dernière / tout »). Refonte 2026-05-19 :
-        # avant cette date, duplicate_manager faisait ses opérations
-        # « en aveugle » sans laisser de trace → impossible de défaire.
-        fm = _get_file_manager()
+        # FileManager (injecté par l'UI, partagé entre onglets) pour
+        # enregistrer chaque opération dans l'historique unifié (visible
+        # dans le panneau Historique + « Annuler dernière / tout »).
+        # Lot D (audit 2026-06-11) : remplace le singleton module-level
+        # _get_file_manager() qui n'était jamais celui affiché par l'UI.
+        fm = self.file_manager
 
         try:
             if decision.action == FileAction.DELETE:

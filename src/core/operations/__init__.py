@@ -16,15 +16,15 @@ from .duplicate_manager import (
     get_manager,
     reset_manager,
 )
-from .file_manager import FileManager, copy_file, move_file
-from .organizer import OrganizationOptions, OrganizationResult, SmartOrganizer, organize_files
+from .file_manager import FileManager
+from .organizer import OrganizationOptions, OrganizationResult, SmartOrganizer
 
 __all__ = [
     # File manager
-    'FileManager', 'copy_file', 'move_file',
+    'FileManager',
 
     # Organizer
-    'SmartOrganizer', 'organize_files', 'OrganizationOptions', 'OrganizationResult',
+    'SmartOrganizer', 'OrganizationOptions', 'OrganizationResult',
 
     # Duplicate finder
     'DuplicateFinder', 'DuplicateGroup', 'DuplicateResult',

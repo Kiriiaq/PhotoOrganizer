@@ -1258,42 +1258,7 @@ def _quick_hash(path: str, head_bytes: int = 64 * 1024) -> str:
     h.update(str(size).encode())
     return h.hexdigest()
 
-
-# Instance globale
-_organizer: Optional[SmartOrganizer] = None
-
-
-def get_organizer() -> SmartOrganizer:
-    """Retourne l'instance globale de l'organiseur."""
-    global _organizer
-    if _organizer is None:
-        _organizer = SmartOrganizer()
-    return _organizer
-
-
-def organize_files(
-    file_paths: List[str], target_dir: str, options: Dict[str, Any], progress_callback: Optional[Callable] = None
-) -> Dict[str, Any]:
-    """
-    Fonction utilitaire pour organiser des fichiers.
-
-    Args:
-        file_paths: Liste des fichiers
-        target_dir: Répertoire de destination
-        options: Options d'organisation (dictionnaire)
-        progress_callback: Callback de progression
-
-    Returns:
-        Dictionnaire des résultats
-    """
-    organizer = get_organizer()
-    opts = OrganizationOptions.from_dict(options)
-    result = organizer.organize(file_paths, target_dir, opts, progress_callback)
-
-    return {
-        "total": result.total,
-        "processed": result.processed,
-        "skipped": result.skipped,
-        "errors": result.errors,
-        "error_messages": result.error_messages,
-    }
+# Lot D (audit 2026-06-11) : les helpers module-level `get_organizer()` et
+# `organize_files()` (singleton + wrapper dict) ont été supprimés — aucun
+# appelant dans src/, tests/ ni photoorganizer_pro/. Instancier directement
+# `SmartOrganizer(file_manager=...)` comme le font organize_frame et les CLI.

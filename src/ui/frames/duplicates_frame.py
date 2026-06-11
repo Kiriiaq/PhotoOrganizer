@@ -978,7 +978,9 @@ class DuplicatesFrame(ctk.CTkFrame):
 
         def scan_thread():
             try:
-                self._manager = DuplicateManager(config)
+                # Lot D (audit 2026-06-11) : injection du FileManager partagé
+                # pour que trash/move/delete apparaissent dans l'Historique.
+                self._manager = DuplicateManager(config, file_manager=self.file_manager)
 
                 # Phase 1: Scan
                 self._update_progress("Scan des fichiers...", 0)

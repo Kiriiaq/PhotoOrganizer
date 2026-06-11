@@ -453,26 +453,7 @@ class FileManager:
         """Efface l'historique sans annuler aucune opération."""
         self._operations_history.clear()
 
-
-# Instance globale
-_manager: Optional[FileManager] = None
-
-
-def get_manager() -> FileManager:
-    """Retourne l'instance globale du gestionnaire."""
-    global _manager
-    if _manager is None:
-        _manager = FileManager()
-    return _manager
-
-
-def copy_file(source: str, destination: str, **kwargs) -> bool:
-    """Fonction utilitaire pour copier un fichier."""
-    result = get_manager().copy_file(source, destination, **kwargs)
-    return result.success
-
-
-def move_file(source: str, destination: str, **kwargs) -> bool:
-    """Fonction utilitaire pour déplacer un fichier."""
-    result = get_manager().move_file(source, destination, **kwargs)
-    return result.success
+# Lot D (audit 2026-06-11) : les helpers module-level `get_manager()`,
+# `copy_file()` et `move_file()` (singleton + wrappers bool) ont été
+# supprimés — aucun appelant. L'app utilise UN FileManager partagé créé
+# par PhotoOrganizerApp (cf. bug B5/B6 historique), jamais de singleton.
