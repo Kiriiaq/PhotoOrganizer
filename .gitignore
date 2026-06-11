@@ -129,7 +129,10 @@ test_data/outputs_reels/
 tools/_*.txt
 tools/_*.json
 
-# Pro edition — clé secrète de signature des licences (NE JAMAIS COMMIT)
+# Clé secrète de signature des licences (NE JAMAIS COMMIT)
+# Emplacement principal depuis le Lot F (audit 2026-06-11) : src/utils/.
+# L'ancien emplacement Pro est conservé en doublon de sécurité.
+src/utils/_secret.py
 src/photoorganizer_pro/license/_secret.py
 
 # Pro edition — fichier d'activation utilisateur (jamais distribué dans le repo)

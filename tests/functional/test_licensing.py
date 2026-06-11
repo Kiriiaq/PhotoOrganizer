@@ -28,14 +28,16 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from src.photoorganizer_pro.license import validator as validator_mod  # noqa: E402
+# Lot F (audit 2026-06-11) : la validation vit dans src/utils/ — keygen
+# reste côté Pro (outil auteur) et passe par le shim de ré-export.
 from src.photoorganizer_pro.license.keygen import generate_key  # noqa: E402
-from src.photoorganizer_pro.license.validator import (  # noqa: E402
+from src.utils import license_validator as validator_mod  # noqa: E402
+from src.utils import licensing  # noqa: E402
+from src.utils.license_validator import (  # noqa: E402
     EDITION_LIFETIME,
     LicenseExpiredError,
     LicenseInvalidError,
 )
-from src.utils import licensing  # noqa: E402
 
 
 # ---------------------------------------------------------------------

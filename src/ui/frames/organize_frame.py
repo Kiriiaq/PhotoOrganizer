@@ -2895,7 +2895,7 @@ class OrganizeFrame(ctk.CTkFrame):
                 # B-02 (audit 2026-06-11) : on capture toutes les exceptions
                 # du validator pour afficher un message localisé ; la
                 # distinction des cas se fait par isinstance ci-dessous.
-                from src.photoorganizer_pro.license.validator import (
+                from utils.license_validator import (
                     LicenseExpiredError,
                     LicenseInvalidError,
                 )

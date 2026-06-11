@@ -68,7 +68,7 @@ src/utils/{cache, hash_cache, config, logger, licensing*}    (infrastructure)
 **Frontières strictes** :
 - `core/` n'importe jamais `ui/`.
 - `utils/` n'importe ni `core/` ni `ui/`.
-- `src/photoorganizer_pro/` (**gelé pour v3.0+**) peut importer `core/` et `utils/`, jamais l'inverse. **N'est plus appelé par l'app v2.x** — les entry points pip sont commentés et les tests sont skippés.
+- `src/photoorganizer_pro/` (**gelé pour v3.0+**) peut importer `core/` et `utils/`, jamais l'inverse. **N'est plus appelé par l'app v2.x** — les entry points pip sont commentés et les tests sont skippés. *(Redevenu vrai au Lot F de l'audit 2026-06-11 : la validation de licence a été rapatriée dans `src/utils/license_validator.py` ; l'ancien `photoorganizer_pro/license/validator.py` n'est plus qu'un shim de ré-export pour `keygen.py`.)*
 
 **Points d'entrée** :
 - GUI : `python main.py` ou `photo-organizer` (entry point pip) ou EXE.
@@ -187,7 +187,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 - **Modifier le `.github/workflows/release.yml`** ou la signature du build.
 - **Toucher à `LICENSE`, `pyproject.toml` `[project]`, ou aux URLs publiques**.
 - **Renommer un fichier ou un module** (refs croisées).
-- **Modifier le SECRET HMAC** (`src/photoorganizer_pro/license/_secret.py`) — invaliderait toutes les clés émises.
+- **Modifier le SECRET HMAC** (`src/utils/_secret.py`, copie legacy dans `src/photoorganizer_pro/license/_secret.py`) — invaliderait toutes les clés émises.
 - **Lancer un commit, un push, une PR** — interdit par défaut, voir préférence durable ci-dessous.
 
 ### Tests à lancer après modification
@@ -208,7 +208,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 - **`%LOCALAPPDATA%\PhotoOrganizer\`** — config, caches utilisateur, **futur `usage.dat` et `license.dat`**. Si la session est sur le poste de l'auteur, ne pas effacer.
 - **`test_data/inputs/` et `test_data/outputs_reference/`** — fixtures versionnées pour la non-régression, ne pas régénérer sans validation.
 - **`LICENSE`** sans demande explicite de l'utilisateur (décision impactante).
-- **`src/photoorganizer_pro/license/_secret.py`** — gitignored, contient la clé HMAC qui signe les licences. La perdre = invalider toutes les clés émises.
+- **`src/utils/_secret.py`** (et sa copie legacy `src/photoorganizer_pro/license/_secret.py`) — gitignored, contient la clé HMAC qui signe les licences. La perdre = invalider toutes les clés émises.
 
 ### Préférences durables de l'utilisateur (rappel mémoire)
 

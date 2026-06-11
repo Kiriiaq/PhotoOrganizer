@@ -16,9 +16,10 @@ Ce module est utilitaire (``src/utils/``) :
 
 * il **ne dépend ni de** ``src/core/`` **ni de** ``src/ui/`` ;
 * il peut être importé par n'importe quelle couche supérieure ;
-* il **réutilise le même secret HMAC** que
-  ``src/photoorganizer_pro/license/`` pour rester aligné sur la signature
-  des clés (un seul secret = une seule source de confiance crypto).
+* il **partage le même secret HMAC** que ``utils.license_validator``
+  (un seul secret = une seule source de confiance crypto). Depuis le
+  Lot F (audit 2026-06-11), plus aucune dépendance vers
+  ``photoorganizer_pro`` — la frontière de couches est respectée.
 
 Caveat sécurité
 ---------------
@@ -54,15 +55,20 @@ from typing import Optional, Tuple
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------
-# Secret HMAC : partagé avec ``photoorganizer_pro.license``.
-# En prod, le ``_secret.py`` est gitignored et embarqué au build.
-# En dev/contributeur sans ``_secret.py``, on utilise un placeholder qui
-# permet aux tests de tourner mais ne valide rien en production.
+# Secret HMAC : partagé avec ``utils.license_validator`` (un seul secret =
+# une seule source de confiance crypto). Lot F (audit 2026-06-11) :
+# l'emplacement principal est ``src/utils/_secret.py`` (gitignored,
+# embarqué au build) ; fallback transitoire sur l'ancien emplacement Pro,
+# puis placeholder qui permet aux tests de tourner mais ne valide rien
+# en production.
 # -----------------------------------------------------------------------
 try:
-    from src.photoorganizer_pro.license._secret import SECRET_KEY  # type: ignore  # noqa: F401
+    from ._secret import SECRET_KEY  # type: ignore  # noqa: F401
 except ImportError:
-    SECRET_KEY = b"placeholder-replace-at-build-time"
+    try:
+        from src.photoorganizer_pro.license._secret import SECRET_KEY  # type: ignore  # noqa: F401
+    except ImportError:
+        SECRET_KEY = b"placeholder-replace-at-build-time"
 
 # -----------------------------------------------------------------------
 # Constantes du modèle
@@ -307,8 +313,10 @@ def get_state() -> LicenseState:
 
     N'effectue **aucune** mutation (pas d'incrément, pas de save).
     """
-    # Import paresseux : évite un cycle si le validator importe utils plus tard.
-    from src.photoorganizer_pro.license.validator import load_active_license
+    # Import paresseux : évite le cycle licensing ↔ license_validator.
+    # Relatif (Lot F) : même identité de module que l'app charge utils
+    # en ``utils.*`` ou en ``src.utils.*``.
+    from .license_validator import load_active_license
 
     machine_id = _compute_machine_id()
     short = get_machine_id_short(machine_id)
@@ -366,18 +374,18 @@ def record_successful_organize() -> LicenseState:
 def activate_key(key: str) -> LicenseState:
     """Valide une clé et la persiste (avec binding machine).
 
-    Délègue à ``photoorganizer_pro.license.validator`` :
+    Délègue à ``utils.license_validator`` :
 
     * ``validate_license_key()`` vérifie la signature + l'expiration ;
     * ``save_license_key()`` écrit ``license.dat`` avec le ``machine_id``
       courant comme binding.
 
     Raises:
-        Les exceptions de ``validator`` :
+        Les exceptions de ``license_validator`` :
         :class:`LicenseInvalidError`, :class:`LicenseExpiredError`.
     """
     # Lazy import (cf. get_state).
-    from src.photoorganizer_pro.license.validator import (
+    from .license_validator import (
         save_license_key,
         validate_license_key,
     )
@@ -394,7 +402,7 @@ def reset_for_tests() -> None:
 
     Ne JAMAIS appeler en prod.
     """
-    from src.photoorganizer_pro.license.validator import _license_storage_path
+    from .license_validator import _license_storage_path
 
     for path in (_usage_path(), _license_storage_path()):
         if path.exists():

@@ -126,10 +126,10 @@ def build(*, light: bool = False, debug: bool = False, pro: bool = False) -> Pat
       gratuit (les deux peuvent coexister sur la même machine).
     - défaut : release windowed (pas de console).
 
-    Note Pro : ce script utilise le ``SECRET_KEY`` actuel de
-    ``photoorganizer_pro/license/validator.py``. Pour un build de
-    production, créer ``photoorganizer_pro/license/_secret.py`` (gitignored)
-    avec ``SECRET_KEY = b"<vraie clé>"`` avant de lancer le build.
+    Note licence : ce script embarque le ``SECRET_KEY`` lu par
+    ``src/utils/license_validator.py``. Pour un build de production,
+    créer ``src/utils/_secret.py`` (gitignored) avec
+    ``SECRET_KEY = b"<vraie clé>"`` avant de lancer le build.
     """
     project_dir = Path(__file__).parent
 
@@ -262,8 +262,8 @@ if __name__ == "__main__":
     parser.add_argument("--pro", action="store_true",
                         help="Build Pro edition (bundles src/photoorganizer_pro/, "
                              "renames output to PhotoOrganizerPro-X.Y.Z.exe). "
-                             "PRE-REQ: replace SECRET_KEY in license/validator.py "
-                             "via license/_secret.py (gitignored) before running.")
+                             "PRE-REQ: provide the real SECRET_KEY via "
+                             "src/utils/_secret.py (gitignored) before running.")
     parser.add_argument("--all", action="store_true",
                         help="Build debug + release (no light)")
     args = parser.parse_args()
