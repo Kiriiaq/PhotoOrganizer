@@ -239,7 +239,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 - Changelog : [CHANGELOG.md](CHANGELOG.md)
 - **Stratégie monétisation (nouveau modèle)** : [docs/MONETIZATION.md](docs/MONETIZATION.md)
 - Plateformes & calendrier de lancement : [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md)
-- Drafts LinkedIn / X / Show HN : [LINKEDIN_DRAFTS.md](LINKEDIN_DRAFTS.md)
-- **Procédure de rentabilisation pas-à-pas** : [NEXT_STEPS.html](NEXT_STEPS.html)
-- Dashboard projet : [PROJECT_OVERVIEW.html](PROJECT_OVERVIEW.html)
+- Drafts LinkedIn / X / Show HN : [LINKEDIN_DRAFTS.md](docs/marketing/LINKEDIN_DRAFTS.md)
+- **Procédure de rentabilisation pas-à-pas** : [NEXT_STEPS.html](docs/NEXT_STEPS.html)
+- Dashboard projet : [PROJECT_OVERVIEW.html](docs/PROJECT_OVERVIEW.html)
 - Docs archivées (pivot 2026-05) : `docs/archives/superseded_2026-05/` — anciens modules Pro, design cloud, checklist freemium

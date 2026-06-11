@@ -262,7 +262,7 @@
     </div>
     <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
       <b>Règle d'or :</b> aucune dépendance inverse — <code>core/</code> n'importe jamais <code>ui/</code>, <code>utils/</code> n'importe ni l'un ni l'autre.
-      Voir <a href="docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a> pour le détail.
+      Voir <a href="ARCHITECTURE.md">docs/ARCHITECTURE.md</a> pour le détail.
     </p>
   </div>
 
@@ -292,7 +292,7 @@
           <tr><td>Synchronisation cloud (Pro, étude)</td><td><span class="status wip">ÉTUDE FAITE — décision T+3 mois</span></td></tr>
         </tbody>
       </table>
-      <p style="font-size: 11px; color: var(--muted); margin: 8px 0 0 0;">État synchronisé avec <a href="AUDIT.md">AUDIT.md §5</a>.</p>
+      <p style="font-size: 11px; color: var(--muted); margin: 8px 0 0 0;">État synchronisé avec <a href="../AUDIT.md">AUDIT.md §5</a>.</p>
     </div>
 
     <div class="card">
@@ -361,7 +361,7 @@
       </div>
     </div>
     <p style="font-size: 12px; color: var(--muted); margin: 12px 0 0 0;">
-      <b>Pré-requis avant lancement :</b> implémenter `src/utils/licensing.py` + modal d'activation, retirer ExifTool bundlé (GPL, cf. <a href="docs/exe-optimization.md">exe-optimization F-01</a>), auto-entreprise, Privacy Policy publiée, S-01 + G-01 + S-02 (assets). Procédure pas-à-pas : <a href="NEXT_STEPS.html">NEXT_STEPS.html</a>. Stratégie détaillée : <a href="docs/MONETIZATION.md">docs/MONETIZATION.md</a>.
+      <b>Pré-requis avant lancement :</b> implémenter `src/utils/licensing.py` + modal d'activation, retirer ExifTool bundlé (GPL, cf. <a href="exe-optimization.md">exe-optimization F-01</a>), auto-entreprise, Privacy Policy publiée, S-01 + G-01 + S-02 (assets). Procédure pas-à-pas : <a href="NEXT_STEPS.html">NEXT_STEPS.html</a>. Stratégie détaillée : <a href="MONETIZATION.md">docs/MONETIZATION.md</a>.
     </p>
   </div>
 
@@ -386,7 +386,7 @@
     </table>
     <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
       <b>Effort total :</b> 60-85 h sur 6-10 semaines (~ 8-11 j-h). <b>KPI 90 j :</b> 200-500 stars GitHub · 10-100 ventes Pro · 1 000-3 000 downloads EXE.
-      Plan détaillé : <a href="docs/DISTRIBUTION.md">docs/DISTRIBUTION.md</a>.
+      Plan détaillé : <a href="DISTRIBUTION.md">docs/DISTRIBUTION.md</a>.
     </p>
   </div>
 
@@ -403,14 +403,14 @@
         <tr><td>Cross-platform</td><td><span class="status wip">WINDOWS ONLY</span></td><td>P3</td><td>4-8 h</td><td>Matrice CI multi-OS si stratégie élargie</td></tr>
         <tr><td>Tests (smoke + chemins critiques)</td><td><span class="status ok">OK</span></td><td>P1</td><td>1-2 j</td><td>Couverture UI fonctionnelle à compléter</td></tr>
         <tr><td>Docs (compréhension en 30 s)</td><td><span class="status ok">OK</span></td><td>—</td><td>—</td><td>README + ARCHI + CONTRIB + SECURITY OK</td></tr>
-        <tr><td><b>Démo visuelle</b> (GIF/screenshot)</td><td><span class="status bad">BLOQUANT</span></td><td><b>P0</b></td><td><b>4-6 h</b></td><td>Produire S-01 + G-01 minimum (voir <a href="docs/MEDIA.md">docs/MEDIA.md</a>)</td></tr>
+        <tr><td><b>Démo visuelle</b> (GIF/screenshot)</td><td><span class="status bad">BLOQUANT</span></td><td><b>P0</b></td><td><b>4-6 h</b></td><td>Produire S-01 + G-01 minimum (voir <a href="MEDIA.md">docs/MEDIA.md</a>)</td></tr>
         <tr><td>Versionning (tag + release)</td><td><span class="status wip">DÉSALIGNÉ</span></td><td>P1</td><td>5 min</td><td>Code en 2.0.0 mais tag v2.1.0 publié → bumper à 2.2.0-dev</td></tr>
         <tr><td>Sécurité (secrets, CVE)</td><td><span class="status wip">À COMPLÉTER</span></td><td>P1</td><td>30 min</td><td>Ajouter pip-audit + bandit au workflow CI</td></tr>
       </tbody>
     </table>
     <p style="font-size: 12px; color: var(--muted); margin: 10px 0 0 0;">
       <b>Bilan :</b> 1 bloquant P0 (démo visuelle), 3 P1, le reste OK. Cumul P0+P1 ≈ <b>6-8 h</b> pour rendre le projet pleinement shippable publiquement.
-      Plan détaillé : <a href="AUDIT.md">AUDIT.md §14</a>.
+      Plan détaillé : <a href="../AUDIT.md">AUDIT.md §14</a>.
     </p>
   </div>
 
@@ -420,21 +420,21 @@
     <div class="links">
       <a href="https://github.com/Kiriiaq/PhotoOrganizer">Repo GitHub</a>
       <a href="https://github.com/Kiriiaq/PhotoOrganizer/releases">Releases (.exe)</a>
-      <a href="README.md">README</a>
-      <a href="AUDIT.md">AUDIT.md</a>
-      <a href="docs/ARCHITECTURE.md">Architecture</a>
-      <a href="docs/exe-optimization.md">Audit EXE</a>
-      <a href="docs/exe-optimization.html">Audit EXE (HTML)</a>
-      <a href="docs/MEDIA.md">Assets à produire</a>
-      <a href="docs/MONETIZATION.md">Monétisation</a>
-      <a href="docs/DISTRIBUTION.md">Distribution &amp; lancement</a>
-      <a href="LINKEDIN_DRAFTS.md">Drafts LinkedIn / X / Show HN</a>
+      <a href="../README.md">README</a>
+      <a href="../AUDIT.md">AUDIT.md</a>
+      <a href="ARCHITECTURE.md">Architecture</a>
+      <a href="exe-optimization.md">Audit EXE</a>
+      <a href="exe-optimization.html">Audit EXE (HTML)</a>
+      <a href="MEDIA.md">Assets à produire</a>
+      <a href="MONETIZATION.md">Monétisation</a>
+      <a href="DISTRIBUTION.md">Distribution &amp; lancement</a>
+      <a href="marketing/LINKEDIN_DRAFTS.md">Drafts LinkedIn / X / Show HN</a>
       <a href="NEXT_STEPS.html">Next Steps (HTML)</a>
-      <a href="docs/CLOUD_SYNC_DESIGN.md">Étude Cloud Sync (design)</a>
-      <a href="CHANGELOG.md">Changelog</a>
-      <a href="CONTRIBUTING.md">Contributing</a>
-      <a href="SECURITY.md">Security</a>
-      <a href="CLAUDE.md">CLAUDE.md (mémoire IA)</a>
+      <a href="archives/superseded_2026-05/CLOUD_SYNC_DESIGN.md">Étude Cloud Sync (design)</a>
+      <a href="../CHANGELOG.md">Changelog</a>
+      <a href="../CONTRIBUTING.md">Contributing</a>
+      <a href="../SECURITY.md">Security</a>
+      <a href="../CLAUDE.md">CLAUDE.md (mémoire IA)</a>
       <a href="https://ko-fi.com/kiriiaq">Ko-fi</a>
     </div>
   </div>

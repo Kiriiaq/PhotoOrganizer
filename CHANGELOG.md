@@ -16,7 +16,7 @@ PhotoOrganizer abandonne le modèle "édition Pro séparée" (19/49/99 € avec 
 - **Prix unique : 10 € lifetime**, clé universelle liée au premier PC qui l'active (machine binding via MachineGuid + Volume Serial).
 - **Aucune réémission** (changement PC / réinstall Windows / disque mort = nouvelle clé). Politique stricte affichée, geste commercial possible au cas par cas.
 
-Cf. [docs/MONETIZATION.md](docs/MONETIZATION.md) (réécrit) et [NEXT_STEPS.html](NEXT_STEPS.html) (procédure pas-à-pas).
+Cf. [docs/MONETIZATION.md](docs/MONETIZATION.md) (réécrit) et [NEXT_STEPS.html](docs/NEXT_STEPS.html) (procédure pas-à-pas).
 
 ### Added — Phase 1 du code (livrée 2026-05-26)
 

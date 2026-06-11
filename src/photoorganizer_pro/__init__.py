@@ -17,7 +17,7 @@ Le seul sous-package **toujours actif** en v2.x est :
 
 * ``license/`` — validation HMAC SHA-256 des clés. Sera étendu en v2.3.0
   pour gérer le ``machine_id_bound`` (binding au 1er PC qui active une
-  clé) — voir [NEXT_STEPS.html](../../NEXT_STEPS.html) §A.2.
+  clé) — voir [NEXT_STEPS.html](../../docs/NEXT_STEPS.html) §A.2.
 
 État opérationnel
 -----------------

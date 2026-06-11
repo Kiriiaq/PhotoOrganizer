@@ -19,7 +19,7 @@ PhotoOrganizer est passé d'un modèle "freemium par fonctionnalité"
 
 | Fichier | Origine | Pourquoi archivé |
 |---|---|---|
-| `PRO.md` | `docs/PRO.md` | Documentait l'UX d'activation de l'édition Pro séparée. La nouvelle UX trial+unlock est documentée dans [NEXT_STEPS.html](../../../NEXT_STEPS.html) §A.5. |
+| `PRO.md` | `docs/PRO.md` | Documentait l'UX d'activation de l'édition Pro séparée. La nouvelle UX trial+unlock est documentée dans [NEXT_STEPS.html](../../NEXT_STEPS.html) §A.5. |
 | `CLOUD_SYNC_DESIGN.md` | `docs/CLOUD_SYNC_DESIGN.md` | Étude design d'un module Pro V2 "synchronisation cloud" (S3/B2/GDrive). Pertinent uniquement si l'add-on Pro est réactivé en v3.0+. |
 | `LAUNCH_CHECKLIST.html` | Racine du repo | Checklist initiale (création Pro V1.1 + standards repo). Remplacée par `NEXT_STEPS.html` post-pivot. |
 

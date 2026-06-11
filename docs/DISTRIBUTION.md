@@ -14,7 +14,7 @@ L'objectif de la distribution est double :
    débloquer des missions freelance ou des opportunités d'embauche
    (cf. `docs/MONETIZATION.md` §1, voie complémentaire).
 
-Les drafts à publier sont dans [LINKEDIN_DRAFTS.md](../LINKEDIN_DRAFTS.md).
+Les drafts à publier sont dans [LINKEDIN_DRAFTS.md](marketing/LINKEDIN_DRAFTS.md).
 
 ---
 
@@ -37,7 +37,7 @@ Les drafts à publier sont dans [LINKEDIN_DRAFTS.md](../LINKEDIN_DRAFTS.md).
 
 ## 2. Calendrier de lancement court (3 semaines)
 
-Tableau condensé. Détail dans [NEXT_STEPS.html](../NEXT_STEPS.html) §F.
+Tableau condensé. Détail dans [NEXT_STEPS.html](NEXT_STEPS.html) §F.
 
 | Jour | Action | Pré-requis |
 |---|---|---|
@@ -95,7 +95,7 @@ On 10th success, app moves to "Limit reached" state. Modal opens. Pay
 ### 3.2 Product Hunt
 
 Tagline + description + first comment : dans
-[LINKEDIN_DRAFTS.md Format 4](../LINKEDIN_DRAFTS.md).
+[LINKEDIN_DRAFTS.md Format 4](marketing/LINKEDIN_DRAFTS.md).
 
 **Stratégie**:
 - Submit un **mardi ou mercredi** entre 8 h et 9 h heure de Californie (= 17 h
@@ -108,7 +108,7 @@ Tagline + description + first comment : dans
 
 ### 3.3 Show HN
 
-Titre + first comment : [LINKEDIN_DRAFTS.md Format 5](../LINKEDIN_DRAFTS.md).
+Titre + first comment : [LINKEDIN_DRAFTS.md Format 5](marketing/LINKEDIN_DRAFTS.md).
 
 **Pièges à éviter**:
 - ❌ Lien direct vers Lemon Squeezy (HN flag commercial).
@@ -201,8 +201,8 @@ une alternative).
 
 ## 7. Documents associés
 
-- **Drafts de publication** : [LINKEDIN_DRAFTS.md](../LINKEDIN_DRAFTS.md)
+- **Drafts de publication** : [LINKEDIN_DRAFTS.md](marketing/LINKEDIN_DRAFTS.md)
 - **Stratégie monétisation** : [docs/MONETIZATION.md](MONETIZATION.md)
-- **Procédure pas-à-pas** : [NEXT_STEPS.html](../NEXT_STEPS.html)
+- **Procédure pas-à-pas** : [NEXT_STEPS.html](NEXT_STEPS.html)
 - **Assets à produire** : [docs/MEDIA.md](MEDIA.md)
 - **Privacy Policy** : [docs/PRIVACY.md](PRIVACY.md)

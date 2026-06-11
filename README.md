@@ -140,7 +140,7 @@ PhotoOrganizer adopte un modèle **trial + unlock** (type Sublime Text / WinRAR)
 - **Toutes les mises à jour futures incluses** — pas d'abonnement, pas de version "Pro+", pas de paywall sur des fonctionnalités.
 - **Aucune réémission** en cas de changement de PC, réinstallation Windows, ou disque mort — politique stricte assumée au prix de 10 €.
 
-Stratégie détaillée + flow technique : [docs/MONETIZATION.md](docs/MONETIZATION.md). Procédure pas-à-pas : [NEXT_STEPS.html](NEXT_STEPS.html).
+Stratégie détaillée + flow technique : [docs/MONETIZATION.md](docs/MONETIZATION.md). Procédure pas-à-pas : [NEXT_STEPS.html](docs/NEXT_STEPS.html).
 
 ---
 

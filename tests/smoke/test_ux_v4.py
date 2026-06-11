@@ -747,7 +747,7 @@ class TestUnlockPanel:
 
 
 # =============================================================================
-# Pivot 2026-05-26 — Scénarios E2E spec A.7 (NEXT_STEPS.html)
+# Pivot 2026-05-26 — Scénarios E2E spec A.7 (docs/NEXT_STEPS.html)
 # =============================================================================
 
 class TestLicenseFlowE2E:

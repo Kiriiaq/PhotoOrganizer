@@ -1,6 +1,6 @@
 """Tests fonctionnels du compteur trial + machine binding (v2.3+).
 
-Couvre les 10 scénarios listés dans ``NEXT_STEPS.html`` §A.3 :
+Couvre les 10 scénarios listés dans ``docs/NEXT_STEPS.html`` §A.3 :
 
 1. Premier lancement : compteur = 0
 2. ``record_successful_organize()`` incrémente
