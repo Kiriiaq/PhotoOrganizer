@@ -76,9 +76,18 @@ class FileManager:
         self._current_session_id: Optional[str] = None
 
     def start_session(self) -> str:
-        """Démarre une nouvelle session d'opérations."""
+        """Démarre une nouvelle session d'opérations.
+
+        B-04 (audit 2026-06-11) : ne purge PLUS l'historique. Le FileManager
+        est partagé entre les onglets (Organisation / Doublons / Historique) ;
+        purger ici faisait disparaître à chaque tri les opérations
+        précédentes — y compris les mises en quarantaine — et rendait leur
+        rollback impossible. Sémantique conforme au glossaire projet :
+        une « session » court du lancement de l'app jusqu'au prochain
+        rollback global (``rollback_all`` vide l'historique) ou à un
+        ``clear_history`` explicite.
+        """
         self._current_session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self._operations_history.clear()
         logger.info(f"Session démarrée: {self._current_session_id}")
         return self._current_session_id
 

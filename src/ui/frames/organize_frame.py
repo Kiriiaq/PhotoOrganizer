@@ -2889,9 +2889,10 @@ class OrganizeFrame(ctk.CTkFrame):
                 return
             try:
                 new_state = licensing.activate_key(key)
-            except licensing.LicenseInvalidError if False else Exception as exc:  # noqa: BLE001
-                # On capture toutes les exceptions de validator pour afficher
-                # un message localisé. Imports paresseux pour distinguer les cas.
+            except Exception as exc:  # noqa: BLE001
+                # B-02 (audit 2026-06-11) : on capture toutes les exceptions
+                # du validator pour afficher un message localisé ; la
+                # distinction des cas se fait par isinstance ci-dessous.
                 from src.photoorganizer_pro.license.validator import (
                     LicenseExpiredError,
                     LicenseInvalidError,
@@ -3643,52 +3644,61 @@ class OrganizeFrame(ctk.CTkFrame):
         self._cancel_requested = False
 
         def analyze():
+            # B-03 (audit 2026-06-11) : tout le corps du worker est sous
+            # try/finally — sans cela, une exception précoce (ex. dossier
+            # devenu inaccessible dans _get_files) laissait
+            # _operation_running=True et les boutons morts jusqu'au
+            # redémarrage de l'app. Même pattern que duplicates_frame.
             self._operation_running = True
             self._set_buttons_state(False)
+            try:
+                files = self._get_files()
+                total = len(files)
 
-            files = self._get_files()
-            total = len(files)
+                if total == 0:
+                    self._update_progress("Aucun fichier trouvé", 0)
+                    return
 
-            if total == 0:
-                self._update_progress("Aucun fichier trouvé", 0)
+                # Statistiques
+                stats = {"total": total, "with_date": 0, "with_camera": 0, "with_gps": 0, "by_year": {}, "by_camera": {}}
+
+                for i, file_path in enumerate(files):
+                    if self._cancel_requested:
+                        break
+
+                    self._update_progress(f"Analyse de {os.path.basename(file_path)} ({i + 1}/{total})", (i + 1) / total)
+
+                    try:
+                        exif_data = get_exif_data(file_path)
+                        date = extract_date(file_path, exif_data)
+                        make, model = get_camera_info(exif_data, file_path)
+                        gps = get_gps_coordinates(file_path)
+
+                        if date:
+                            stats["with_date"] += 1
+                            year = date.year
+                            stats["by_year"][year] = stats["by_year"].get(year, 0) + 1
+
+                        if make != "Unknown":
+                            stats["with_camera"] += 1
+                            camera = f"{make} {model}"
+                            stats["by_camera"][camera] = stats["by_camera"].get(camera, 0) + 1
+
+                        if gps[0] is not None:
+                            stats["with_gps"] += 1
+
+                    except (OSError, ValueError) as exc:
+                        logger.warning(f"Analyse echouee pour {file_path}: {exc}")
+
+                self._show_analysis_results(stats)
+            except Exception as exc:  # noqa: BLE001 — le worker ne doit jamais mourir muet
+                err_msg = str(exc)
+                logger.exception("Analyse échouée")
+                self._update_progress(f"Erreur : {err_msg}", 0)
+                self._safe_after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
+            finally:
                 self._operation_running = False
                 self._set_buttons_state(True)
-                return
-
-            # Statistiques
-            stats = {"total": total, "with_date": 0, "with_camera": 0, "with_gps": 0, "by_year": {}, "by_camera": {}}
-
-            for i, file_path in enumerate(files):
-                if self._cancel_requested:
-                    break
-
-                self._update_progress(f"Analyse de {os.path.basename(file_path)} ({i + 1}/{total})", (i + 1) / total)
-
-                try:
-                    exif_data = get_exif_data(file_path)
-                    date = extract_date(file_path, exif_data)
-                    make, model = get_camera_info(exif_data, file_path)
-                    gps = get_gps_coordinates(file_path)
-
-                    if date:
-                        stats["with_date"] += 1
-                        year = date.year
-                        stats["by_year"][year] = stats["by_year"].get(year, 0) + 1
-
-                    if make != "Unknown":
-                        stats["with_camera"] += 1
-                        camera = f"{make} {model}"
-                        stats["by_camera"][camera] = stats["by_camera"].get(camera, 0) + 1
-
-                    if gps[0] is not None:
-                        stats["with_gps"] += 1
-
-                except (OSError, ValueError) as exc:
-                    logger.warning(f"Analyse echouee pour {file_path}: {exc}")
-
-            self._operation_running = False
-            self._set_buttons_state(True)
-            self._show_analysis_results(stats)
 
         thread = threading.Thread(target=analyze, daemon=True)
         thread.start()
@@ -3771,58 +3781,66 @@ class OrganizeFrame(ctk.CTkFrame):
             return
 
         def organize():
+            # B-03 (audit 2026-06-11) : tout le corps du worker est sous
+            # try/except/finally — une exception précoce (_get_files,
+            # _get_options…) laissait _operation_running=True et les
+            # boutons morts jusqu'au redémarrage de l'app.
             self._operation_running = True
             self._cancel_requested = False
             self._set_buttons_state(False)
-
-            files = self._get_files()
-            total = len(files)
-
-            if total == 0:
-                self._update_progress("Aucun fichier trouvé", 0)
-                self._operation_running = False
-                self._set_buttons_state(True)
-                return
-
-            # Créer le dossier de destination
-            os.makedirs(dest, exist_ok=True)
-
-            # Organiser avec le FileManager partagé : la session et l'historique
-            # seront ainsi visibles dans l'onglet Historique.
-            organizer = SmartOrganizer(file_manager=self.file_manager)
-            self._current_organizer = organizer
-            options = self._get_options()
-
-            def progress_callback(current, total_files, message):
-                self._update_progress(
-                    f"Organisation : {current}/{total_files} — {message}",
-                    current / total_files if total_files else 0.0,
-                )
-
             try:
-                result = organizer.organize(files, dest, options, progress_callback)
+                files = self._get_files()
+                total = len(files)
+
+                if total == 0:
+                    self._update_progress("Aucun fichier trouvé", 0)
+                    return
+
+                # Créer le dossier de destination
+                os.makedirs(dest, exist_ok=True)
+
+                # Organiser avec le FileManager partagé : la session et l'historique
+                # seront ainsi visibles dans l'onglet Historique.
+                organizer = SmartOrganizer(file_manager=self.file_manager)
+                self._current_organizer = organizer
+                options = self._get_options()
+
+                def progress_callback(current, total_files, message):
+                    self._update_progress(
+                        f"Organisation : {current}/{total_files} — {message}",
+                        current / total_files if total_files else 0.0,
+                    )
+
+                try:
+                    result = organizer.organize(files, dest, options, progress_callback)
+                finally:
+                    self._current_organizer = None
+
+                # ------------------------------------------------------------
+                # Hook trial : incrémenter UNIQUEMENT après succès, pas après
+                # annulation. Le compteur ne sert à rien si une licence est
+                # active (licensing.record_successful_organize gère ce cas).
+                # ------------------------------------------------------------
+                # B-01 (audit 2026-06-11) : le champ s'appelle `processed` —
+                # `result.success` n'existe pas et tuait le worker en silence.
+                if not self._cancel_requested and result.processed > 0:
+                    try:
+                        licensing.record_successful_organize()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(f"Impossible d'enregistrer l'usage : {exc}")
+                    # Rafraîchit le badge global si l'app expose cette méthode.
+                    self._safe_after(0, self._refresh_license_badge)
+
+                # Afficher les résultats
+                self._safe_after(0, lambda: self._show_organization_results(result))
+            except Exception as exc:  # noqa: BLE001 — le worker ne doit jamais mourir muet
+                err_msg = str(exc)
+                logger.exception("Organisation échouée")
+                self._update_progress(f"Erreur : {err_msg}", 0)
+                self._safe_after(0, lambda m=err_msg: messagebox.showerror("Erreur", m))
             finally:
-                self._current_organizer = None
                 self._operation_running = False
                 self._set_buttons_state(True)
-
-            # ------------------------------------------------------------
-            # Hook trial : incrémenter UNIQUEMENT après succès, pas après
-            # annulation. Le compteur ne sert à rien si une licence est
-            # active (licensing.record_successful_organize gère ce cas).
-            # ------------------------------------------------------------
-            # B-01 (audit 2026-06-11) : le champ s'appelle `processed` —
-            # `result.success` n'existe pas et tuait le worker en silence.
-            if not self._cancel_requested and result.processed > 0:
-                try:
-                    licensing.record_successful_organize()
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(f"Impossible d'enregistrer l'usage : {exc}")
-                # Rafraîchit le badge global si l'app expose cette méthode.
-                self._safe_after(0, self._refresh_license_badge)
-
-            # Afficher les résultats
-            self._safe_after(0, lambda: self._show_organization_results(result))
 
         thread = threading.Thread(target=organize, daemon=True)
         thread.start()
