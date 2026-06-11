@@ -3811,7 +3811,9 @@ class OrganizeFrame(ctk.CTkFrame):
             # annulation. Le compteur ne sert à rien si une licence est
             # active (licensing.record_successful_organize gère ce cas).
             # ------------------------------------------------------------
-            if not self._cancel_requested and result.success > 0:
+            # B-01 (audit 2026-06-11) : le champ s'appelle `processed` —
+            # `result.success` n'existe pas et tuait le worker en silence.
+            if not self._cancel_requested and result.processed > 0:
                 try:
                     licensing.record_successful_organize()
                 except Exception as exc:  # noqa: BLE001
