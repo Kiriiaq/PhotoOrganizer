@@ -64,12 +64,13 @@ class ExifExtractor:
         Robuste : ignore les chemins vides, attrape OSError (cf. WinError
         87 quand l'exécutable n'est pas trouvé du tout dans PATH).
         """
+        # B-12 (audit 2026-06-11) : le chemin bundlé assets/tools/exiftool.exe
+        # a été retiré du repo (cf. AUDIT_EXE F-01, ambiguïté GPL) — seuls
+        # EXIFTOOL_PATH et le PATH système restent sondés.
         possible_paths = [
             os.environ.get('EXIFTOOL_PATH', ''),
             'exiftool',
             'exiftool.exe',
-            os.path.join(os.path.dirname(__file__), '..', '..', '..',
-                         'assets', 'tools', 'exiftool.exe'),
         ]
 
         for path in possible_paths:

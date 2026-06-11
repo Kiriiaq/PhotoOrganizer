@@ -2,15 +2,17 @@
 
 > Fichier vivant. À mettre à jour à chaque décision structurante prise dans une
 > session future.
-> Dernière mise à jour : 2026-05-26 (**pivot économique** — abandon de l'édition
-> Pro séparée, adoption du modèle *trial + unlock* à 10 € lifetime).
+> Dernière mise à jour : 2026-06-11 (**audit complet** — correction du bug
+> bloquant B-01 du worker d'organisation, robustesse threads, rangement ;
+> cf. branche `audit/2026-06-11`). Pivot économique *trial + unlock* 10 €
+> lifetime acté le 2026-05-26.
 
 ## Identité du projet
 
 - **Nom** : PhotoOrganizer
 - **Pitch** : Organiseur automatique de photos par métadonnées EXIF, application Windows GUI.
-- **Version actuelle** : 2.2.0 (sur branche `feat/v2.3-organize-tabview`).
-- **Statut** : WIP — pivot économique en cours d'implémentation (compteur d'usages + modal de déblocage + machine binding).
+- **Version actuelle** : 2.3.0.dev0 (source de vérité : `src/__init__.py`).
+- **Statut** : pivot économique **implémenté** (compteur d'usages + panneau d'activation inline + machine binding + badge/bandeaux). Reste avant lancement : setup Lemon Squeezy + médias (cf. priorités).
 - **Modèle économique** : **édition unique** Apache-2.0. Essai gratuit limité à **10 tris**, puis déblocage par clé HMAC à **10 € lifetime, 1 PC** (cf. [docs/MONETIZATION.md](docs/MONETIZATION.md)).
 
 ## Stack & contraintes techniques
@@ -30,7 +32,7 @@
   ```bash
   pip install -e ".[dev,dnd,toast]"   # install complet
   python main.py                       # lancer GUI depuis sources
-  make test                            # 170 tests core, ~25 s (Pro skippé par défaut)
+  make test                            # 207 tests core, ~20 s (Pro skippé par défaut)
   make lint                            # ruff + bandit
   python build.py                      # build EXE release
   python build.py --debug              # build EXE debug (console)
@@ -61,7 +63,7 @@ src/core/{operations, metadata}    (logique métier — jamais d'import ui/)
 src/utils/{cache, hash_cache, config, logger, licensing*}    (infrastructure)
 ```
 
-`*` : `licensing` est le futur module à créer en v2.3.0 pour gérer le compteur + clé + binding 1 PC. Détails dans [docs/MONETIZATION.md](docs/MONETIZATION.md) §3.
+`*` : `licensing` (créé en v2.3.0) gère le compteur + clé + binding 1 PC. Détails dans [docs/MONETIZATION.md](docs/MONETIZATION.md) §3.
 
 **Frontières strictes** :
 - `core/` n'importe jamais `ui/`.
@@ -85,7 +87,7 @@ src/utils/{cache, hash_cache, config, logger, licensing*}    (infrastructure)
 | Champ de configuration | `src/utils/config.py` (dataclass `AppConfig`) |
 | Fixture de test | `test_data/inputs/<scenario>/` + scénario dans `test_data/scripts/run_tests.py` |
 | Test pytest | `tests/{smoke,functional,perf,stress,volume}/test_<name>.py` |
-| Logique licence/compteur/machine binding | `src/utils/licensing.py` (à créer en v2.3.0) |
+| Logique licence/compteur/machine binding | `src/utils/licensing.py` |
 | **Code "futur v3.0+"** | `src/photoorganizer_pro/<area>/` — **mais ne pas l'activer en v2.x** |
 
 ### Patterns à respecter
@@ -117,18 +119,18 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 
 ## État actuel & priorités
 
-- **Branche active** : `feat/v2.3-organize-tabview` — refonte du panneau Organisation + intégration imminente du flow trial/unlock.
-- **Tests** : **170/170 core verts**. Les 61 tests Pro (batch CLI 10 + watch 12 + plugins 25 + license 14) sont skippés (reason: `Deferred to v3.0+`) sauf `test_pro_license.py` qui sera adapté à la nouvelle logique trial+unlock.
+- **Branche active** : `main` (+ branche `audit/2026-06-11` pour les correctifs d'audit).
+- **Tests** : **207/207 core verts** (~20 s), dont E2E worker organisation (`tests/smoke/test_organize_e2e.py`) et 17 tests licensing dédiés. Les tests Pro restent skippés (reason: `Deferred to v3.0+`).
 - **Pivot économique 2026-05** : 19/49/99 € freemium-par-fonctionnalité → **édition unique 10 € lifetime, 10 tris d'essai**. Cf. AUDIT.md §15.
 
 ### Priorités immédiates (post-pivot)
 
 | # | Action | Effort | Bloque |
 |---:|---|---|---|
-| 1 | **P0** Créer `src/utils/licensing.py` : compteur HMAC + binding machine | 3-4 h | Toute la monétisation |
-| 2 | **P0** Modal inline d'activation/blocage dans `organize_frame` (warnings 8/9, blocage 11) | 3-4 h | Visibilité de la limite |
-| 3 | **P0** Badge "Essai X/10" ou "Activée" dans la barre de l'app | 30 min | UX du modèle |
-| 4 | **P0** Setup Lemon Squeezy avec un seul produit à 10 € + flow d'envoi clé (manuel d'abord) | 2 h | Revenue |
+| 1 | ~~**P0** Créer `src/utils/licensing.py` : compteur HMAC + binding machine~~ ✅ *fait (v2.3.0)* | — | — |
+| 2 | ~~**P0** Modal inline d'activation/blocage dans `organize_frame` (warnings 8/9, blocage 11)~~ ✅ *fait (v2.3.0)* | — | — |
+| 3 | ~~**P0** Badge "Essai X/10" ou "Activée" dans la barre de l'app~~ ✅ *fait (v2.3.0)* | — | — |
+| 4 | **P0** Setup Lemon Squeezy avec un seul produit à 10 € + flow d'envoi clé (manuel d'abord). L'URL `photoorganizer.lemonsqueezy.com` codée dans `_open_purchase_page` doit exister avant lancement | 2 h | Revenue |
 | 5 | **P1** Produire screenshot + GIF démo (S-01 + G-01 dans `docs/media/`) | 4-6 h | Communication publique |
 | 6 | **P1** Réécrire LINKEDIN_DRAFTS.md sur la base du nouveau modèle | 1 h | Cohérence com |
 
@@ -141,9 +143,10 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 
 ### Bugs connus (à inspecter avant toute modif)
 
-- ExifTool fallback **désactivé en pratique** (chemin corrigé dans Phase 2 mais utilité douteuse, prévu pour retrait — cf. AUDIT_EXE F-01).
+- ExifTool fallback : le binaire bundlé `assets/tools/` a été **retiré du repo** ; seuls `EXIFTOOL_PATH` et le PATH système sont sondés (audit 2026-06-11, B-12). Le retrait complet du fallback subprocess reste envisageable (AUDIT_EXE F-01).
 - `core/scheduler.py` : **utilisé** par `ui/frames/organize_frame.py` pour `JobScheduler` (planif quotidienne in-app). Pas mort, à garder.
-- `src/core/metadata/exif_extractor.py:193` : `bare except` à durcir en `except UnicodeDecodeError`.
+- ~~`exif_extractor.py:193` : bare except~~ ✅ corrigé (`except UnicodeDecodeError`).
+- L'EXE embarque les sources `.py` (dont `_secret.py` en clair) via `--add-data src;src` — cf. rapport d'audit 2026-06-11 B-13, à traiter lors d'un build de contrôle.
 
 ## Décisions techniques actées
 

@@ -1834,7 +1834,9 @@ class OrganizeFrame(ctk.CTkFrame):
             corner_radius=6,
             anchor="w",
             justify="left",
-            wraplength=380,
+            # B-11 (audit 2026-06-11) : le rail fait 210 px de large —
+            # wraplength=380 tronquait le texte au lieu de le replier.
+            wraplength=180,
         )
         # NB : on utilise pack(...) ailleurs dans ce conteneur — pack_forget()
         # est l'équivalent de grid_remove pour le pack manager.
@@ -4030,9 +4032,19 @@ Distribution par appareil:
 
     def _show_dry_run_preview(self):
         """Q2 — Aperçu dry-run : applique les options pour les 100 premiers
-        fichiers et affiche l'arborescence cible dans une modale, **sans
-        copier ni déplacer aucun fichier**.
+        fichiers et affiche l'arborescence cible dans un panneau inline,
+        **sans copier ni déplacer aucun fichier**.
+
+        B-07 (audit 2026-06-11) : le calcul (lecture EXIF jusqu'à 100
+        fichiers) tourne désormais dans un worker thread — il gelait l'UI
+        plusieurs secondes sur le main thread. B-06 : le critère « lieu »
+        est maintenant pris en compte (coordonnées brutes, sans appel
+        réseau ; les noms de lieux sont résolus uniquement au tri réel).
         """
+        if getattr(self, "_operation_running", False):
+            logger.debug("Aperçu ignoré : une opération est déjà en cours")
+            return
+
         sources = self._split_sources()
         dest = self.dest_var.get().strip()
         if not sources:
@@ -4042,109 +4054,161 @@ Distribution par appareil:
             messagebox.showerror("Aperçu", "Sélectionnez le dossier destination.")
             return
 
-        files = self._get_files()
-        if not files:
-            messagebox.showinfo("Aperçu", "Aucun fichier détecté avec ces filtres.")
-            return
-
-        options = self._get_options()
-        # On applique les filtres pré-traitement comme en réel
-        organizer = SmartOrganizer(file_manager=self.file_manager)
-        eligible = [f for f in files if organizer._passes_filters(f, options)]
-
-        # Détection paires si demandé (impact visuel)
-        pairs = organizer._detect_raw_jpeg_pairs(eligible) if options.keep_raw_jpeg_pairs else {}
-
-        # Pour chaque fichier, calculer le chemin cible (sans copier)
-        sample = eligible[:100]
-        tree: dict = {}
-        counter = 0
-        for fp in sample:
-            counter += 1
+        def compute_preview():
+            # B-03/B-07 : même discipline que les autres workers — flags
+            # toujours remis en place, erreurs affichées, jamais de mort muette.
+            self._operation_running = True
+            self._set_buttons_state(False)
             try:
-                exif = get_exif_data(fp)
-                date_taken = extract_date(fp, exif)
-                make, model = get_camera_info(exif, fp)
-                path = dest
-                # Critères dans l'ordre choisi
-                if options.multilayer:
-                    crits = options.criteria_order
-                elif options.organize_by_date:
-                    crits = ["date"]
-                elif options.organize_by_camera:
-                    crits = ["camera"]
-                else:
-                    crits = []
-                for c in crits:
-                    if c == "date" and options.organize_by_date:
-                        if date_taken:
-                            y, m, d = (str(date_taken.year), f"{date_taken.month:02d}", f"{date_taken.day:02d}")
-                            mapping = {
-                                "year/month/day": [y, m, f"{y}_{m}_{d}"],
-                                "year/month": [y, f"{y}_{m}"],
-                                "year": [y],
-                                "year_month_day": [f"{y}_{m}_{d}"],
-                                "year_month": [f"{y}_{m}"],
-                            }
-                            for seg in mapping.get(options.date_format, [y, m, f"{y}_{m}_{d}"]):
-                                path = os.path.join(path, seg)
-                        else:
-                            path = os.path.join(path, "Sans date")
-                    elif c == "camera" and options.organize_by_camera:
-                        cam = (
-                            f"{make} {model}".strip()
-                            if (make != "Unknown" or model != "Unknown")
-                            else "Appareil inconnu"
-                        )
-                        path = os.path.join(path, cam.replace("/", "_"))
+                files = self._get_files()
+                if not files:
+                    self._update_progress("Aucun fichier détecté avec ces filtres.", 0)
+                    self._safe_after(0, lambda: messagebox.showinfo(
+                        "Aperçu", "Aucun fichier détecté avec ces filtres."))
+                    return
 
-                # Renommage
-                fname = os.path.basename(fp)
-                if options.rename_template:
+                options = self._get_options()
+                # On applique les filtres pré-traitement comme en réel
+                organizer = SmartOrganizer(file_manager=self.file_manager)
+                eligible = [f for f in files if organizer._passes_filters(f, options)]
+
+                # Détection paires si demandé (impact visuel)
+                pairs = organizer._detect_raw_jpeg_pairs(eligible) if options.keep_raw_jpeg_pairs else {}
+
+                # Pour chaque fichier, calculer le chemin cible (sans copier)
+                sample = eligible[:100]
+                total_sample = len(sample)
+                tree: dict = {}
+                counter = 0
+                location_used = False
+                for idx, fp in enumerate(sample):
+                    if self._cancel_requested:
+                        self._update_progress("Aperçu annulé", 0)
+                        return
+                    counter += 1
+                    self._update_progress(
+                        f"Aperçu : {idx + 1}/{total_sample}",
+                        (idx + 1) / total_sample,
+                    )
                     try:
-                        fname = SmartOrganizer._apply_rename_template(
-                            fname,
-                            options.rename_template,
-                            date_taken,
-                            make,
-                            model,
-                            counter,
-                        )
-                    except Exception:
-                        pass
-            except Exception as exc:
-                logger.debug(f"preview erreur : {exc}")
-                path = os.path.join(dest, "(erreur)")
-                fname = os.path.basename(fp)
+                        exif = get_exif_data(fp)
+                        date_taken = extract_date(fp, exif)
+                        make, model = get_camera_info(exif, fp)
+                        path = dest
+                        # Critères dans l'ordre choisi
+                        if options.multilayer:
+                            crits = options.criteria_order
+                        elif options.organize_by_date:
+                            crits = ["date"]
+                        elif options.organize_by_camera:
+                            crits = ["camera"]
+                        elif options.organize_by_location:
+                            crits = ["location"]
+                        else:
+                            crits = []
+                        for c in crits:
+                            if c == "date" and options.organize_by_date:
+                                if date_taken:
+                                    y, m, d = (str(date_taken.year), f"{date_taken.month:02d}", f"{date_taken.day:02d}")
+                                    mapping = {
+                                        "year/month/day": [y, m, f"{y}_{m}_{d}"],
+                                        "year/month": [y, f"{y}_{m}"],
+                                        "year": [y],
+                                        "year_month_day": [f"{y}_{m}_{d}"],
+                                        "year_month": [f"{y}_{m}"],
+                                    }
+                                    for seg in mapping.get(options.date_format, [y, m, f"{y}_{m}_{d}"]):
+                                        path = os.path.join(path, seg)
+                                else:
+                                    path = os.path.join(path, "Sans date")
+                            elif c == "camera" and options.organize_by_camera:
+                                cam = (
+                                    f"{make} {model}".strip()
+                                    if (make != "Unknown" or model != "Unknown")
+                                    else "Appareil inconnu"
+                                )
+                                path = os.path.join(path, cam.replace("/", "_"))
+                            elif c == "location" and options.organize_by_location:
+                                # B-06 : aperçu du critère lieu SANS réseau —
+                                # coordonnées brutes, comme le fallback du tri réel.
+                                location_used = True
+                                try:
+                                    lat, lon = get_gps_coordinates(fp)
+                                except Exception:
+                                    lat, lon = None, None
+                                if lat is None or lon is None:
+                                    seg = "Sans localisation GPS"
+                                else:
+                                    seg = f"Lat_{lat:.4f}_Lon_{lon:.4f}"
+                                path = os.path.join(path, seg)
 
-            tree.setdefault(path, []).append(fname)
+                        # Renommage
+                        fname = os.path.basename(fp)
+                        if options.rename_template:
+                            try:
+                                fname = SmartOrganizer._apply_rename_template(
+                                    fname,
+                                    options.rename_template,
+                                    date_taken,
+                                    make,
+                                    model,
+                                    counter,
+                                )
+                            except Exception:
+                                pass
+                    except Exception as exc:
+                        logger.debug(f"preview erreur : {exc}")
+                        path = os.path.join(dest, "(erreur)")
+                        fname = os.path.basename(fp)
 
-        # Header textuel + arbo cible (refonte 2026-05-18 — panneau inline)
-        header_text = f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
-        if options.keep_raw_jpeg_pairs and pairs:
-            header_text += f"  •  {len(pairs)} paire(s) RAW+JPEG détectée(s)"
-        header_text += f"\n📁 Destination : {dest}"
-        if len(eligible) > 100:
-            header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
+                    tree.setdefault(path, []).append(fname)
 
-        def build(body):
-            body.columnconfigure(0, weight=1)
-            body.rowconfigure(1, weight=1)
-            ctk.CTkLabel(
-                body, text=header_text, justify="left", anchor="w",
-            ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
-            textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
-            textbox.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
-            for folder in sorted(tree.keys()):
-                rel = os.path.relpath(folder, dest) if dest in folder else folder
-                textbox.insert("end", f"\n📁 {rel}/  ({len(tree[folder])} fichiers)\n")
-                for f in tree[folder][:10]:
-                    textbox.insert("end", f"   • {f}\n")
-                if len(tree[folder]) > 10:
-                    textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
-            textbox.configure(state="disabled")
+                # Header textuel + arbo cible (refonte 2026-05-18 — panneau inline)
+                header_text = f"📋 {len(eligible)} fichier(s) éligible(s) sur {len(files)} détecté(s)"
+                if options.keep_raw_jpeg_pairs and pairs:
+                    header_text += f"  •  {len(pairs)} paire(s) RAW+JPEG détectée(s)"
+                header_text += f"\n📁 Destination : {dest}"
+                if len(eligible) > 100:
+                    header_text += f"\n(Aperçu limité aux 100 premiers fichiers sur {len(eligible)})"
+                if location_used and options.use_geocoding:
+                    header_text += (
+                        "\nℹ️ Lieux affichés en coordonnées brutes — les noms de "
+                        "lieux seront résolus lors du tri réel."
+                    )
 
-        self._show_inline_panel(
-            title="👁 Aperçu (dry-run, sans modification disque)",
-            builder=build,
-        )
+                def show_panel():
+                    def build(body):
+                        body.columnconfigure(0, weight=1)
+                        body.rowconfigure(1, weight=1)
+                        ctk.CTkLabel(
+                            body, text=header_text, justify="left", anchor="w",
+                        ).grid(row=0, column=0, sticky="ew", padx=PAD_M, pady=(PAD_S, PAD_S))
+                        textbox = ctk.CTkTextbox(body, font=ctk.CTkFont(family="Consolas", size=11))
+                        textbox.grid(row=1, column=0, sticky="nsew", padx=PAD_M, pady=PAD_S)
+                        for folder in sorted(tree.keys()):
+                            rel = os.path.relpath(folder, dest) if dest in folder else folder
+                            textbox.insert("end", f"\n📁 {rel}/  ({len(tree[folder])} fichiers)\n")
+                            for f in tree[folder][:10]:
+                                textbox.insert("end", f"   • {f}\n")
+                            if len(tree[folder]) > 10:
+                                textbox.insert("end", f"   … {len(tree[folder]) - 10} de plus\n")
+                        textbox.configure(state="disabled")
+
+                    self._show_inline_panel(
+                        title="👁 Aperçu (dry-run, sans modification disque)",
+                        builder=build,
+                    )
+                    self._update_progress("Aperçu prêt", None)
+
+                self._safe_after(0, show_panel)
+            except Exception as exc:  # noqa: BLE001 — le worker ne doit jamais mourir muet
+                err_msg = str(exc)
+                logger.exception("Aperçu dry-run échoué")
+                self._update_progress(f"Erreur : {err_msg}", 0)
+                self._safe_after(0, lambda m=err_msg: messagebox.showerror("Aperçu", m))
+            finally:
+                self._operation_running = False
+                self._set_buttons_state(True)
+
+        self._cancel_requested = False
+        threading.Thread(target=compute_preview, daemon=True).start()

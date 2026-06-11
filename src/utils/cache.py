@@ -217,11 +217,64 @@ class MetadataCache:
                         cache_file.unlink()
                         count += 1
             except Exception:
-                # Fichier corrompu, supprimer
-                cache_file.unlink()
-                count += 1
+                # Fichier corrompu, supprimer. B-09 (audit 2026-06-11) :
+                # l'unlink lui-même est protégé (fichier verrouillé par un
+                # antivirus / autre process → on passe au suivant).
+                try:
+                    cache_file.unlink()
+                    count += 1
+                except OSError as exc:
+                    logger.debug(f"cleanup cache : unlink impossible ({exc})")
 
         return count
+
+    def purge(self) -> Dict[str, int]:
+        """Purge complète : entrées expirées + application de ``max_size``.
+
+        B-09 (audit 2026-06-11) : avant ce correctif, ``cleanup_expired``
+        n'était jamais appelé et ``max_size`` jamais appliqué — le cache
+        disque grossissait sans limite jusqu'au clic manuel « Vider le
+        cache ». À appeler au démarrage de l'app (dans un thread pour ne
+        pas ralentir le lancement).
+
+        Returns:
+            ``{"expired": n, "evicted": m}``.
+        """
+        expired = self.cleanup_expired()
+
+        # Application de la taille max : éviction des fichiers les plus
+        # anciens (mtime croissant) jusqu'à repasser sous la limite.
+        evicted = 0
+        try:
+            entries = []
+            total = 0
+            for f in self.cache_dir.glob("*.json"):
+                try:
+                    st = f.stat()
+                except OSError:
+                    continue
+                entries.append((st.st_mtime, st.st_size, f))
+                total += st.st_size
+
+            if total > self.max_size:
+                entries.sort()  # plus ancien d'abord
+                for _, size, f in entries:
+                    if total <= self.max_size:
+                        break
+                    try:
+                        f.unlink()
+                        total -= size
+                        evicted += 1
+                    except OSError as exc:
+                        logger.debug(f"purge cache : unlink impossible ({exc})")
+        except Exception as exc:  # noqa: BLE001 — la purge ne doit jamais faire crasher l'app
+            logger.warning(f"Purge cache partielle : {exc}")
+
+        if expired or evicted:
+            logger.info(
+                f"Cache EXIF purgé : {expired} expirée(s), {evicted} évincée(s) (limite taille)"
+            )
+        return {"expired": expired, "evicted": evicted}
 
     def get_stats(self) -> Dict[str, Any]:
         """Retourne les statistiques du cache."""

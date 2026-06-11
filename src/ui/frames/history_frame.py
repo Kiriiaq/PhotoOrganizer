@@ -161,9 +161,13 @@ class HistoryFrame(ctk.CTkFrame):
         # Afficher les opérations (les plus récentes en premier)
         for i, op in enumerate(reversed(operations), 1):
             status_icon = "✅" if op.success else "❌"
-            op_type = {"copy": "Copié", "move": "Déplacé", "rename": "Renommé", "delete": "Supprimé"}.get(
-                op.operation_type, op.operation_type
-            )
+            op_type = {
+                "copy": "Copié",
+                "move": "Déplacé",
+                "rename": "Renommé",
+                "trash": "Quarantaine",  # B-08 (audit 2026-06-11)
+                "delete": "Supprimé",
+            }.get(op.operation_type, op.operation_type)
 
             self.history_textbox.insert("end", f"\n{'─'*50}\n")
             self.history_textbox.insert("end", f"{status_icon} #{i} - {op_type}\n")

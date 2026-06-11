@@ -6,6 +6,7 @@ Interface moderne avec CustomTkinter.
 import logging
 import os
 import sys
+import threading
 import tkinter as tk
 from tkinter import messagebox
 from typing import Optional
@@ -28,12 +29,24 @@ from .frames.settings_frame import SettingsFrame
 
 logger = logging.getLogger(__name__)
 
+# B-10 (audit 2026-06-11) : version lue depuis src/__init__.py (source de
+# vérité unique, comme build.py et src/main.py) au lieu d'un hardcode local.
+try:
+    from src import __version__ as _APP_VERSION
+except ImportError:
+    # EXE PyInstaller où ``src`` n'est pas un package importable
+    # (cf. fallback identique dans src/main.py).
+    try:
+        from __init__ import __version__ as _APP_VERSION  # type: ignore
+    except ImportError:
+        _APP_VERSION = "0.0.0-unknown"
+
 
 class PhotoOrganizerApp(ctk.CTk):
     """Application principale PhotoOrganizer."""
 
     APP_NAME = "PhotoOrganizer"
-    APP_VERSION = "2.3.0-dev"
+    APP_VERSION = _APP_VERSION
 
     def __init__(self):
         """Initialise l'application."""
@@ -52,10 +65,14 @@ class PhotoOrganizerApp(ctk.CTk):
         config = self.config_manager.config
 
         # Initialiser les singletons depuis AppConfig
-        init_cache(
+        cache = init_cache(
             ttl_hours=config.cache_ttl_hours,
             max_size_mb=config.max_cache_size_mb,
         )
+        # B-09 (audit 2026-06-11) : purge du cache disque au démarrage
+        # (entrées expirées + limite de taille) — dans un thread daemon
+        # pour ne pas ralentir l'ouverture de la fenêtre.
+        threading.Thread(target=cache.purge, daemon=True, name="CachePurge").start()
         get_gps_processor().geocoding_enabled = config.geocoding_enabled
 
         # Configuration de l'apparence
