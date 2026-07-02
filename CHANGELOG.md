@@ -5,6 +5,14 @@ All notable changes to PhotoOrganizer are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — CI verte (2026-07-02, post-release)
+
+- **Job `test`** : `piexif` ajouté à l'extra `[dev]` (test-only, jamais bundlé dans l'EXE) — 12 tests de `test_organizer.py` échouaient sur CI faute de module (il ne restait installé qu'en local).
+- **Job `audit`** : `Pillow>=12.2.0,<13` (7 CVE connues sur 11.3.0, corrigées en 12.2.0). `pillow-heif` 0.22.0 compatible. 217 tests verts en local avec Pillow 12.2.0. ⚠️ L'EXE v2.3.0 publié a été buildé avec Pillow 11.3.0 — prévoir un rebuild v2.3.1.
+- Distribution : anciennes releases gratuites **v1.0.0 et v2.1.0 supprimées de GitHub** (EXE sans limitation d'essai) ainsi que leurs tags. Seule v2.3.0 (trial 10 tris) reste téléchargeable.
+
 ## [2.3.0] — 2026-07-02
 
 ### Added — Assets de lancement (2026-07-02)
