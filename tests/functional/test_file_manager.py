@@ -95,6 +95,25 @@ def test_list_files_recursive(fm, tmp_path):
     assert len(files_flat) == 1
 
 
+def test_start_session_preserves_history(fm, src_file, tmp_path):
+    """B-04 (audit 2026-06-11) : start_session ne purge PLUS l'historique.
+
+    Le FileManager est partagé entre onglets — purger à chaque tri faisait
+    disparaître les opérations précédentes (dont les quarantaines doublons)
+    et rendait leur rollback impossible. Une « session » court du lancement
+    de l'app au prochain rollback global ou clear_history explicite.
+    """
+    dest = tmp_path / "dest.jpg"
+    fm.copy_file(str(src_file), str(dest))
+    assert len(fm.get_operations_history()) == 1
+
+    fm.start_session()  # nouveau tri → l'historique doit survivre
+    assert len(fm.get_operations_history()) == 1
+
+    fm.rollback_all()  # le rollback global, lui, vide bien l'historique
+    assert fm.get_operations_history() == []
+
+
 def test_rollback_last_skips_failed_ops(fm, tmp_path):
     """Une opération en erreur initiale est ignorée par rollback_last."""
     bad = tmp_path / "missing.jpg"

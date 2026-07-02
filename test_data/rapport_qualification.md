@@ -5,13 +5,28 @@
 | Champ | Valeur |
 |---|---|
 | **Outil** | PhotoOrganizer |
-| **Version** | 2.3-dev |
+| **Version** | 2.3.0.dev0 |
 | **Testeur** | Pipeline automatisé (Claude Code) + validation manuelle requise |
-| **Date** | 2026-05-19 |
-| **Environnement** | Windows 10/11 64-bit, Python 3.11, écran 1920×1080 (×1.5 HiDPI) |
-| **Empreinte de version** | `20d895a` (branche `feat/v2.3-organize-tabview`) |
-| **Pile technique** | Python 3.11 + CustomTkinter 5.2 + tkinterdnd2 0.4 + plyer 2.1 + Pillow + piexif |
-| **Évolutions vs v2.0.0** | Refonte v2.3 du panneau Organisation (Variante B — 4 onglets internes) + finition 2026-05-18 (bouton 💡 Exemples de marques + remplacement de toutes les anciennes fenêtres modales par des panneaux intégrés) + finition 2026-05-19 (bouton 💡 Exemples de filtres dans l'onglet Filtrer — valeurs standards pour mots-clés, extensions, dimensions, orientation, note). |
+| **Date** | 2026-06-12 (campagne courante) — historique 2026-05-19 conservé ci-dessous |
+| **Environnement** | Windows 11 64-bit, Python 3.11, écran 1920×1080 |
+| **Empreinte de version** | `5b0c2eb` (branche `audit/2026-06-11`) |
+| **Pile technique** | Python 3.11 + CustomTkinter 5.2 + tkinterdnd2 0.4 (extra `dnd`) + plyer 2.1 (extra `toast`) + Pillow + exifread + pillow-heif + requests + PyYAML |
+| **Évolutions vs v2.0.0** | Refonte v2.3 du panneau Organisation (4 onglets internes) + panneaux intégrés + exemples marques/filtres (2026-05) ; **pivot économique trial+unlock 10 € lifetime** (compteur HMAC + binding machine + badge/panneau d'activation, 2026-05-26) ; **audit complet lots A-F** (correction du bug bloquant B-01 du worker, robustesse threads, découplage architecture, rangement, 2026-06-11). |
+
+> **Note piexif** : la dépendance `piexif` a été retirée du projet (cf. CLAUDE.md « dépendances déjà retirées »). Les anciennes mentions plus bas dans ce rapport (sections datées 2026-05-19) sont conservées telles quelles pour l'historique.
+
+## 0. Diagnostic état des lieux (Phase 0 — campagne 2026-06-12)
+
+**Cas détecté : `test_data/` existe, code source modifié → mise à jour ciblée.**
+
+- **Dernière qualification** : 2026-05-19 (commit `20d895a`). Pas de `.test_state.json` présent → créé en fin de campagne (`scripts/snapshot_state.py`, 54 sources empreintées au commit `5b0c2eb`).
+- **Fichiers source modifiés depuis** (déduits de `git diff 04118c5..HEAD`) : tout `src/` (pivot trial+unlock v2.3.0 + audit lots A-F), `main.py`, `build.py`. Nouveau module `src/utils/license_validator.py` ; nouveau `src/utils/licensing.py`.
+- **Fonctionnalités impactées** : worker d'organisation (B-01), historique partagé (B-04), injection FileManager doublons (Lot D), purge cache (B-09), version unique (B-10), aperçu dry-run (B-06/B-07), libellé quarantaine (B-08), **tout le modèle économique trial+unlock** (nouveau).
+- **Mise à jour appliquée (pas de régénération from scratch)** :
+  - Matrice : +21 tests (T-190 à T-210, licence + non-régressions audit), colonne **Mode (Auto/Manuel)** ajoutée, statuts Auto **injectés depuis l'exécution réelle** ; IDs T-001 à T-189 inchangés.
+  - HTML : +7 widgets licence (W137-W141) + 2 widgets audit (W142-W143), badges **« auto ✓ »** excluant du décompte manuel les éléments couverts par un test exécuté, section **« Checklist résiduelle »** (8 vérifications non automatisables), bouton **« Tout OK »** par panneau. Statuts existants préservés (bump `STORAGE_KEY` v4→v5 pour isoler proprement les nouveaux widgets).
+  - 1 anomalie de qualif corrigée au fil de l'eau (**ANO-Q1**, voir §6).
+- **Résultats d'exécution 2026-06-12** : pytest **217 passed (dont 6 slow) / 47 skipped (Pro v3.0+) / 0 failed** — soit **211 en mode rapide** (`-m "not slow"`) ; `run_tests.py` **16/16 OK** ; `compare_outputs.py` **9/9 conformes**.
 
 ## 2. Périmètre testé
 
@@ -61,6 +76,37 @@
 | `input_keywords` | Photos avec mots-clés EXIF (vacances, mariage, …) | 5 |
 
 ## 3. Synthèse chiffrée
+
+### 3.0 Synthèse — campagne 2026-06-12 (faisant foi)
+
+**Matrice : 210 tests** (T-001 à T-210), dont **49 Auto** (statuts injectés depuis l'exécution réelle) et **161 Manuel** (validation_ihm.html + checklist résiduelle).
+
+| Source de vérité | Résultat |
+|---|---|
+| **pytest** (`tests/`, suite complète) | **217 passed** (211 rapides + 6 slow), 47 skipped (Pro v3.0+), **0 failed** |
+| **Scénarios** (`run_tests.py`) | **16/16 OK**, 0 erreur (de input_nominal à input_pas_exif) |
+| **Non-régression** (`compare_outputs.py`) | **9/9 conformes** vs vérité terrain (après correctif ANO-Q1) |
+| **Anomalies bloquantes / majeures** | **0 / 0** (le bloquant B-01 a été corrigé pendant l'audit, cf. §6) |
+
+**Validation manuelle restante** : **135 widgets** + **8 vérifications résiduelles** = **143 points** dans `validation_ihm.html` (8 widgets pré-marqués « auto ✓ » sont exclus du décompte). Temps estimé : ~15 min en lançant l'app en parallèle.
+
+| Catégorie | Total | Auto OK (exécuté) | Manuel à valider |
+|---|---|---|---|
+| IHM | 49 | 0 | 49 |
+| Paramètres | 31 | 0 | 31 |
+| Entrées | 15 | 11 | 4 |
+| Sorties | 16 | 10 | 6 |
+| Cas limites | 27 | 2 | 25 |
+| Performance | 10 | 0 | 10 |
+| Robustesse | 25 | 13 | 12 |
+| Régression | 37 | 13 | 24 |
+| **TOTAL** | **210** | **49** | **161** |
+
+> Les nouveaux tests T-190 à T-202 couvrent le **modèle trial+unlock** (compteur HMAC, blocage 11e tri, anti-tampering, activation, machine binding, badge, panneau inline) ; T-203 à T-210 couvrent les **non-régressions de l'audit 2026-06-11** (B-01 worker, B-04 historique, Lot D injection FileManager, B-09 purge cache, B-10 version, ANO-Q1 déterminisme des références).
+
+---
+
+> Les sous-sections 3.1 à 3.9 ci-dessous datent de la campagne **2026-05-19** (avant pivot et audit). Conservées pour l'historique ; les chiffres faisant foi sont ceux du §3.0.
 
 ### 3.1 Exécution automatisée (run_tests.py)
 
@@ -244,12 +290,33 @@ personnels » (date et taille en octets restent à saisir librement).
 
 ## 4. Anomalies détectées
 
-| ID Test | Sévérité | Description | Reproductibilité | Contournement |
-|---|---|---|---|---|
-| T-114 | **Mineur** | Cache des métadonnées ne reporte pas de hits sur 2e pass (hit_rate = 0%). Soit le cache n'écrit pas, soit la lecture ne le consulte pas. | 100 % | Désactiver le cache n'a aucun impact fonctionnel ; ticket à ouvrir pour investigation. |
-| T-112 | Cosmétique | RAM repos 211.9 MB > objectif 200 MB (+11.9 MB) | 100 % | Acceptable (Material design + scheduler thread + 117 widgets). Tolérance à ajuster à 250 MB. |
+### 4.1 Campagne 2026-06-12
 
-**0 anomalie bloquante. 0 anomalie majeure.** 2 anomalies (Mineur + Cosmétique) avec contournement documenté.
+| ID | Sévérité | Description | Reproductibilité | Statut |
+|---|---|---|---|---|
+| **ANO-Q1** | Majeur (qualif) | `compare_outputs.py` T-079 non reproductible : les photos `input_pas_exif` sans EXIF retombent sur le **mtime** du fichier, non versionné par git → la référence figée (mois 05) divergeait du run (mois courant). | 100 % avant fix | ✅ **Corrigé** (voir §6) |
+
+> Les anomalies **B-01 (bloquant), B-02, B-03, B-04** et mineures **B-06 à B-12** ont été détectées et **corrigées lors de l'audit du 2026-06-11** (branche `audit/2026-06-11`, lots A-F). Elles sont désormais couvertes par des tests automatiques de non-régression (T-203 à T-210). Le détail figure dans le rapport d'audit et au §6 ci-dessous.
+
+### 4.2 Historique 2026-05-19 (résolu depuis)
+
+| ID Test | Sévérité | Description | Statut au 2026-06-12 |
+|---|---|---|---|
+| T-114 | Mineur | Cache des métadonnées ne reportait pas de hits sur 2e pass (hit_rate = 0 %). | ✅ **Résolu** : cache 2-tier corrigé ; `test_exif_cache.py` vérifie désormais hit_rate > 0 (3 tests verts). |
+| T-112 | Cosmétique | RAM repos 211.9 MB > objectif 200 MB (+11.9 MB). | 🟡 Toléré : objectif réaligné à 250 MB (Material + scheduler + widgets). Non re-mesuré cette campagne. |
+
+**Campagne 2026-06-12 : 0 anomalie bloquante, 0 anomalie majeure ouverte.** La seule anomalie de la campagne (ANO-Q1, outillage de test) a été corrigée immédiatement.
+
+## 6bis. Corrections appliquées
+
+### ANO-Q1 — Références non déterministes (T-079/T-060)
+
+- **Symptôme** : `compare_outputs.py` signalait un DIFF sur T-079 — les fichiers sans EXIF étaient classés sous `2026/05/2026_05_11/` dans la référence mais `2026/05/2026_05_26/` (ou la date courante) au run.
+- **Cause racine** : sans EXIF, `extract_date` retombe sur le mtime du fichier ; `gen_pas_exif()` ne figeait pas ce mtime → il prenait la date de régénération des inputs, non versionnée.
+- **Fichiers modifiés** : `test_data/scripts/generate_inputs.py` (`gen_pas_exif` fige le mtime à `2026-05-11 12:00` via `os.utime`).
+- **Re-validation** : régénération du mtime + `run_tests.py --only T-079/T-060` + `compare_outputs.py` → **9/9 OK**.
+
+> Rappel : les corrections produit (bug bloquant B-01 et autres) ont été appliquées et committées lors de l'audit du 2026-06-11 (lots A-F), avec un test E2E du worker (`tests/smoke/test_organize_e2e.py`) en non-régression. Cette campagne de qualification les a **vérifiées** (tous verts) et ajouté la couverture matricielle correspondante (T-203 à T-210).
 
 ## 5. Couverture fonctionnelle (matrice exigences × tests)
 
@@ -275,49 +342,49 @@ nécessitant interaction utilisateur).
 
 ## 6. Conclusion
 
-### Verdict : 🟡 **GO CONDITIONNEL — re-qualif partielle v2.3 requise**
+### Verdict (campagne 2026-06-12) : 🟡 **GO CONDITIONNEL — validation IHM manuelle requise**
 
 **Justification** :
-- 0 anomalie bloquante détectée.
-- 0 anomalie majeure détectée.
-- 51 tests automatisés OK (34 % de la matrice) avec 0 régression.
-- 104 / 104 tests pytest internes verts (smoke + functional + volume + stress).
-- 9 / 9 tests de non-régression OK vs vérité terrain.
-- 12 / 12 invariants visuels UI OK.
-- Cold-start 3.55 s < 5 s objectif.
-- Performance correcte sur 200 / 1 000 / 10 k fichiers (extrapolation linéaire).
+- **0 anomalie bloquante, 0 anomalie majeure ouverte.** Le bug bloquant B-01 (worker d'organisation mort en silence → compteur trial inopérant) a été **corrigé et couvert par un test E2E** lors de l'audit ; cette campagne le confirme.
+- **211 / 211 tests pytest exécutables verts** (47 Pro skippés v3.0+, 0 échec).
+- **16 / 16 scénarios** `run_tests.py` OK, **9 / 9 non-régressions** conformes vs vérité terrain.
+- **49 tests Auto** de la matrice validés par exécution réelle (statuts injectés, non saisis à la main).
+- Anomalie d'outillage ANO-Q1 corrigée au fil de l'eau (références désormais déterministes).
+- Modèle économique trial+unlock entièrement couvert côté logique (T-190 à T-202).
 
 ### Conditions de levée du « conditionnel »
 
-1. **Validation IHM manuelle complète** : exécuter `validation_ihm.html` et atteindre ≥ 95 % de OK sur les **136 widgets** (dont 11 v2.3 W118-W128 + 6 finition 2026-05-19 W129-W134).
-2. **Tests fumigatoires v2.3** : exécuter `pytest tests/smoke/test_ui_v3.py tests/smoke/test_ux_v4.py` — les **30 nouveaux tests** doivent tous passer (19 v2.3 + 11 finition 2026-05-19 : onglets internes, panneaux intégrés, déduplication marques/mots-clés/extensions, dimensions ↧/↥, orientation, note, invariant « aucune nouvelle fenêtre »).
-3. **Investigation T-114** : ticket à ouvrir pour expliquer le cache hit rate à 0 %. Si bug confirmé : correction + re-test ; sinon ajuster l'objectif.
-4. **Tests Cas limites manuels** : exécuter T-081 à T-105 (chemins UTF-8 réels, espace disque saturé, sources réseau, permissions limitées, etc.).
-5. **Re-mesure RAM** sur Windows 11 production (sans dev-tooling parasite).
-6. **Audit visuel v2.3** : mettre à jour `tools/visual_audit.py` pour vérifier les nouveaux invariants : présence des 4 onglets internes, présence du bouton 💡 Exemples de marques, panneau intégré inexistant à l'initialisation.
+1. **Validation IHM manuelle** : ouvrir `validation_ihm.html`, lancer l'app en parallèle, et atteindre ≥ 95 % de OK sur les **143 points manuels** (135 widgets + 8 résiduelles). Les 8 widgets « auto ✓ » sont déjà couverts.
+2. **Vérifier en priorité les nouveautés visuelles** : badge licence et ses 4 couleurs (W137), panneau d'activation inline (W139), bandeau warning trial non tronqué (W140), aperçu dry-run avec critère lieu (W142), libellé « Quarantaine » dans l'historique (W143).
+3. **Tests Cas limites manuels** restants (T-081 à T-105 non auto) : chemins UTF-8 réels, espace disque saturé, sources réseau, permissions limitées.
+4. **Re-mesure RAM** (T-112) sur Windows 11 production si l'objectif 200 MB doit être tranché.
+5. **Vérif manuelle de l'achat** : la page Lemon Squeezy (`photoorganizer.lemonsqueezy.com`, ouverte par W139) doit exister avant lancement public (priorité produit P0 #4, hors périmètre qualif logicielle).
 
 ### Si conditions levées
 
-**Statut final attendu : ✅ GO production**.
+**Statut final attendu : ✅ GO production** (sous réserve du setup Lemon Squeezy, qui relève du déploiement commercial et non de la qualité logicielle).
 
 ## 7. Annexes
 
 | Livrable | Chemin | Statut |
 |---|---|---|
-| Matrice tests | [test_data/matrice_tests.xlsx](matrice_tests.xlsx) | ✅ 189 tests (150 v2.0 + 15 v2.3 + 10 finition 2026-05-19), 4 feuilles |
-| Checklist IHM | [test_data/validation_ihm.html](validation_ihm.html) | ✅ 136 widgets (117 v2.0 + 11 v2.3 + 6 finition 2026-05-19), autonome |
-| Inputs | `test_data/inputs/` (12 jeux) | ✅ 321 fichiers |
-| Refs non-régression | `test_data/outputs_reference/` (9 tests) | ✅ 178 fichiers |
-| Sorties réelles | `test_data/outputs_reels/` | ✅ rempli par run_tests.py |
+| Empreinte sources | [test_data/.test_state.json](.test_state.json) | ✅ 54 sources empreintées (commit 5b0c2eb) — Phase 0 |
+| Matrice tests | [test_data/matrice_tests.xlsx](matrice_tests.xlsx) | ✅ 210 tests, colonne Mode (Auto/Manuel), 4 feuilles + synthèse par mode |
+| Checklist IHM | [test_data/validation_ihm.html](validation_ihm.html) | ✅ 143 widgets (8 auto ✓ + 135 manuels) + 8 résiduelles, autonome |
+| Inputs | `test_data/inputs/` (12 jeux) | ✅ ~280 fichiers (mtime sans-EXIF figé, ANO-Q1) |
+| Refs non-régression | `test_data/outputs_reference/` (9 tests) | ✅ figées |
+| Sorties réelles | `test_data/outputs_reels/` | ✅ rempli par run_tests.py (16/16) |
 | Rapport diff | `test_data/outputs_reels/_diff_report.md` | ✅ 9/9 OK |
 | Résumé exécution | `test_data/outputs_reels/_run_summary.json` | ✅ JSON |
-| Résultats perf | `test_data/outputs_reels/_perf_results.json` | ✅ JSON |
-| Build report | `build_report.md` | ✅ |
-| Audit visuel | `tools/visual_audit.py` | ✅ 12/12 |
+| Rapport d'audit produit | branche `audit/2026-06-11` (7 commits, lots A-F) | ✅ B-01 bloquant corrigé + non-régressions |
+| Audit visuel | `tools/visual_audit.py` | ✅ 12/12 (campagne 2026-05) |
 
 ### Commandes utiles
 
 ```bash
+# Phase 0 — empreinte des sources (diagnostic de la prochaine campagne)
+python test_data/scripts/snapshot_state.py
+
 # Régénération (idempotent)
 python test_data/scripts/generate_matrix.py
 python test_data/scripts/generate_inputs.py --large 1000
@@ -343,4 +410,5 @@ python -m pytest tests/ -m "slow"       # volume + stress
 
 ---
 
-*Rapport généré le 2026-05-11 par le pipeline de qualification automatisé.*
+*Campagne 2026-06-12 (PhotoOrganizer 2.3.0.dev0, commit 5b0c2eb) : mise à jour ciblée — pivot trial+unlock + audit lots A-F. Sections datées 2026-05-19 conservées pour l'historique.*
+*Rapport initial généré le 2026-05-11 par le pipeline de qualification automatisé.*

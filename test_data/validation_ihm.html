@@ -108,6 +108,19 @@
     display: none;
   }
   .export-area.visible { display: block; }
+  /* Badge « auto ✓ » : élément couvert par un test automatique exécuté */
+  .auto-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px;
+    background: #E8F5E9; color: var(--ok); border: 1px solid var(--ok);
+    border-radius: 3px; font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  /* Bouton « Tout OK » par panneau */
+  .sec-allok {
+    margin-left: 10px; padding: 2px 10px; font-size: 12px; cursor: pointer;
+    background: var(--ok); color: #fff; border: none; border-radius: 3px;
+  }
+  .sec-allok:hover { filter: brightness(1.1); }
+  .sec-count { margin-left: 6px; }
   /* Imprimante : optimisations */
   @media print {
     body { background: white; padding: 0; }
@@ -120,7 +133,7 @@
 </head>
 <body>
 
-<h1>🧪 Validation IHM — PhotoOrganizer 2.3-dev</h1>
+<h1>🧪 Validation IHM — PhotoOrganizer 2.3.0.dev0</h1>
 <p class="subtitle">Liste de vérification visuelle de l'interface. Pas besoin de connaissances techniques.</p>
 
 <!-- Bloc d'instructions pour le testeur -->
@@ -156,7 +169,7 @@
   </div>
   <div>
     <label>Version</label>
-    <input id="meta-version" value="2.3-dev">
+    <input id="meta-version" value="2.3.0.dev0">
   </div>
   <div>
     <label>Testeur</label>
@@ -182,7 +195,7 @@
   <button onclick="exportMarkdown()" class="primary">📝 Générer résumé Markdown</button>
   <button onclick="window.print()">🖨 Imprimer</button>
   <button onclick="clearAll()" class="danger">🗑 Effacer tout</button>
-  <span class="progress-bar" id="progress">0 / 136 — 0 %</span>
+  <span class="progress-bar" id="progress">— manuel —</span>
 </div>
 
 <!-- Conteneur du tableau (rempli en JS) -->
@@ -360,14 +373,41 @@ const WIDGETS = [
 
   // ----- v2.3 finition 2026-05-19 (II) : quarantaine réversible -----
   { id: "W135", section: "Doublons - Quarantaine (v2.3)", widget: "Bouton 🗑 Vider quarantaine",                desc: "Panneau Doublons, en bas, à côté du bouton Annuler (couleur orange)",                                 attendu: "Au démarrage : libellé « 🗑 Vider quarantaine (0) » et bouton désactivé. Après une suppression en mode « Corbeille (récupérable) » : libellé devient « 🗑 Vider quarantaine (N — XX MB) » et bouton actif." },
-  { id: "W136", section: "Doublons - Quarantaine (v2.3)", widget: "Mode « Corbeille (récupérable) »",            desc: "Onglet Doublons, en haut, 4e radio dans la barre « Mode »",                                            attendu: "Sélectionner ce mode + exécuter sur des doublons → les fichiers sont déplacés en quarantaine interne, l'historique liste des opérations 'trash'. Le bouton « ↩️ Annuler dernière » du panneau Historique restaure le fichier à sa source d'origine." },
+  { id: "W136", section: "Doublons - Quarantaine (v2.3)", widget: "Mode « Corbeille (récupérable) »",            desc: "Onglet Doublons, en haut, 4e radio dans la barre « Mode »",                                            attendu: "Sélectionner ce mode + exécuter sur des doublons → les fichiers sont déplacés en quarantaine interne, l'historique liste des opérations 'trash' (affichées « Quarantaine »). Le bouton « ↩️ Annuler dernière » du panneau Historique restaure le fichier à sa source d'origine.", auto: "T-187/T-209" },
+
+  // ----- Pivot trial+unlock 2026-05-26 (W137-W141) -----
+  { id: "W137", section: "Licence — trial + unlock (pivot 2026-05)", widget: "Badge licence (en-tête)",          desc: "En-tête haut-droite, à gauche du bouton thème",                                                       attendu: "Affiche « Essai N/10 » (gris). À 8 ou 9 essais consommés : devient orange. À 10+ sans clé : « Limite atteinte · Activer » (rouge). Après activation : « Activée · MAC-XXXX-XXXX » (vert). La logique d'état est auto-testée (T-190..200) ; ici on valide le RENDU visuel des couleurs.", auto: "T-200" },
+  { id: "W138", section: "Licence — trial + unlock (pivot 2026-05)", widget: "Clic badge → panneau activation",  desc: "Cliquer le badge licence",                                                                            attendu: "Si pas de licence : bascule sur l'onglet Organisation et ouvre le panneau d'activation inline. Si licence active : affiche un récap dans la barre d'état. AUCUNE nouvelle fenêtre.", auto: "T-201" },
+  { id: "W139", section: "Licence — trial + unlock (pivot 2026-05)", widget: "Panneau d'activation inline",       desc: "S'ouvre au blocage (11e tri) ou via le badge",                                                        attendu: "Voir : message d'explication, ID machine « 🖥️ MAC-XXXX-XXXX », champ « Clé de licence », bouton « 🛒 Acheter une licence (10 €) », lien « ℹ️ Comment ça marche ? ». Pied : boutons « Activer » + « Fermer ». Aucune fenêtre Toplevel (invariant projet).", auto: "T-201" },
+  { id: "W140", section: "Licence — trial + unlock (pivot 2026-05)", widget: "Bandeau warning trial",            desc: "Au-dessus du bouton 🚀 Organiser (rail droit), aux seuils 8/9",                                       attendu: "Sans licence, à 8 essais : bandeau jaune « ⚠️ Avant-dernier tri gratuit ». À 9 : « ⚠️ Dernier tri gratuit avant blocage ». Texte entièrement lisible dans le rail (pas tronqué — wraplength corrigé B-11). Masqué sinon.", auto: "T-193" },
+  { id: "W141", section: "Licence — trial + unlock (pivot 2026-05)", widget: "Feedback d'activation",            desc: "Zone sous le champ clé, après clic « Activer »",                                                      attendu: "Clé valide → « ✅ Activée pour cet ordinateur (MAC-XXXX-XXXX). Merci ! » (vert) + badge passe au vert. Clé invalide → message rouge localisé. Clé d'un autre PC → « déjà liée à un autre ordinateur ». Clé expirée → « Cette clé a expiré ».", auto: "T-198/T-199" },
+
+  // ----- Audit 2026-06-11 : éléments visuels modifiés (W142-W143) -----
+  { id: "W142", section: "Organisation - Panneaux intégrés (audit 2026-06)", widget: "Aperçu dry-run avec critère Lieu",   desc: "Onglet Organiser : cocher « Par localisation GPS », puis bouton « 👁 Aperçu » (rail droit)",          attendu: "L'arborescence prévisualisée montre des dossiers « Lat_x_Lon_y » / « Sans localisation GPS » (le critère lieu n'est plus ignoré — B-06). Pendant le calcul, l'IHM reste réactive et la barre de progression avance (worker — B-07).", auto: "T-208 (semi)" },
+  { id: "W143", section: "Historique", widget: "Libellé « Quarantaine » dans l'historique",                     desc: "Onglet Historique, après une mise en quarantaine de doublons",                                        attendu: "Les opérations de type 'trash' s'affichent « Quarantaine » (et non plus le code brut « trash » — B-08).", auto: "T-209" },
 ];
 
-// v4 : incrémenté lors de l'ajout des widgets W135-W136 (quarantaine
-// réversible, refonte 2026-05-19 II). v3 : ajout des widgets W129-W134
-// (panneau 💡 Exemples de filtres). v2 : W118-W128 (v2.3 + finition
-// 2026-05-18). Bump à chaque évolution majeure pour isoler l'ancien état.
-const STORAGE_KEY = "photoorganizer_validation_ihm_v4";
+// v5 (2026-06-12) : widgets licence W137-W141 (pivot trial+unlock) +
+// W142-W143 (audit 2026-06-11), et badges « auto ✓ » qui excluent du
+// décompte manuel les éléments couverts par un test automatique exécuté.
+// v4 : W135-W136 (quarantaine réversible). v3 : W129-W134 (panneau
+// Exemples de filtres). v2 : W118-W128 (v2.3). Bump à chaque évolution
+// majeure pour isoler l'ancien état localStorage.
+const STORAGE_KEY = "photoorganizer_validation_ihm_v5";
+
+// Vérifications résiduelles : non représentables par un widget cliquable
+// (fluidité, ordre de tabulation, redimensionnement, rendu réel des thèmes).
+// Protocole v3 — section « Checklist résiduelle ».
+const RESIDUAL_CHECKS = [
+  { id: "R01", desc: "Fluidité pendant un tri volumineux : l'IHM reste réactive (déplacer la fenêtre, changer d'onglet) pendant l'organisation de ~1000 fichiers." },
+  { id: "R02", desc: "Annulation coopérative : pendant un tri, Échap OU le bouton ❌ Annuler arrête proprement ; le bouton 🚀 Organiser redevient cliquable sans redémarrer l'app." },
+  { id: "R03", desc: "Ordre de tabulation : dans le panneau d'activation, Tab passe logiquement champ clé → Activer → Fermer." },
+  { id: "R04", desc: "Redimensionnement : réduire la fenêtre à 800×550 garde tous les boutons d'action atteignables (scroll central si besoin)." },
+  { id: "R05", desc: "Rendu réel des thèmes : basculer ☀️/🌙 — aucun texte illisible (contraste), aucune zone restée à l'ancienne couleur." },
+  { id: "R06", desc: "Multi-écran : déplacer la fenêtre sur un 2e écran puis fermer/relancer → l'app réapparaît visible (pas hors-champ)." },
+  { id: "R07", desc: "Toast de fin d'organisation (si plyer installé) : notification système non-modale visible ~5 s après un tri réussi." },
+  { id: "R08", desc: "Drag & drop (si tkinterdnd2 installé) : glisser un dossier sur le champ Source le renseigne." },
+];
 
 /* ========================================================================
    Build UI : génère le tableau et restaure l'état depuis localStorage
@@ -392,11 +432,20 @@ function saveState() {
     },
     widgets: {},
   };
+  state.residual = {};
   WIDGETS.forEach(w => {
+    const sel = document.querySelector(`select[data-widget="${w.id}"]`);
     state.widgets[w.id] = {
-      status:  document.querySelector(`select[data-widget="${w.id}"]`).value,
+      status:  sel ? sel.value : "À faire",
       observe: document.querySelector(`input[data-widget="${w.id}"][data-field="observe"]`).value,
       comment: document.querySelector(`textarea[data-widget="${w.id}"][data-field="comment"]`).value,
+      auto:    !!w.auto,
+    };
+  });
+  RESIDUAL_CHECKS.forEach(r => {
+    state.residual[r.id] = {
+      status:  document.querySelector(`select[data-residual="${r.id}"]`).value,
+      comment: document.querySelector(`textarea[data-residual="${r.id}"][data-field="comment"]`).value,
     };
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -404,14 +453,52 @@ function saveState() {
 }
 
 function updateProgress() {
-  const total = WIDGETS.length;
+  // Les widgets « auto ✓ » (couverts par un test automatique exécuté) sont
+  // exclus du décompte manuel — protocole v3 : la validation manuelle ne
+  // porte que sur ce qui n'est pas automatisable.
+  const manual = WIDGETS.filter(w => !w.auto);
+  const total = manual.length;
   let done = 0;
-  WIDGETS.forEach(w => {
-    const status = document.querySelector(`select[data-widget="${w.id}"]`).value;
-    if (status === "OK" || status === "NOK" || status === "NA") done++;
+  manual.forEach(w => {
+    const sel = document.querySelector(`select[data-widget="${w.id}"]`);
+    if (sel && (sel.value === "OK" || sel.value === "NOK" || sel.value === "NA")) done++;
   });
-  const pct = total ? Math.round(done / total * 100) : 0;
-  document.getElementById("progress").textContent = `${done} / ${total} — ${pct} %`;
+  // + checklist résiduelle
+  let rDone = 0;
+  RESIDUAL_CHECKS.forEach(r => {
+    const sel = document.querySelector(`select[data-residual="${r.id}"]`);
+    if (sel && sel.value !== "À faire") rDone++;
+  });
+  const grandTotal = total + RESIDUAL_CHECKS.length;
+  const grandDone = done + rDone;
+  const autoN = WIDGETS.length - manual.length;
+  const pct = grandTotal ? Math.round(grandDone / grandTotal * 100) : 0;
+  document.getElementById("progress").textContent =
+    `${grandDone} / ${grandTotal} manuel — ${pct} %  (+${autoN} auto ✓)`;
+  // Compteurs par panneau (badge dans chaque summary)
+  document.querySelectorAll("details[data-section]").forEach(d => {
+    const sec = d.getAttribute("data-section");
+    const secWidgets = manual.filter(w => w.section === sec);
+    let secDone = 0;
+    secWidgets.forEach(w => {
+      const sel = document.querySelector(`select[data-widget="${w.id}"]`);
+      if (sel && sel.value !== "À faire") secDone++;
+    });
+    const badge = d.querySelector(".sec-count");
+    if (badge) badge.textContent = secWidgets.length
+      ? `${secDone}/${secWidgets.length} manuel`
+      : `auto ✓`;
+  });
+}
+
+function markPanelOK(section) {
+  document.querySelectorAll(`select[data-section-name="${CSS.escape(section)}"]`).forEach(sel => {
+    if (!sel.disabled && sel.value === "À faire") {
+      sel.value = "OK";
+      updateStatusColor(sel);
+    }
+  });
+  saveState();
 }
 
 function buildChecklist() {
@@ -437,8 +524,12 @@ function buildChecklist() {
 
   let html = '';
   Object.entries(sections).forEach(([section, widgets]) => {
-    html += `<details open>
-      <summary>${section} <span style="color:#777;font-weight:normal;">(${widgets.length})</span></summary>
+    const manualCount = widgets.filter(w => !w.auto).length;
+    html += `<details open data-section="${escapeHtml(section)}">
+      <summary>${escapeHtml(section)}
+        <span class="sec-count" style="color:#777;font-weight:normal;">(${widgets.length})</span>
+        ${manualCount ? `<button class="sec-allok" onclick="event.preventDefault(); markPanelOK('${escapeHtml(section).replace(/'/g, "\\'")}')">Tout OK</button>` : ''}
+      </summary>
       <table>
         <thead>
           <tr>
@@ -454,28 +545,68 @@ function buildChecklist() {
         <tbody>`;
     widgets.forEach(w => {
       const s = (state.widgets && state.widgets[w.id]) || {};
-      const status  = s.status  || "À faire";
+      // Widgets auto : forcés à OK, select verrouillé, exclus du décompte.
+      const status  = w.auto ? "OK" : (s.status || "À faire");
       const observe = s.observe || "";
       const comment = s.comment || "";
-      html += `<tr>
-        <td class="col-id">${w.id}</td>
-        <td class="col-widget">${escapeHtml(w.widget)}</td>
-        <td class="col-desc">${escapeHtml(w.desc)}</td>
-        <td class="col-attendu">${escapeHtml(w.attendu)}</td>
-        <td>
-          <select class="status" data-widget="${w.id}" data-value="${status}" onchange="updateStatusColor(this); saveState();">
+      const autoBadge = w.auto
+        ? `<span class="auto-badge" title="Couvert par un test automatique exécuté">auto ✓ ${escapeHtml(w.auto)}</span>`
+        : '';
+      const statusCell = w.auto
+        ? `<select class="status" data-widget="${w.id}" data-value="OK" data-section-name="${escapeHtml(section)}" disabled>
+             <option value="OK" selected>OK (auto)</option>
+           </select>${autoBadge}`
+        : `<select class="status" data-widget="${w.id}" data-value="${status}" data-section-name="${escapeHtml(section)}" onchange="updateStatusColor(this); saveState();">
             <option value="À faire" ${status === 'À faire' ? 'selected' : ''}>À faire</option>
             <option value="OK"      ${status === 'OK' ? 'selected' : ''}>OK</option>
             <option value="NOK"     ${status === 'NOK' ? 'selected' : ''}>NOK</option>
             <option value="NA"      ${status === 'NA' ? 'selected' : ''}>NA</option>
-          </select>
-        </td>
+          </select>`;
+      html += `<tr${w.auto ? ' style="opacity:0.72;"' : ''}>
+        <td class="col-id">${w.id}</td>
+        <td class="col-widget">${escapeHtml(w.widget)}</td>
+        <td class="col-desc">${escapeHtml(w.desc)}</td>
+        <td class="col-attendu">${escapeHtml(w.attendu)}</td>
+        <td>${statusCell}</td>
         <td><input class="field" data-widget="${w.id}" data-field="observe" value="${escapeHtml(observe)}" oninput="saveState()" placeholder="ex. couleur, position…"></td>
         <td><textarea class="field" data-widget="${w.id}" data-field="comment" oninput="saveState()" placeholder="Notes…">${escapeHtml(comment)}</textarea></td>
       </tr>`;
     });
     html += `</tbody></table></details>`;
   });
+
+  // ----- Checklist résiduelle (vérifications non graphiques) -----
+  html += `<details open data-residual-block>
+    <summary>🔧 Checklist résiduelle — vérifications non automatisables
+      <span style="color:#777;font-weight:normal;">(${RESIDUAL_CHECKS.length})</span></summary>
+    <table>
+      <thead><tr>
+        <th class="col-id">N°</th>
+        <th class="col-attendu">Vérification à mener en conditions réelles</th>
+        <th class="col-status">Statut</th>
+        <th class="col-comment">Commentaire</th>
+      </tr></thead>
+      <tbody>`;
+  RESIDUAL_CHECKS.forEach(r => {
+    const s = (state.residual && state.residual[r.id]) || {};
+    const status = s.status || "À faire";
+    const comment = s.comment || "";
+    html += `<tr>
+      <td class="col-id">${r.id}</td>
+      <td class="col-attendu">${escapeHtml(r.desc)}</td>
+      <td>
+        <select class="status" data-residual="${r.id}" data-value="${status}" onchange="updateStatusColor(this); saveState();">
+          <option value="À faire" ${status === 'À faire' ? 'selected' : ''}>À faire</option>
+          <option value="OK"      ${status === 'OK' ? 'selected' : ''}>OK</option>
+          <option value="NOK"     ${status === 'NOK' ? 'selected' : ''}>NOK</option>
+          <option value="NA"      ${status === 'NA' ? 'selected' : ''}>NA</option>
+        </select>
+      </td>
+      <td><textarea class="field" data-residual="${r.id}" data-field="comment" oninput="saveState()" placeholder="Notes…">${escapeHtml(comment)}</textarea></td>
+    </tr>`;
+  });
+  html += `</tbody></table></details>`;
+
   container.innerHTML = html;
 
   // Initial color update
@@ -533,32 +664,43 @@ function exportMarkdown() {
   md += `| Environnement | ${meta.env || ""} |\n`;
   md += `| Empreinte de version | ${meta.hash || ""} |\n\n`;
 
-  // Synthèse
+  // Synthèse — auto (couverts par test exécuté) vs manuel + résiduel
+  const autoWidgets = WIDGETS.filter(w => w.auto);
+  const manualWidgets = WIDGETS.filter(w => !w.auto);
   const counts = { "OK": 0, "NOK": 0, "NA": 0, "À faire": 0 };
-  WIDGETS.forEach(w => {
+  manualWidgets.forEach(w => {
     const s = (state.widgets || {})[w.id] || {};
     const st = s.status || "À faire";
     counts[st] = (counts[st] || 0) + 1;
   });
-  const total = WIDGETS.length;
+  RESIDUAL_CHECKS.forEach(r => {
+    const s = (state.residual || {})[r.id] || {};
+    const st = s.status || "À faire";
+    counts[st] = (counts[st] || 0) + 1;
+  });
+  const total = manualWidgets.length + RESIDUAL_CHECKS.length;
   md += `### Synthèse\n\n`;
+  md += `- **${autoWidgets.length} éléments couverts automatiquement** (badge auto ✓ — tests exécutés, non recomptés ici).\n`;
+  md += `- **${total} vérifications manuelles** (${manualWidgets.length} widgets + ${RESIDUAL_CHECKS.length} résiduelles) :\n\n`;
   md += `| Statut | Nombre | Taux |\n|---|---|---|\n`;
   Object.entries(counts).forEach(([k, v]) => {
     const pct = total ? Math.round(v / total * 1000) / 10 : 0;
     md += `| ${k} | ${v} | ${pct} % |\n`;
   });
 
-  // Anomalies (NOK uniquement)
-  const noks = WIDGETS.filter(w => {
-    const s = (state.widgets || {})[w.id] || {};
-    return s.status === "NOK";
-  });
-  if (noks.length) {
+  // Anomalies (NOK uniquement) — widgets manuels + résiduelles
+  const noks = manualWidgets.filter(w => ((state.widgets || {})[w.id] || {}).status === "NOK");
+  const noksR = RESIDUAL_CHECKS.filter(r => ((state.residual || {})[r.id] || {}).status === "NOK");
+  if (noks.length || noksR.length) {
     md += `\n### Anomalies détectées\n\n`;
-    md += `| ID | Widget | Section | Observation | Commentaire |\n|---|---|---|---|---|\n`;
+    md += `| ID | Élément | Section | Observation | Commentaire |\n|---|---|---|---|---|\n`;
     noks.forEach(w => {
       const s = (state.widgets || {})[w.id] || {};
       md += `| ${w.id} | ${w.widget.replace(/\|/g, '\\|')} | ${w.section.replace(/\|/g, '\\|')} | ${(s.observe || '').replace(/\|/g, '\\|')} | ${(s.comment || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`;
+    });
+    noksR.forEach(r => {
+      const s = (state.residual || {})[r.id] || {};
+      md += `| ${r.id} | ${r.desc.slice(0, 40).replace(/\|/g, '\\|')}… | Checklist résiduelle | — | ${(s.comment || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`;
     });
   }
 

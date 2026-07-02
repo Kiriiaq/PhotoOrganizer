@@ -1,23 +1,29 @@
-# Dossier de qualification — PhotoOrganizer 2.3-dev
+# Dossier de qualification — PhotoOrganizer 2.3.0.dev0
 
 Dossier auto-contenu pour la **qualification fonctionnelle** de l'outil.
 Structure conforme au prompt « Test IHM Advanced » (Edvance EPR/I&C).
 
-> **Mise à jour 2026-05-19** — Ajout des tests T-151 à T-175 (25 nouveaux)
-> pour la refonte v2.3 du panneau Organisation (4 onglets internes +
-> bouton 💡 Exemples de marques + panneaux intégrés remplaçant les anciennes
-> fenêtres modales) **et** le bouton 💡 Exemples de filtres dans l'onglet
-> Filtrer (valeurs standards pour mots-clés, extensions, dimensions,
-> orientation, note). Widgets W118-W134 ajoutés dans `validation_ihm.html`.
+> **Mise à jour 2026-06-12** — Campagne post-pivot + audit. Ajout des tests
+> T-190 à T-210 (modèle trial+unlock + non-régressions de l'audit lots A-F),
+> colonne **Mode (Auto/Manuel)** dans la matrice avec statuts Auto **injectés
+> depuis l'exécution réelle**, badges **« auto ✓ »** et **checklist résiduelle**
+> dans `validation_ihm.html` (widgets W137-W143), et `.test_state.json` +
+> `scripts/snapshot_state.py` pour le diagnostic Phase 0. Résultats :
+> pytest **211 verts** / run_tests **16/16** / non-régression **9/9**.
+>
+> **Mise à jour 2026-05-19** — Ajout des tests T-151 à T-189 pour la refonte
+> v2.3 (4 onglets internes, panneaux intégrés, exemples marques/filtres,
+> quarantaine réversible). Widgets W118-W136 ajoutés dans `validation_ihm.html`.
 
 ## Structure
 
 ```
 test_data/
-├── matrice_tests.xlsx          ← 189 tests catégorisés + traçabilité exigences (v2.3)
-├── validation_ihm.html         ← checklist interactive 136 widgets (autonome, v2.3)
-├── rapport_qualification.md    ← squelette du rapport à compléter
-├── inputs/                     ← 11 jeux d'entrée réalistes
+├── .test_state.json            ← empreinte SHA-256 + date des sources (Phase 0)
+├── matrice_tests.xlsx          ← 210 tests + colonne Mode (Auto/Manuel) + traçabilité
+├── validation_ihm.html         ← checklist interactive 143 widgets (8 auto ✓) + 8 résiduelles
+├── rapport_qualification.md    ← rapport complet (campagne 2026-06-12 + historique)
+├── inputs/                     ← 12 jeux d'entrée réalistes
 │   ├── input_nominal/                  (50 photos avec EXIF complet)
 │   ├── input_vide/                     (dossier vide)
 │   ├── input_volumineux/               (1000 photos, --large)
@@ -35,7 +41,8 @@ test_data/
 │   ├── T-066/  T-068/  T-074/  T-076/  T-079/
 ├── outputs_reels/              ← rempli à chaque exécution de run_tests.py
 └── scripts/
-    ├── generate_matrix.py      ← (re)génère matrice_tests.xlsx
+    ├── snapshot_state.py       ← (re)génère .test_state.json (empreinte sources)
+    ├── generate_matrix.py      ← (re)génère matrice_tests.xlsx (210 tests)
     ├── generate_inputs.py      ← (re)génère inputs/*
     ├── run_tests.py            ← lance 16 scénarios automatisés
     └── compare_outputs.py      ← diff réel vs référence (rapport Markdown)
@@ -77,8 +84,17 @@ Double-clic sur **`test_data/validation_ihm.html`** dans l'explorateur Windows.
 
 ## Catégories et traçabilité
 
-8 catégories × 189 tests numérotés `T-001` à `T-175`, traçables vers
-8 référentiels d'exigences :
+8 catégories × 210 tests numérotés `T-001` à `T-210`, traçables vers
+8 référentiels d'exigences. Périmètre 2026-06-12 (T-190 à T-210) :
+
+| ID | Couverture |
+|---|---|
+| T-190 → T-199 | Modèle trial+unlock : compteur HMAC, blocage 11e tri, anti-tampering, activation, machine binding, clé invalide/expirée |
+| T-200 → T-202 | IHM licence : badge header, panneau d'activation inline, contenu du panneau |
+| T-203 → T-207 | Non-régressions audit : worker (B-01), historique partagé (B-04), injection FileManager (Lot D), purge cache (B-09), version unique (B-10) |
+| T-208 → T-210 | Aperçu lieu (B-06/07), libellé Quarantaine (B-08), déterminisme références (ANO-Q1) |
+
+Périmètres antérieurs :
 
 | Catégorie | Range v2.0 | Range v2.3 ajout | Finition 2026-05-19 | Exigences |
 |---|---|---|---|---|
@@ -124,16 +140,16 @@ Double-clic sur **`test_data/validation_ihm.html`** dans l'explorateur Windows.
 | T-174 | Constantes standards exposées : COMMON_KEYWORDS / EXTENSIONS_* / DIMENSIONS / ORIENTATIONS |
 | T-175 | Invariant de non-régression : aucune nouvelle fenêtre sur l'ouverture du panneau 💡 Filtres |
 
-## Statut couverture (au moment de la livraison)
+## Statut couverture (campagne 2026-06-12)
 
 | | |
 |---|---|
 | **Tests automatisés exécutés** | 16 scénarios run_tests.py — 100 % OK |
-| **Tests non-régression** | 9 / 9 ✅ (compare_outputs.py) |
-| **Tests pytest internes** | 98 / 98 ✅ |
-| **Tests IHM manuels** | 117 widgets listés, validation à effectuer |
-| **Tests Performance manuels** | 10 (T-106 à T-115) à effectuer |
-| **Anomalies bloquantes** | 0 |
+| **Tests non-régression** | 9 / 9 ✅ (compare_outputs.py, après fix ANO-Q1) |
+| **Tests pytest internes** | 217 passed (211 rapides + 6 slow) / 47 skipped (Pro v3.0+) / 0 failed |
+| **Tests matrice Auto** | 49 / 49 ✅ (statuts injectés depuis l'exécution) |
+| **Tests IHM manuels** | 135 widgets + 8 résiduelles à valider (8 pré-marqués auto ✓) |
+| **Anomalies bloquantes / majeures** | 0 / 0 (B-01 corrigé pendant l'audit) |
 
 ## Réutilisation pour un autre outil
 

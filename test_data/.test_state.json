@@ -1,0 +1,277 @@
+{
+  "qualified_at": "2026-06-13T06:15:00.827857+00:00",
+  "git_commit": "5b0c2eb",
+  "source_count": 54,
+  "files": {
+    "src/__init__.py": {
+      "sha256": "3970b982876d19b8382ee06786d2f4a5cb5e78bcad8bab8779a61e8ba4bee5eb",
+      "mtime": "2026-05-26T21:16:35.103652+00:00",
+      "size": 98
+    },
+    "src/cli/__init__.py": {
+      "sha256": "28a50b61518c36dec9b5b73eefddb9143268747faf547b68eb10230622d4dfac",
+      "mtime": "2026-01-22T16:17:35.883880+00:00",
+      "size": 261
+    },
+    "src/cli/duplicate_cli.py": {
+      "sha256": "4c0614b27b61e98c0c3333771113ac2bc37559e2df5ed138d61755c654e74e04",
+      "mtime": "2026-05-14T10:20:04.224492+00:00",
+      "size": 23987
+    },
+    "src/config/__init__.py": {
+      "sha256": "749c7e1b30f0d763c9326d6a261b83670fe672bf990ab172a6886daa3bc1fbb7",
+      "mtime": "2026-05-14T10:20:04.224492+00:00",
+      "size": 1244
+    },
+    "src/config/duplicate_config.py": {
+      "sha256": "0b5b3dbe061776cd82f099c4c8bf35d70b5505e6b4f10185be7db5ee62590d9e",
+      "mtime": "2026-05-14T10:20:04.224492+00:00",
+      "size": 23081
+    },
+    "src/core/__init__.py": {
+      "sha256": "a6632011d7fc0dba894c19fc4420b6f630fab37ac2c30005df778dba3204f0c7",
+      "mtime": "2026-05-26T21:16:35.103652+00:00",
+      "size": 184
+    },
+    "src/core/metadata/__init__.py": {
+      "sha256": "3ed7ca9cba305ed9484eca7d979a85ae8e1be3fb91cc6b4eebe82aa9f9a67b09",
+      "mtime": "2026-05-07T16:51:41.932100+00:00",
+      "size": 572
+    },
+    "src/core/metadata/camera_detector.py": {
+      "sha256": "d0f71b5aa6ecfa7bf0c76ddffeed9d145eff21270fd8d1b0f355ff02e06d238f",
+      "mtime": "2026-05-07T16:51:41.933085+00:00",
+      "size": 6460
+    },
+    "src/core/metadata/date_extractor.py": {
+      "sha256": "33d162d36fa5a78020159f6fc15d8575d1dabad541eaf23593d837d7fd542072",
+      "mtime": "2026-05-07T16:51:41.933085+00:00",
+      "size": 8102
+    },
+    "src/core/metadata/exif_extractor.py": {
+      "sha256": "94d82623a7d96cb2ca97f7d4406fba45270d4b44db76c1e4abcde2fd1e853aa3",
+      "mtime": "2026-06-11T18:00:03.314041+00:00",
+      "size": 13194
+    },
+    "src/core/metadata/gps_processor.py": {
+      "sha256": "55f8f98a906672484754b7fefba7c06ffe5b5c6cd1680407d49d917cfb17f8ee",
+      "mtime": "2026-05-15T05:45:09.561307+00:00",
+      "size": 13306
+    },
+    "src/core/operations/__init__.py": {
+      "sha256": "e7db5cfbb8719980f2d8b0c1a255fcf8c29af5b66261241f2abb2e9423fc3355",
+      "mtime": "2026-06-11T18:04:47.872047+00:00",
+      "size": 867
+    },
+    "src/core/operations/duplicate_finder.py": {
+      "sha256": "e558192f1548dc35489615c0838d657fd8af989eff656355c33f96b85e0290e3",
+      "mtime": "2026-05-07T16:51:41.933085+00:00",
+      "size": 17511
+    },
+    "src/core/operations/duplicate_manager.py": {
+      "sha256": "9d747c50e75558abf9e6ccf2324008958240e08aad54f70c5b164a8efa9a39d3",
+      "mtime": "2026-06-11T18:08:43.536497+00:00",
+      "size": 33100
+    },
+    "src/core/operations/file_manager.py": {
+      "sha256": "d45cd41944844b08be68ef4f2f9c586b9fd2ac3f6a295e870f7f9712da55cf87",
+      "mtime": "2026-06-11T18:04:45.079498+00:00",
+      "size": 18134
+    },
+    "src/core/operations/organizer.py": {
+      "sha256": "49e2dd7c104ef6fa085618d049afce5fdf49ae35a16bc304c93f3440b2a06f61",
+      "mtime": "2026-06-11T18:04:40.356142+00:00",
+      "size": 54689
+    },
+    "src/core/operations/quarantine.py": {
+      "sha256": "59889949fc1fc5bb413129910f21d6943b29ad98a4c717b6169c8958c5ce71ba",
+      "mtime": "2026-05-26T21:16:35.105450+00:00",
+      "size": 14112
+    },
+    "src/core/scheduler.py": {
+      "sha256": "fe45d17fe9e2a1ab7cddf1abd237f37ca43fd2ae7f74e2bb47ac9f29855879d4",
+      "mtime": "2026-05-07T15:15:50.067084+00:00",
+      "size": 6681
+    },
+    "src/main.py": {
+      "sha256": "2bdb955c13a735a3e7ec6e4b830dc8d5fa9d87933c49003e0bd23167c63506a0",
+      "mtime": "2026-05-26T21:26:51.637021+00:00",
+      "size": 2393
+    },
+    "src/photoorganizer_pro/__init__.py": {
+      "sha256": "831bd1f6dd9ec6cd2dd211b9c8e80e9eb83a5ffae2db472e3fd4ecd9f96bee6d",
+      "mtime": "2026-06-11T19:25:41.497150+00:00",
+      "size": 1642
+    },
+    "src/photoorganizer_pro/cli/__init__.py": {
+      "sha256": "0a99fccfef9a87e8ead2e095df2245c0a39b8b283c60899b91e72c24a28afd2b",
+      "mtime": "2026-05-26T21:16:35.105450+00:00",
+      "size": 646
+    },
+    "src/photoorganizer_pro/cli/batch_organize.py": {
+      "sha256": "7794cac081e5fbc26131f9ccff51553a9f75797a6daeba75285f40f84fd2fde6",
+      "mtime": "2026-05-26T21:16:35.105450+00:00",
+      "size": 13160
+    },
+    "src/photoorganizer_pro/license/__init__.py": {
+      "sha256": "e6b0be7bfec00b8ee507585fd0907ce78e51c6e8bd317a49c261439d7276c4fc",
+      "mtime": "2026-05-26T21:36:02.855630+00:00",
+      "size": 1630
+    },
+    "src/photoorganizer_pro/license/keygen.py": {
+      "sha256": "9f7b6c508bb5365ec41118efb97cee28dcd3f972c3bfb3bd5cb853be2187bb00",
+      "mtime": "2026-05-26T21:15:59.416209+00:00",
+      "size": 3097
+    },
+    "src/photoorganizer_pro/license/validator.py": {
+      "sha256": "315f77a9f647d47c221c9601ce032fc3b049a162cd8659eec06f9c2ab5bf0551",
+      "mtime": "2026-06-11T19:29:17.098448+00:00",
+      "size": 1075
+    },
+    "src/photoorganizer_pro/plugins/__init__.py": {
+      "sha256": "bf518f5e4e16690f46f65312475f4986b4ce43fa0edd12205e3cda209929edf2",
+      "mtime": "2026-05-26T21:16:35.177185+00:00",
+      "size": 1936
+    },
+    "src/photoorganizer_pro/plugins/base.py": {
+      "sha256": "4035b0599024978f6d3389a65fca84b4c4be9516c77e14063cfcd6cd9400a2d2",
+      "mtime": "2026-05-26T21:16:35.179696+00:00",
+      "size": 4559
+    },
+    "src/photoorganizer_pro/plugins/examples/__init__.py": {
+      "sha256": "99cc813434da0cfc87394f1ca4a4a36fe03978c61e5adb8203e0993a87ab465e",
+      "mtime": "2026-05-26T21:16:35.179696+00:00",
+      "size": 259
+    },
+    "src/photoorganizer_pro/plugins/examples/geotag_renamer.py": {
+      "sha256": "44c2b5590ccaaf1e77cfcd925a3bca1f5df0f51fd27bac9f193c6561127c71ab",
+      "mtime": "2026-05-26T21:16:35.179696+00:00",
+      "size": 3799
+    },
+    "src/photoorganizer_pro/plugins/manager.py": {
+      "sha256": "bae01359b79d601e43e6bb9048d23692eeba406a72ad7a4771e81456b061e64c",
+      "mtime": "2026-05-26T21:16:35.181443+00:00",
+      "size": 10238
+    },
+    "src/photoorganizer_pro/scheduler/__init__.py": {
+      "sha256": "585717a1496b3192e68daf6a149bda319c661ecb6bf83c9eb022d75c8cb2c034",
+      "mtime": "2026-05-26T21:16:35.105450+00:00",
+      "size": 708
+    },
+    "src/photoorganizer_pro/scheduler/watch_folder.py": {
+      "sha256": "4e3cc9219f6f98ff05139e45c41ff4723a41e00465dd30a75b8f7365af3045ed",
+      "mtime": "2026-05-26T21:16:35.109650+00:00",
+      "size": 10761
+    },
+    "src/reports/__init__.py": {
+      "sha256": "5f4635b5c3119a4486bd9486936baf97b8a7ef1b71aa7329ea5add959b02d4a3",
+      "mtime": "2026-05-14T10:20:04.220469+00:00",
+      "size": 545
+    },
+    "src/reports/duplicate_reporter.py": {
+      "sha256": "5c7470a23f831373d06845397584211bf88852797d9461e1ed5c149bd53dbc8c",
+      "mtime": "2026-05-14T10:20:04.224492+00:00",
+      "size": 14650
+    },
+    "src/ui/__init__.py": {
+      "sha256": "d7662b3f4ca9240788254f22d94a7670c2bed63b1603252f439f9c065c2cc9ab",
+      "mtime": "2026-01-20T22:23:50.848773+00:00",
+      "size": 173
+    },
+    "src/ui/app.py": {
+      "sha256": "0ffc51faf44a9d2dfbc66f3130f8981640b2a063e99be82d80ce0baf9ca86297",
+      "mtime": "2026-06-11T18:01:07.397869+00:00",
+      "size": 31495
+    },
+    "src/ui/frames/__init__.py": {
+      "sha256": "4b7a89e08518ba1c312532456621df93271824c7e530093244a4333e4992839b",
+      "mtime": "2026-05-07T17:09:50.324952+00:00",
+      "size": 305
+    },
+    "src/ui/frames/duplicates_frame.py": {
+      "sha256": "9934eb0f13a570edfd9cbfb70f6b56721b7337d0e30b64669de6e7d1407a228c",
+      "mtime": "2026-06-11T18:08:45.181533+00:00",
+      "size": 62688
+    },
+    "src/ui/frames/history_frame.py": {
+      "sha256": "beb2146cad64b5b76e034a98c84013006a729b71f108df8f6a0bcbac894028f4",
+      "mtime": "2026-06-11T17:59:57.568194+00:00",
+      "size": 10333
+    },
+    "src/ui/frames/organize_frame.py": {
+      "sha256": "0a3b68e300d7125e25c9acf164ca90eb0d0b06124da7e651f5eff1c134ac7f29",
+      "mtime": "2026-06-11T19:29:51.213436+00:00",
+      "size": 191873
+    },
+    "src/ui/frames/settings_frame.py": {
+      "sha256": "27c37ce43ed63124d33f9ee2f05b3adb6b2056d81b817b1eb04ec3debf4908b8",
+      "mtime": "2026-05-15T10:40:54.827171+00:00",
+      "size": 22123
+    },
+    "src/ui/prompt_examples.py": {
+      "sha256": "84791cdd0526d38d6216ed2384d1d1bda0526b60dab56b5fcf558e7825e6e424",
+      "mtime": "2026-05-08T06:40:16.820352+00:00",
+      "size": 5479
+    },
+    "src/ui/theme.py": {
+      "sha256": "557518a05c20455939a8bf7b9bb20b4573dc332bb6d6d2c96919b1a23435927a",
+      "mtime": "2026-05-15T06:12:28.863561+00:00",
+      "size": 11166
+    },
+    "src/ui/tooltip.py": {
+      "sha256": "6bc86de95196a22acf26a5c6ca21de4049ef643a6fcba91cf339c07fc8b12a10",
+      "mtime": "2026-05-08T06:49:24.556807+00:00",
+      "size": 6574
+    },
+    "src/ui/tooltips_fr.py": {
+      "sha256": "27f91928a6c14d6683512645111bffcbe4007de9a41b44d6fe2aaf0a4c347282",
+      "mtime": "2026-05-26T21:15:59.423489+00:00",
+      "size": 19547
+    },
+    "src/utils/__init__.py": {
+      "sha256": "8580f0eec3a58c6bccb8cf0d4bdb1d34cabeed100ea4f5883873c73c9246f6e8",
+      "mtime": "2026-05-15T06:12:28.864560+00:00",
+      "size": 664
+    },
+    "src/utils/cache.py": {
+      "sha256": "b65aad33bb9a514300ff99f14132ad12ea1e298ed24fd598bb01b66dc220aa94",
+      "mtime": "2026-06-11T18:00:55.348328+00:00",
+      "size": 11558
+    },
+    "src/utils/config.py": {
+      "sha256": "06ed7283675a11dbd003127f318ec681002822dec9e46dfab8a02a5f833e2da5",
+      "mtime": "2026-05-15T10:38:35.361113+00:00",
+      "size": 8122
+    },
+    "src/utils/hash_cache.py": {
+      "sha256": "4d9907b8dbe614742547fd96446f1ba28085f4f464000aa299ac8aa697885eb3",
+      "mtime": "2026-05-14T10:20:04.224492+00:00",
+      "size": 18664
+    },
+    "src/utils/license_validator.py": {
+      "sha256": "4d5d96feeab839b3386dfc6861dbc8a7591377aee711195a7051c83ca9fec7aa",
+      "mtime": "2026-06-11T19:28:23.187582+00:00",
+      "size": 10482
+    },
+    "src/utils/licensing.py": {
+      "sha256": "26c0bf1830a1510742c5036b7836419de9a1c4d36b161904440a2981956d1390",
+      "mtime": "2026-06-11T19:29:48.559490+00:00",
+      "size": 14631
+    },
+    "src/utils/logger.py": {
+      "sha256": "4968d4b117a611939705e5a82a639daa3582b9cc6ae4af30bb4ecb6f932befeb",
+      "mtime": "2026-05-15T06:12:28.864560+00:00",
+      "size": 3946
+    },
+    "main.py": {
+      "sha256": "7f7e799f66ba73029fb4d826243100f85c6c2c93b3e7492744e41c17776249e5",
+      "mtime": "2026-05-26T21:16:35.103652+00:00",
+      "size": 897
+    },
+    "build.py": {
+      "sha256": "255821db76b65ffde96745fb65d37ce416ed59e9b9e48ce64524c0a8096e6fe1",
+      "mtime": "2026-06-11T19:30:57.705361+00:00",
+      "size": 11187
+    }
+  }
+}

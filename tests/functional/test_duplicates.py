@@ -56,6 +56,25 @@ def test_should_include_file_excludes_system_path(cfg, tmp_path):
     assert not mgr._should_include_file(str(bad))
 
 
+def test_file_manager_injection(cfg):
+    """Lot D (audit 2026-06-11) : le FileManager partagé est injectable.
+
+    Avant, _execute_action historisait dans un singleton module-level que
+    l'UI n'affichait jamais — les opérations doublons étaient invisibles
+    dans l'onglet Historique. L'UI injecte désormais son FileManager ;
+    par défaut (CLI/tests), chaque manager a une instance privée.
+    """
+    from src.core.operations.file_manager import FileManager
+
+    shared = FileManager()
+    mgr = DuplicateManager(cfg, file_manager=shared)
+    assert mgr.file_manager is shared
+
+    mgr_a = DuplicateManager(cfg)
+    mgr_b = DuplicateManager(cfg)
+    assert mgr_a.file_manager is not mgr_b.file_manager  # pas de singleton caché
+
+
 def test_collect_files_skips_recyclebin(cfg, tmp_path):
     """End-to-end : un re-scan ne renvoie pas les fichiers de la corbeille."""
     photo = tmp_path / "real.jpg"

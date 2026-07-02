@@ -45,3 +45,15 @@ def test_main_module_callable():
     import src.main as m
     assert callable(m.main)
     assert callable(m.check_dependencies)
+
+
+def test_app_version_matches_package_version():
+    """B-10 (audit 2026-06-11) : APP_VERSION lue depuis src/__init__.py.
+
+    Le hardcode "2.3.0-dev" dans app.py divergeait de la source de vérité
+    unique (src.__version__ = "2.3.0.dev0") utilisée par build.py et
+    pyproject.toml.
+    """
+    from src import __version__
+    from ui.app import PhotoOrganizerApp
+    assert PhotoOrganizerApp.APP_VERSION == __version__

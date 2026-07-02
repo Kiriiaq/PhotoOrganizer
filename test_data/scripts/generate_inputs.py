@@ -252,13 +252,23 @@ def gen_bursts():
 
 
 def gen_pas_exif():
-    """3 photos sans aucune métadonnée EXIF."""
+    """3 photos sans aucune métadonnée EXIF.
+
+    Qualification 2026-06-12 (ANO-Q1) : sans EXIF, l'organiseur retombe sur
+    le **mtime** du fichier — qui n'est pas versionné par git et changeait à
+    chaque régénération, rendant la référence T-079 non reproductible. On
+    fige donc le mtime à une date fixe (2026-05-11 12:00, date de gel de la
+    référence) pour rendre le scénario déterministe.
+    """
     out = os.path.join(ROOT_OUT, "input_pas_exif")
     safe_mkdir(out)
+    fixed_ts = datetime(2026, 5, 11, 12, 0, 0).timestamp()
     for i in range(3):
+        path = os.path.join(out, f"sans_exif_{i:02d}.jpg")
         img = Image.new("RGB", (200, 150), (50 + i*30, 100, 200))
-        img.save(os.path.join(out, f"sans_exif_{i:02d}.jpg"), "jpeg", quality=85)
-    print("  input_pas_exif : 3 photos sans EXIF")
+        img.save(path, "jpeg", quality=85)
+        os.utime(path, (fixed_ts, fixed_ts))
+    print("  input_pas_exif : 3 photos sans EXIF (mtime figé 2026-05-11)")
 
 
 def gen_doublons():

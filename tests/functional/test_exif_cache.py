@@ -77,6 +77,35 @@ def test_global_cache_persists_between_extractor_instances(sample_photo, tmp_pat
     assert hit_rate > 0, "Cache global ne persiste pas entre instances"
 
 
+def test_purge_evicts_entries_over_size_limit(tmp_path):
+    """B-09 (audit 2026-06-11) : purge() applique réellement max_size.
+
+    Avant le correctif, cleanup_expired() n'était jamais appelé et
+    max_size_mb n'était jamais lu : le cache disque grossissait sans
+    limite. purge() évince désormais les entrées les plus anciennes
+    jusqu'à repasser sous la limite.
+    """
+    from utils.cache import MetadataCache
+
+    cache_dir = tmp_path / "cache"
+    cache = MetadataCache(cache_dir=str(cache_dir), ttl_hours=24, max_size_mb=1)
+    cache.max_size = 2000  # limite minuscule (octets) pour le test
+
+    for i in range(5):
+        photo = tmp_path / f"photo_{i}.jpg"
+        photo.write_bytes(b"x" * 10)
+        cache.set(str(photo), {"Pad": "y" * 800, "Index": i})
+
+    before = sum(p.stat().st_size for p in cache_dir.glob("*.json"))
+    assert before > cache.max_size, "pré-condition : le cache doit dépasser la limite"
+
+    result = cache.purge()
+
+    assert result["evicted"] > 0, "purge() doit évincer des entrées au-delà de max_size"
+    after = sum(p.stat().st_size for p in cache_dir.glob("*.json"))
+    assert after <= cache.max_size, f"cache encore à {after} o > limite {cache.max_size} o"
+
+
 def test_use_cache_false_bypasses_global_cache(sample_photo):
     """``use_cache=False`` doit bypasser TOUTES les couches de cache."""
     from core.metadata.exif_extractor import get_extractor

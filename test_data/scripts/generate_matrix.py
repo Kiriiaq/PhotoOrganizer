@@ -24,6 +24,22 @@ Mise à jour 2026-05-19 (II) — Quarantaine réversible :
     quarantaine interne récupérable via « Annuler dernière/tout », puis
     bouton « 🗑 Vider quarantaine » pour passer en corbeille système.
 
+Mise à jour 2026-06-12 — Campagne de qualification (pivot + audit) :
+  - Colonne « Mode » (Auto/Manuel) ajoutée — protocole v3. Les statuts
+    des tests Auto sont injectés depuis l'exécution réelle (pytest 211
+    verts + run_tests.py 16/16 + compare_outputs.py 9/9 du 2026-06-12),
+    jamais remplis à la main.
+  - 21 tests ajoutés (T-190 à T-210) :
+      • T-190 à T-199 : modèle trial+unlock (compteur HMAC, blocage 11e
+        tri, anti-tampering, activation, machine binding) — pivot 2026-05-26.
+      • T-200 à T-202 : IHM licence (badge header, panneau d'activation
+        inline, invariant zéro Toplevel).
+      • T-203 à T-207, T-210 : non-régressions de l'audit 2026-06-11
+        (B-01 worker, B-04 historique, Lot D injection FileManager,
+        B-09 purge cache, B-10 version, ANO-Q1 mtime fixtures).
+      • T-208, T-209 : vérifications manuelles rapides (aperçu lieu,
+        libellé Quarantaine).
+
 Usage :
     python test_data/scripts/generate_matrix.py
 """
@@ -40,22 +56,67 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 # ---------------------------------------------------------------------------
 COLUMNS = [
     "ID_Test", "Catégorie", "Exigence liée", "Fonctionnalité",
-    "Description", "Pré-requis", "Données entrée",
+    "Description", "Mode", "Pré-requis", "Données entrée",
     "Résultat attendu", "Résultat obtenu", "Statut",
     "Sévérité", "Testeur", "Date", "Commentaires",
 ]
 
 # Sévérités : Bloquant / Majeur / Mineur / Cosmétique
 # Statut (rempli à l'exécution) : OK / NOK / NA / À faire
+# Mode : Auto (exécuté par scripts/pytest) / Manuel (validation_ihm.html)
+
+# ---------------------------------------------------------------------------
+# Tests AUTOMATISÉS — exécutés par la machine, jamais cochés à la main.
+#   - scénarios run_tests.py (organisation headless sur inputs/)
+#   - pytest (tests/{smoke,functional}) pour cache, quarantaine, licensing,
+#     E2E worker et non-régressions d'audit.
+# ---------------------------------------------------------------------------
+AUTO_RUNTESTS = {
+    "T-051", "T-052", "T-053", "T-055", "T-056", "T-057", "T-058", "T-059",
+    "T-060", "T-066", "T-068", "T-069", "T-070", "T-074", "T-076", "T-079",
+}
+AUTO_PYTEST = (
+    {"T-114"}                                   # cache EXIF 2-tier (test_exif_cache)
+    | {f"T-{i:03d}" for i in range(176, 188)}   # quarantaine (test_quarantine)
+    | {"T-189"}                                 # API quarantaine DuplicateManager
+    | {f"T-{i:03d}" for i in range(190, 208)}   # licensing + audit 2026-06-11
+)
+AUTO_IDS = AUTO_RUNTESTS | AUTO_PYTEST | {"T-210"}
+
+# ---------------------------------------------------------------------------
+# Résultats de la campagne du 2026-06-12 (exécution réelle — ne pas éditer
+# à la main : relancer pytest + run_tests.py + compare_outputs.py).
+# ---------------------------------------------------------------------------
+CAMPAIGN_DATE = "2026-06-12"
+CAMPAIGN_TESTER = "Claude (campagne auto)"
+CAMPAIGN_RESULTS = {
+    # run_tests.py 16/16 OK (0 erreur) + compare_outputs.py 9/9 conformes
+    **{tid: ("OK", "run_tests.py : 0 erreur ; références conformes") for tid in AUTO_RUNTESTS},
+    # pytest : 217 passed (211 rapides + 6 slow), 47 skipped (Pro v3.0+), 0 failed — 2026-06-12
+    **{tid: ("OK", "pytest vert (campagne 217 passed)") for tid in AUTO_PYTEST},
+    "T-210": ("OK", "compare_outputs.py : 9/9 OK (mtime fixtures figé)"),
+}
 
 
 def T(idx, categorie, req, fonctionnalite, description,
       prerequis, entree, attendu, severite):
-    """Helper de construction d'une ligne test."""
+    """Helper de construction d'une ligne test.
+
+    Le Mode (Auto/Manuel) est déduit de AUTO_IDS ; pour les tests Auto,
+    Statut/Résultat obtenu/Testeur/Date sont injectés depuis
+    CAMPAIGN_RESULTS (exécution réelle de la dernière campagne).
+    """
+    tid = f"T-{idx:03d}"
+    mode = "Auto" if tid in AUTO_IDS else "Manuel"
+    statut, obtenu = CAMPAIGN_RESULTS.get(tid, (None, ""))
     return [
-        f"T-{idx:03d}", categorie, req, fonctionnalite, description,
-        prerequis, entree, attendu, "", "À faire",
-        severite, "", "", "",
+        tid, categorie, req, fonctionnalite, description, mode,
+        prerequis, entree, attendu, obtenu,
+        statut if statut else "À faire",
+        severite,
+        CAMPAIGN_TESTER if statut else "",
+        CAMPAIGN_DATE if statut else "",
+        "",
     ]
 
 
@@ -493,11 +554,128 @@ tests += [
 ]
 
 # =============================================================================
+# Trial + unlock — pivot 2026-05-26 (T-190 à T-202)
+# =============================================================================
+tests += [
+    T(190, "Régression", "REQ-REG-21", "Compteur trial : état initial",
+      "Premier lancement (usage.dat absent) : compteur = 0, 10 tris disponibles, pas de warning",
+      "—", "LOCALAPPDATA vierge (fixture isolée)",
+      "trial_count=0, trial_remaining=10, is_blocked=False, should_warn=False",
+      "Bloquant"),
+    T(191, "Régression", "REQ-REG-22", "Incrément du compteur après tri réussi",
+      "record_successful_organize() après un tri : +1 ; jamais au simple clic ni après annulation",
+      "T-190 OK", "—",
+      "count passe de 0 à 1 ; un crash ou une annulation ne consomme pas d'essai",
+      "Bloquant"),
+    T(192, "Cas limites", "REQ-LIM-29", "10e tri autorisé, 11e bloqué",
+      "Consommer 9 tris puis vérifier can_organize_now ; consommer le 10e puis re-vérifier",
+      "T-190 OK", "—",
+      "10e tri allowed=True ; après le 10e : is_blocked=True, allowed=False",
+      "Bloquant"),
+    T(193, "Régression", "REQ-REG-23", "Warnings aux seuils 8 et 9",
+      "should_warn vrai uniquement à count=8 et count=9 (avant-dernier / dernier tri gratuit)",
+      "T-190 OK", "—",
+      "should_warn False à 7, True à 8 et 9, False à 10 (bloqué)",
+      "Majeur"),
+    T(194, "Robustesse", "REQ-ROB-26", "Anti-tampering usage.dat",
+      "Modifier count à la main dans usage.dat sans recalculer la signature HMAC",
+      "T-191 OK", "usage.dat falsifié",
+      "HMAC mismatch détecté → compteur reset à 0 (silencieux, loggé warning)",
+      "Majeur"),
+    T(195, "Régression", "REQ-REG-24", "Activation clé valide → illimité",
+      "activate_key(clé LIFE signée) après 5 tris consommés",
+      "T-190 OK", "Clé HMAC valide",
+      "has_valid_license=True, can_organize_now=True quel que soit le compteur, email exposé",
+      "Bloquant"),
+    T(196, "Robustesse", "REQ-ROB-27", "Machine binding : clé refusée sur autre PC",
+      "Activer sur machine A (fingerprint a*64) puis recharger l'état avec fingerprint b*64",
+      "T-195 OK", "license.dat bound machine A",
+      "has_valid_license=False sur machine B (binding vérifié à chaque load)",
+      "Majeur"),
+    T(197, "Robustesse", "REQ-ROB-28", "Licence re-validée au relancement",
+      "Activer puis simuler un redémarrage de l'app (re-lecture license.dat, même machine)",
+      "T-195 OK", "—",
+      "has_valid_license=True, email conservé",
+      "Majeur"),
+    T(198, "Robustesse", "REQ-ROB-29", "Clé malformée rejetée",
+      "activate_key('not a real key') après 3 tris",
+      "T-190 OK", "Chaîne arbitraire",
+      "LicenseInvalidError levée, compteur intact (toujours 3)",
+      "Majeur"),
+    T(199, "Robustesse", "REQ-ROB-30", "Clé expirée rejetée",
+      "activate_key(clé signée mais date d'expiration passée)",
+      "T-190 OK", "Clé expirée (exp = hier)",
+      "LicenseExpiredError levée, pas d'activation",
+      "Majeur"),
+    T(200, "IHM", "REQ-IHM-45", "Badge licence dans le header",
+      "Texte du badge selon l'état : essai / limite / activée",
+      "T-001 OK", "—",
+      "« Essai N/10 » (gris, orange si N≥8) / « Limite atteinte · Activer » (rouge) / « Activée · MAC-XXXX-XXXX » (vert)",
+      "Majeur"),
+    T(201, "IHM", "REQ-IHM-46", "Blocage : panneau d'activation inline",
+      "À 11 tris sans licence, clic 🚀 Organiser ouvre le panneau d'activation DANS l'onglet",
+      "T-192 OK", "usage.dat simulé count=11",
+      "Panneau inline créé (_inline_panel non None), AUCUNE fenêtre Toplevel (invariant projet)",
+      "Bloquant"),
+    T(202, "IHM", "REQ-IHM-47", "Contenu du panneau d'activation",
+      "Vérifier les composants : champ clé, Activer, 🛒 Acheter (10 €), ℹ️ Comment ça marche, ID machine MAC-XXXX-XXXX",
+      "T-201 OK", "—",
+      "Tous les composants présents ; feedback inline localisé (clé invalide / autre PC / expirée)",
+      "Majeur"),
+]
+
+# =============================================================================
+# Non-régressions audit 2026-06-11 (T-203 à T-210)
+# =============================================================================
+tests += [
+    T(203, "Régression", "REQ-REG-25", "Worker organisation : fin de tri complète (B-01)",
+      "Tri réel de 2 JPEG via le worker UI : résultats affichés + compteur incrémenté (régression : result.success inexistant tuait le thread en silence)",
+      "T-001 OK", "2 JPEG temporaires",
+      "record_successful_organize appelé 1 fois, panneau « ✅ Organisation terminée » affiché, fichiers copiés",
+      "Bloquant"),
+    T(204, "Régression", "REQ-REG-26", "Historique persistant entre tris (B-04)",
+      "copy_file puis start_session() : l'historique ne doit plus être purgé (FileManager partagé entre onglets)",
+      "T-001 OK", "—",
+      "Historique conservé après start_session ; vidé uniquement par rollback_all / clear_history",
+      "Majeur"),
+    T(205, "Régression", "REQ-REG-27", "Doublons historisés via FileManager injecté (Lot D)",
+      "DuplicateManager(config, file_manager=fm_partagé) : les opérations trash/move/delete vont dans l'historique affiché",
+      "T-001 OK", "—",
+      "mgr.file_manager is fm_partagé ; par défaut instance privée (pas de singleton caché)",
+      "Majeur"),
+    T(206, "Régression", "REQ-REG-28", "Purge cache au démarrage (B-09)",
+      "MetadataCache.purge() : éviction des entrées les plus anciennes au-delà de max_size + entrées expirées",
+      "—", "5 entrées cache > limite",
+      "evicted > 0, taille disque finale ≤ max_size",
+      "Mineur"),
+    T(207, "Régression", "REQ-REG-29", "Version unique (B-10)",
+      "PhotoOrganizerApp.APP_VERSION == src.__version__ (plus de hardcode divergent)",
+      "—", "—",
+      "Égalité stricte avec la source de vérité src/__init__.py",
+      "Mineur"),
+    T(208, "IHM", "REQ-IHM-48", "Aperçu dry-run : critère lieu + non-bloquant (B-06/B-07)",
+      "Cocher « Par localisation GPS » puis 👁 Aperçu sur input_gps_piexif",
+      "T-001 OK", "input_gps_piexif/",
+      "Arborescence montre Lat_x_Lon_y / « Sans localisation GPS » ; UI reste réactive pendant le calcul (worker)",
+      "Mineur"),
+    T(209, "IHM", "REQ-IHM-49", "Libellé « Quarantaine » dans l'Historique (B-08)",
+      "Mettre un doublon en quarantaine puis ouvrir l'onglet Historique",
+      "T-176 OK", "input_doublons/",
+      "L'opération s'affiche « Quarantaine » (plus le type brut 'trash')",
+      "Cosmétique"),
+    T(210, "Régression", "REQ-REG-30", "Références déterministes (ANO-Q1)",
+      "compare_outputs.py : T-079 reproductible (mtime des fixtures sans EXIF figé au 2026-05-11)",
+      "Inputs générés", "input_pas_exif/",
+      "9/9 références conformes, indépendant de la date de régénération des inputs",
+      "Majeur"),
+]
+
+# =============================================================================
 # Sanity check : numérotation continue
 # =============================================================================
 ids = [t[0] for t in tests]
-assert ids == [f"T-{i:03d}" for i in range(1, 190)], "Numérotation cassée !"
-assert len(tests) == 189
+assert ids == [f"T-{i:03d}" for i in range(1, 211)], "Numérotation cassée !"
+assert len(tests) == 210
 
 
 # ---------------------------------------------------------------------------
@@ -553,10 +731,11 @@ def main():
             for col_idx in range(1, len(COLUMNS) + 1):
                 ws.cell(row=row_idx, column=col_idx).fill = fill
 
-    # Largeurs colonnes
+    # Largeurs colonnes (Mode inséré en F depuis 2026-06-12)
     widths = {
-        "A": 10, "B": 13, "C": 15, "D": 25, "E": 50, "F": 22, "G": 25,
-        "H": 45, "I": 20, "J": 11, "K": 12, "L": 12, "M": 12, "N": 30,
+        "A": 10, "B": 13, "C": 15, "D": 25, "E": 50, "F": 9, "G": 22,
+        "H": 25, "I": 45, "J": 20, "K": 11, "L": 12, "M": 18, "N": 12,
+        "O": 30,
     }
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
@@ -564,25 +743,31 @@ def main():
     # Freeze première ligne
     ws.freeze_panes = "A2"
 
-    # Validation Statut : OK / NOK / NA / À faire
+    # Validation Statut : OK / NOK / NA / À faire (col K depuis ajout Mode)
     from openpyxl.worksheet.datavalidation import DataValidation
     dv_statut = DataValidation(type="list",
-                                formula1='"OK,NOK,NA,À faire"',
+                                formula1='"OK,NOK,NA,À faire,Retiré"',
                                 allow_blank=True)
-    dv_statut.add(f"J2:J{len(tests) + 1}")
+    dv_statut.add(f"K2:K{len(tests) + 1}")
     ws.add_data_validation(dv_statut)
 
     dv_severite = DataValidation(type="list",
                                   formula1='"Bloquant,Majeur,Mineur,Cosmétique"',
                                   allow_blank=True)
-    dv_severite.add(f"K2:K{len(tests) + 1}")
+    dv_severite.add(f"L2:L{len(tests) + 1}")
     ws.add_data_validation(dv_severite)
+
+    dv_mode = DataValidation(type="list",
+                             formula1='"Auto,Manuel"',
+                             allow_blank=True)
+    dv_mode.add(f"F2:F{len(tests) + 1}")
+    ws.add_data_validation(dv_mode)
 
     # --- Feuille Synthèse ---
     ws_syn = wb.create_sheet("Synthèse")
 
     title_font = Font(bold=True, size=14, color="1F6AA5")
-    ws_syn["A1"] = "Synthèse des tests — PhotoOrganizer v2.3-dev (refonte onglets internes + panneau intégré)"
+    ws_syn["A1"] = "Synthèse des tests — PhotoOrganizer 2.3.0.dev0 (campagne 2026-06-12 : pivot trial+unlock + audit lots A-F)"
     ws_syn["A1"].font = title_font
     ws_syn.merge_cells("A1:E1")
 
@@ -606,10 +791,10 @@ def main():
     for i, cat in enumerate(categories, start=4):
         ws_syn[f"A{i}"] = cat
         ws_syn[f"B{i}"] = f'=COUNTIF(Tests!B:B,A{i})'
-        ws_syn[f"C{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!J:J,"OK")'
-        ws_syn[f"D{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!J:J,"NOK")'
-        ws_syn[f"E{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!J:J,"NA")'
-        ws_syn[f"F{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!J:J,"À faire")'
+        ws_syn[f"C{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!K:K,"OK")'
+        ws_syn[f"D{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!K:K,"NOK")'
+        ws_syn[f"E{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!K:K,"NA")'
+        ws_syn[f"F{i}"] = f'=COUNTIFS(Tests!B:B,A{i},Tests!K:K,"À faire")'
         ws_syn[f"G{i}"] = f'=IF(B{i}=0,"-",ROUND(C{i}/B{i}*100,1))'
         for col_letter in "ABCDEFG":
             ws_syn[f"{col_letter}{i}"].border = cell_border
@@ -645,10 +830,34 @@ def main():
 
     for i, sev in enumerate(["Bloquant", "Majeur", "Mineur", "Cosmétique"], start=sev_row + 1):
         ws_syn[f"A{i}"] = sev
-        ws_syn[f"B{i}"] = f'=COUNTIF(Tests!K:K,A{i})'
-        ws_syn[f"C{i}"] = f'=COUNTIFS(Tests!K:K,A{i},Tests!J:J,"OK")'
-        ws_syn[f"D{i}"] = f'=COUNTIFS(Tests!K:K,A{i},Tests!J:J,"NOK")'
+        ws_syn[f"B{i}"] = f'=COUNTIF(Tests!L:L,A{i})'
+        ws_syn[f"C{i}"] = f'=COUNTIFS(Tests!L:L,A{i},Tests!K:K,"OK")'
+        ws_syn[f"D{i}"] = f'=COUNTIFS(Tests!L:L,A{i},Tests!K:K,"NOK")'
         for col_letter in "ABCD":
+            ws_syn[f"{col_letter}{i}"].border = cell_border
+
+    # Tableau par mode Auto/Manuel (protocole v3 — 2026-06-12)
+    mode_row = sev_row + 7
+    ws_syn[f"A{mode_row}"] = "Mode"
+    ws_syn[f"B{mode_row}"] = "Total"
+    ws_syn[f"C{mode_row}"] = "OK"
+    ws_syn[f"D{mode_row}"] = "NOK"
+    ws_syn[f"E{mode_row}"] = "À faire"
+    ws_syn[f"F{mode_row}"] = "Taux OK (%)"
+    for col_letter in "ABCDEF":
+        c = ws_syn[f"{col_letter}{mode_row}"]
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = header_align
+        c.border = cell_border
+    for i, mode in enumerate(["Auto", "Manuel"], start=mode_row + 1):
+        ws_syn[f"A{i}"] = mode
+        ws_syn[f"B{i}"] = f'=COUNTIF(Tests!F:F,A{i})'
+        ws_syn[f"C{i}"] = f'=COUNTIFS(Tests!F:F,A{i},Tests!K:K,"OK")'
+        ws_syn[f"D{i}"] = f'=COUNTIFS(Tests!F:F,A{i},Tests!K:K,"NOK")'
+        ws_syn[f"E{i}"] = f'=COUNTIFS(Tests!F:F,A{i},Tests!K:K,"À faire")'
+        ws_syn[f"F{i}"] = f'=IF(B{i}=0,"-",ROUND(C{i}/B{i}*100,1))'
+        for col_letter in "ABCDEF":
             ws_syn[f"{col_letter}{i}"].border = cell_border
 
     ws_syn.column_dimensions["A"].width = 18
@@ -723,7 +932,12 @@ def main():
     ws_leg["A22"] = "Robustesse"; ws_leg["B22"] = "Stabilité sous spam/concurrence/conditions dégradées"
     ws_leg["A23"] = "Régression"; ws_leg["B23"] = "Non-régression sur features post-refonte"
 
-    for row in [3, 9, 15]:
+    ws_leg["A25"] = "Mode"
+    ws_leg["B25"] = "Description"
+    ws_leg["A26"] = "Auto"; ws_leg["B26"] = "Exécuté par la machine (pytest / run_tests.py / compare_outputs.py) — statut injecté, jamais coché à la main"
+    ws_leg["A27"] = "Manuel"; ws_leg["B27"] = "Validation humaine via validation_ihm.html (rendu visuel, ergonomie, conditions réelles)"
+
+    for row in [3, 9, 15, 25]:
         for col_letter in "AB":
             c = ws_leg[f"{col_letter}{row}"]
             c.font = header_font
