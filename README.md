@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/Kiriiaq/PhotoOrganizer/releases)
 [![CI](https://github.com/Kiriiaq/PhotoOrganizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Kiriiaq/PhotoOrganizer/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-207%20passing-brightgreen.svg)](#tests)
+[![Tests](https://img.shields.io/badge/tests-211%20passing-brightgreen.svg)](#tests)
 
 [Télécharger l'EXE Windows](https://github.com/Kiriiaq/PhotoOrganizer/releases) · [Documentation](docs/) · [Soutenir sur Ko-fi](https://ko-fi.com/kiriiaq)
 
@@ -15,9 +15,9 @@
 
 ## Démo
 
-> ![Capture principale — onglet Organisation](docs/media/screenshot-organize.png)
->
-> *Capture à produire — voir [docs/MEDIA.md](docs/MEDIA.md) pour la liste complète des visuels à enregistrer.*
+![Capture principale — onglet Organisation](docs/media/screenshot-organize.png)
+
+![Démo — sélection des dossiers, critères, organisation](docs/media/demo-organize.gif)
 
 ---
 
@@ -99,7 +99,7 @@ main.py → src/main:main → src/ui/app:PhotoOrganizerApp
 ## Tests
 
 ```bash
-make test        # 207 tests, exécution ~20 s
+make test        # 211 tests, exécution ~20 s
 make test-all    # + slow + benchmarks
 make lint        # ruff + bandit
 make bench       # benchmarks isolés

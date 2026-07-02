@@ -133,6 +133,12 @@
   .tag.p2  { background: #5e6878;     color: #fff; }
   .tag.eff { background: var(--accent-soft); color: var(--accent); }
   .tag.opt { background: #ebebeb; color: #333; }
+  .tag.done { background: var(--ok); color: #fff; }
+
+  .card.done { border-left: 4px solid var(--ok); background: #fbfdfb; }
+  .card.done h3 s { color: var(--muted); text-decoration-color: var(--ok); }
+  tr.done td { color: var(--muted); }
+  tr.done td s { text-decoration-color: var(--ok); }
 
   ol.steps { padding-left: 20px; margin: 8px 0 0; }
   ol.steps li { margin-bottom: 10px; }
@@ -216,11 +222,11 @@
   <h1>PhotoOrganizer — Procédure de rentabilisation</h1>
   <p>Pivot acté le 2026-05-26 : modèle <b>trial + unlock</b> (10 tris gratuits, puis 10 € lifetime, 1 PC, aucune réémission). Tout ce qui reste à faire pour transformer l'app en source de revenu, pas-à-pas, commandes copiables.</p>
   <div class="meta-line">
-    <span class="pill ok">Tests core : 170/170 ✅</span>
+    <span class="pill ok">Tests core : 207/207 ✅</span>
     <span class="pill ok">Pivot doc : ✅</span>
-    <span class="pill bad">Code unlock : à faire</span>
+    <span class="pill ok">Code unlock : livré ✅ (v2.3.0)</span>
     <span class="pill">Version cible : v2.3.0</span>
-    <span class="pill">Effort restant : ~2-3 j-h dev + setup</span>
+    <span class="pill">Effort restant : setup Lemon Squeezy + lancement</span>
   </div>
 </header>
 
@@ -231,15 +237,15 @@
 <!-- Stat overview -->
 <div class="summary-grid">
   <div class="stat ok">
-    <b>170</b>
+    <b>207</b>
     <div class="lbl">Tests core verts</div>
   </div>
   <div class="stat wip">
     <b>61</b>
     <div class="lbl">Tests Pro skippés v3.0+</div>
   </div>
-  <div class="stat bad">
-    <b>3</b>
+  <div class="stat ok">
+    <b>0</b>
     <div class="lbl">Blocs code à livrer</div>
   </div>
   <div class="stat">
@@ -259,7 +265,7 @@
 <div class="toc">
   <h2>Sommaire</h2>
   <ul>
-    <li><a href="#sec-code">Section A — Implémenter le flow trial + unlock (2-3 j)</a></li>
+    <li><a href="#sec-code">Section A — Implémenter le flow trial + unlock</a> ✅ <b>fait (v2.3.0)</b></li>
     <li><a href="#sec-payment">Section B — Setup Lemon Squeezy (1 h)</a></li>
     <li><a href="#sec-keys">Section C — Flow d'envoi clé (manuel puis auto)</a></li>
     <li><a href="#sec-legal">Section D — Pré-requis légaux et visuels (P0)</a></li>
@@ -273,14 +279,14 @@
 <!-- ============================================ -->
 <div class="section-band code" id="sec-code">
   <span class="num">A</span>
-  <span>Implémenter le flow trial + unlock (2-3 j-h)</span>
+  <span>Implémenter le flow trial + unlock — ✅ FAIT (v2.3.0, vérifié le 2026-07-02 : 60 tests licensing/UI verts)</span>
 </div>
 
-<div class="card" id="a1">
-  <h3>A.1 — Créer <code>src/utils/licensing.py</code>
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">3-4 h</span></span>
+<div class="card done" id="a1">
+  <h3><s>A.1 — Créer <code>src/utils/licensing.py</code></s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">3-4 h</span></span>
   </h3>
-  <p class="lead">Module pivot du modèle économique. Gère le compteur HMAC + la machine binding + la vérification d'autorisation. Aucune dépendance UI.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — API complète (<code>get_state</code>, <code>record_successful_organize</code>, <code>can_organize_now</code>, <code>activate_key</code>, <code>get_machine_id</code>) + <code>should_warn</code>/<code>is_blocked</code> et <code>status_badge_text</code> en bonus. Compteur HMAC dans <code>usage.dat</code>, reset silencieux si tampered, anti-copie par machine_id. Secret HMAC rapatrié dans <code>src/utils/_secret.py</code> (Lot F, audit 2026-06-11).</p>
 
   <p><b>API publique à fournir</b> :</p>
   <pre class="copyable"># src/utils/licensing.py — squelette d'API
@@ -312,11 +318,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </ul>
 </div>
 
-<div class="card" id="a2">
-  <h3>A.2 — Adapter <code>src/photoorganizer_pro/license/validator.py</code>
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">1-2 h</span></span>
+<div class="card done" id="a2">
+  <h3><s>A.2 — Adapter <code>src/photoorganizer_pro/license/validator.py</code></s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">1-2 h</span></span>
   </h3>
-  <p class="lead">Le module licence existant est utilisable mais doit être étendu : on retire le concept d'édition (PERS/STUD/LIFE) au profit d'un format unique "lifetime + machine binding".</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — puis <b>déplacé vers <code>src/utils/license_validator.py</code></b> au Lot F (audit 2026-06-11) pour respecter la frontière de couches ; l'ancien emplacement Pro n'est plus qu'un shim de ré-export. Format de clé conservé, <code>machine_id_bound</code> dans <code>LicenseInfo</code>, <code>save_license_key()</code> binde au 1er PC, <code>load_active_license()</code> refuse un autre fingerprint (retourne <code>None</code>, jamais d'exception côté UI).</p>
 
   <ol class="steps">
     <li><b>Garder le format de clé actuel</b> <code>PROG-LIFE-&lt;exp&gt;-&lt;email_b64&gt;-&lt;hmac&gt;</code> — il marche déjà.</li>
@@ -333,11 +339,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </ol>
 </div>
 
-<div class="card" id="a3">
-  <h3>A.3 — Tests <code>tests/functional/test_licensing.py</code>
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">2-3 h</span></span>
+<div class="card done" id="a3">
+  <h3><s>A.3 — Tests <code>tests/functional/test_licensing.py</code></s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">2-3 h</span></span>
   </h3>
-  <p class="lead">Scénarios à couvrir, chacun avec fixture <code>tmp_path</code> qui isole <code>%LOCALAPPDATA%</code> via <code>monkeypatch</code>.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — les 10 scénarios ci-dessous sont couverts (17 tests au total, avec en plus : warnings 8/9, compteur gelé après activation, format machine_id, textes du badge). Fixtures <code>isolated_appdata</code> + <code>fixed_machine_id</code>. Re-vérifié vert le 2026-07-02.</p>
 
   <table>
     <thead><tr><th>Test</th><th>Vérifie</th></tr></thead>
@@ -356,11 +362,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </table>
 </div>
 
-<div class="card" id="a4">
-  <h3>A.4 — Hook dans <code>OrganizeFrame</code>
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">1-2 h</span></span>
+<div class="card done" id="a4">
+  <h3><s>A.4 — Hook dans <code>OrganizeFrame</code></s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">1-2 h</span></span>
   </h3>
-  <p class="lead">Intercepter le clic "Organiser" pour vérifier le compteur AVANT le démarrage du tri, et incrémenter SEULEMENT en cas de succès.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — <code>can_organize_now()</code> vérifié avant le tri (panneau d'activation si bloqué), warnings aux seuils 8/9 dans le dialogue de confirmation, <code>record_successful_organize()</code> appelé uniquement après un tri réussi non annulé (<code>result.processed &gt; 0</code>, fix B-01 audit 2026-06-11). Un crash/annulation ne consomme pas de tri.</p>
 
   <ol class="steps">
     <li><b>Avant le clic</b> : <code>can_organize_now()</code> → si False, ouvre le modal A.5 et <code>return</code>.</li>
@@ -370,11 +376,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </ol>
 </div>
 
-<div class="card" id="a5">
-  <h3>A.5 — Modal inline d'activation/blocage
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">2-3 h</span></span>
+<div class="card done" id="a5">
+  <h3><s>A.5 — Modal inline d'activation/blocage</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">2-3 h</span></span>
   </h3>
-  <p class="lead"><b>Pas de Toplevel</b> (préférence projet stricte sur l'onglet Organisation). Utiliser <code>OrganizeFrame._show_inline_panel</code>.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — <code>OrganizeFrame._show_unlock_panel()</code>, construit sur <code>_show_inline_panel</code> (<b>aucun Toplevel</b>). Machine ID court affiché, Entry pour la clé, bouton « Activer » avec feedback inline (succès vert / clé invalide / bound autre PC / expirée), bouton « 🛒 Acheter une licence (10 €) » → Lemon Squeezy, lien « Comment ça marche ? » → <code>docs/PRO_UNLOCK.md</code>.</p>
 
   <p><b>Contenu du modal</b> :</p>
   <ul>
@@ -396,11 +402,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </ul>
 </div>
 
-<div class="card" id="a6">
-  <h3>A.6 — Badge global dans l'app
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">30 min</span></span>
+<div class="card done" id="a6">
+  <h3><s>A.6 — Badge global dans l'app</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">30 min</span></span>
   </h3>
-  <p class="lead">Indicateur permanent de l'état de la licence, visible partout dans l'app.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — <code>app.license_badge</code> dans le header, rafraîchi via <code>refresh_license_badge()</code> (init, après chaque tri réussi, après activation). États : gris (essai), orange (8-9/10), rouge cliquable (« Limite atteinte · Activer » → ouvre le panneau A.5), vert (« Activée · MAC-XXXX-XXXX »).</p>
 
   <ul>
     <li><b>Position</b> : barre de titre ou sidebar haut-droite. Reprendre l'emplacement de la version (<code>v2.3.0</code>).</li>
@@ -416,11 +422,11 @@ def get_machine_id() -> str: ...      # SHA-256(MachineGuid + VolumeSerial)
   </ul>
 </div>
 
-<div class="card" id="a7">
-  <h3>A.7 — Smoke test de l'intégration UI
-    <span class="h-meta"><span class="tag p1">P1</span> <span class="tag eff">1 h</span></span>
+<div class="card done" id="a7">
+  <h3><s>A.7 — Smoke test de l'intégration UI</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p1">P1</span> <span class="tag eff">1 h</span></span>
   </h3>
-  <p class="lead">À ajouter à <code>tests/smoke/test_ux_v4.py</code> : vérifier que le badge s'affiche et que le modal s'ouvre.</p>
+  <p class="lead">✅ <b>Livré (v2.3.0)</b> — dans <code>tests/smoke/test_ux_v4.py</code> : count=11 + clic Organiser → panneau inline (aucun Toplevel créé) ; licence simulée → badge « Activée · MAC-FFFF-FFFF » ; + tests badge warning 8/9 et proxy <code>_refresh_license_badge</code>. Re-vérifié vert le 2026-07-02 (60 tests licensing + UX).</p>
 
   <ol class="steps">
     <li>Lancer l'app avec <code>usage.dat</code> simulé à count=11 → vérifier que le clic "Organiser" ouvre le modal A.5 (pas de Toplevel).</li>
@@ -616,18 +622,18 @@ Cloudflare Worker https://photoorganizer.workers.dev/lemonsqueezy
   </ol>
 </div>
 
-<div class="card" id="d3">
-  <h3>D.3 — Produire les assets visuels (S-01 + G-01)
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">4-6 h</span></span>
+<div class="card done" id="d3">
+  <h3><s>D.3 — Produire les assets visuels (S-01 + G-01)</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">4-6 h</span></span>
   </h3>
-  <p class="lead">Tant qu'il n'y a pas de screenshot/GIF, le README a une image cassée et aucune publication n'est crédible.</p>
+  <p class="lead">✅ <b>Produits le 2026-07-02</b> (capture scriptée de l'app réelle, compteur d'essai isolé — le trial de la machine de dev n'a pas été consommé). L'image du README n'est plus cassée. Les 3 fichiers sont dans <code>docs/media/</code> :</p>
 
   <table>
     <thead><tr><th>ID</th><th>Fichier</th><th>Format</th><th>Contenu</th></tr></thead>
     <tbody>
-      <tr><td>S-01</td><td><code>docs/media/screenshot-organize.png</code></td><td>PNG 1920×1200</td><td>Onglet Organisation, source/dest remplis, critères Date+Caméra cochés, avant clic</td></tr>
-      <tr><td>G-01</td><td><code>docs/media/demo-organize.gif</code></td><td>GIF ≤5 MB, ~8-10s, ≤15 fps</td><td>Sélection dossier → coche critères → clic Organiser → progress → résultat</td></tr>
-      <tr><td>S-02</td><td><code>docs/media/screenshot-unlock-modal.png</code></td><td>PNG 1280×800</td><td>Modal de blocage avec champ clé visible (post-A.5)</td></tr>
+      <tr class="done"><td>✅ S-01</td><td><s><code>docs/media/screenshot-organize.png</code></s></td><td>PNG 1920×1200 (88 Ko)</td><td>Onglet Organisation, source/dest remplis, Date+Caméra cochés, badge « Essai 3/10 », avant clic</td></tr>
+      <tr class="done"><td>✅ G-01</td><td><s><code>docs/media/demo-organize.gif</code></s></td><td>GIF 0,72 MB, ~10,8 s, 960×600</td><td>Dossiers choisis → critère coché → Organiser → progress 150 photos → « Organisation terminée » (badge 3/10 → 4/10)</td></tr>
+      <tr class="done"><td>✅ S-02</td><td><s><code>docs/media/screenshot-unlock-modal.png</code></s></td><td>PNG 1280×800 (44 Ko)</td><td>Panneau d'activation inline complet : champ clé, « Acheter (10 €) », badge rouge « Limite atteinte »</td></tr>
     </tbody>
   </table>
 
@@ -847,7 +853,7 @@ Premier feedback bienvenu.</pre>
 
 
 <footer>
-  Généré le 2026-05-26 · Procédure post-pivot · Autonome (CSS + JS inline, aucune dépendance) · Imprimable A4
+  Généré le 2026-05-26 · Mis à jour le 2026-07-02 (section A vérifiée + barrée, assets D.3 produits) · Procédure post-pivot · Autonome (CSS + JS inline, aucune dépendance) · Imprimable A4
   <br>Documents de référence : <a href="MONETIZATION.md">docs/MONETIZATION.md</a> · <a href="../AUDIT.md">AUDIT.md</a> · <a href="DISTRIBUTION.md">docs/DISTRIBUTION.md</a> · <a href="marketing/LINKEDIN_DRAFTS.md">LINKEDIN_DRAFTS.md</a> · <a href="../CLAUDE.md">CLAUDE.md</a>
   <br>Ancienne checklist (modèle freemium 19/49/99) archivée dans <code>docs/archives/superseded_2026-05/</code>.
   <br>Cliquer sur un bloc <code>&lt;pre&gt;</code> pour copier automatiquement.
