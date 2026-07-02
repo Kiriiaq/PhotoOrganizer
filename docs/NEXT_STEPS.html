@@ -225,7 +225,7 @@
     <span class="pill ok">Tests core : 207/207 ✅</span>
     <span class="pill ok">Pivot doc : ✅</span>
     <span class="pill ok">Code unlock : livré ✅ (v2.3.0)</span>
-    <span class="pill">Version cible : v2.3.0</span>
+    <span class="pill ok">v2.3.0 publiée sur GitHub ✅ (2026-07-02)</span>
     <span class="pill">Effort restant : setup Lemon Squeezy + lancement</span>
   </div>
 </header>
@@ -268,8 +268,8 @@
     <li><a href="#sec-code">Section A — Implémenter le flow trial + unlock</a> ✅ <b>fait (v2.3.0)</b></li>
     <li><a href="#sec-payment">Section B — Setup Lemon Squeezy (1 h)</a></li>
     <li><a href="#sec-keys">Section C — Flow d'envoi clé (manuel puis auto)</a></li>
-    <li><a href="#sec-legal">Section D — Pré-requis légaux et visuels (P0)</a></li>
-    <li><a href="#sec-release">Section E — Release v2.3.0 sur GitHub</a></li>
+    <li><a href="#sec-legal">Section D — Pré-requis légaux et visuels (P0)</a> — D.3 + D.4 ✅ <b>faits</b></li>
+    <li><a href="#sec-release">Section E — Release v2.3.0 sur GitHub</a> ✅ <b>fait (2026-07-02)</b></li>
     <li><a href="#sec-launch">Section F — Calendrier de lancement court (3 semaines)</a></li>
     <li><a href="#sec-postlaunch">Section G — Post-lancement + KPI 90 jours</a></li>
     <li><a href="#sec-future">Section H — Roadmap v3.0+ (conditionnel)</a></li>
@@ -648,13 +648,11 @@ Cloudflare Worker https://photoorganizer.workers.dev/lemonsqueezy
   <p>Liste complète des assets dans <a href="MEDIA.md">docs/MEDIA.md</a>.</p>
 </div>
 
-<div class="card" id="d4">
-  <h3>D.4 — Privacy Policy hébergée publiquement
-    <span class="h-meta"><span class="tag p0">P0</span> <span class="tag eff">15 min</span></span>
+<div class="card done" id="d4">
+  <h3><s>D.4 — Privacy Policy hébergée publiquement</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p0">P0</span> <span class="tag eff">15 min</span></span>
   </h3>
-  <p class="lead">Lemon Squeezy demande une URL Privacy Policy publique au checkout. On a déjà <code>docs/PRIVACY.md</code> RGPD-compliant.</p>
-
-  <p><b>Recommandation</b> : lien GitHub direct (instantané, versionné) :</p>
+  <p class="lead">✅ <b>En ligne depuis le push de <code>main</code> (2026-07-02)</b> — URL publique vérifiée (Privacy Policy v2.0 post-pivot, effective 2026-05-26). À coller dans le checkout Lemon Squeezy :</p>
   <pre class="copyable">https://github.com/Kiriiaq/PhotoOrganizer/blob/main/docs/PRIVACY.md</pre>
 </div>
 
@@ -662,42 +660,27 @@ Cloudflare Worker https://photoorganizer.workers.dev/lemonsqueezy
 <!-- ============================================ -->
 <div class="section-band launch" id="sec-release">
   <span class="num">E</span>
-  <span>Release v2.3.0 sur GitHub (30 min)</span>
+  <span>Release v2.3.0 sur GitHub — ✅ FAIT (2026-07-02)</span>
 </div>
 
-<div class="card" id="e1">
-  <h3>E.1 — Push tag v2.3.0
-    <span class="h-meta"><span class="tag p1">P1</span> <span class="tag eff">30 min</span></span>
+<div class="card done" id="e1">
+  <h3><s>E.1 — Push tag v2.3.0</s>
+    <span class="h-meta"><span class="tag done">✅ fait</span> <span class="tag p1">P1</span> <span class="tag eff">30 min</span></span>
   </h3>
 
-  <p><b>Pré-requis</b> :</p>
-  <ul>
-    <li>✅ Section A complète (code unlock livré)</li>
-    <li>✅ S-01 + G-01 dans <code>docs/media/</code></li>
-    <li>✅ <code>docs/PRIVACY.md</code> à jour</li>
-    <li>✅ <code>CHANGELOG.md</code> avec entrée [2.3.0]</li>
-    <li>✅ <code>pyproject.toml</code> version=2.3.0</li>
-  </ul>
+  <p class="lead">✅ <b>Publiée le 2026-07-02.</b> Réalisé depuis la branche <code>audit/2026-06-11</code> (la <code>feat/v2.3-organize-tabview</code> de la procédure initiale était obsolète) :</p>
 
-  <p><b>Procédure</b> :</p>
   <ol class="steps">
-    <li><b>Vérifier l'état</b> :
-      <pre class="copyable">git status
-git log -1 --oneline</pre>
-    </li>
-    <li><b>Pousser la branche</b> :
-      <pre class="copyable">git push origin feat/v2.3-organize-tabview</pre>
-    </li>
-    <li><b>Merger vers main</b> (via PR ou direct fast-forward).</li>
-    <li><b>Tagger</b> :
-      <pre class="copyable">git tag -a v2.3.0 -m "Release v2.3.0 — trial+unlock model"
-git push origin v2.3.0</pre>
-      → déclenche <code>release.yml</code> qui build l'EXE + checksums + crée la GitHub Release.
-    </li>
-    <li><b>Vérifier le workflow</b> : <a href="https://github.com/Kiriiaq/PhotoOrganizer/actions" target="_blank">github.com/Kiriiaq/PhotoOrganizer/actions</a></li>
-    <li><b>Éditer la release</b> publiée, coller les notes depuis CHANGELOG.md, marquer "Latest", publier.</li>
-    <li><b>Tester l'EXE</b> sur un PC vierge si possible. Defender SmartScreen va probablement avertir (EXE non signé) — c'est normal.</li>
+    <li><s>Commits locaux (qualification tests, assets D.3, bump 2.3.0) + fast-forward vers <code>main</code></s> ✅</li>
+    <li><s>Push <code>main</code></s> ✅ (45 commits, <code>ed5b485..1975f33</code>)</li>
+    <li><s>Tag annoté <code>v2.3.0</code> poussé</s> ✅ → workflow <code>Release</code> <b>vert</b>, EXE + debug + checksums publiés</li>
+    <li><s>Notes de release collées depuis CHANGELOG.md + marquée "Latest"</s> ✅ (via API)</li>
+    <li><b>Distribution assainie</b> : anciennes releases gratuites <b>v1.0.0 et v2.1.0 supprimées</b> (EXE sans limite d'essai) + tags <code>v1.0.0</code>/<code>v2.1.0</code> (remote) et <code>v2.2.0</code> (local) supprimés. Seule <b>v2.3.0</b> (essai 10 tris) reste téléchargeable.</li>
+    <li><b>CI réparée dans la foulée</b> (échouait depuis janvier) : <code>piexif</code> en extra dev + <code>Pillow&gt;=12.2.0</code> (7 CVE sur 11.3.0) — commit <code>d633a77</code>.</li>
+    <li>⬜ <b>Reste (manuel)</b> : tester l'EXE sur un PC vierge. SmartScreen avertira (EXE non signé) — normal.</li>
   </ol>
+
+  <p><b>⚠️ Avant les premières ventes</b> : l'EXE CI est buildé <b>sans <code>src/utils/_secret.py</code></b> (gitignored) → il utilise le placeholder HMAC et <b>aucune vraie clé n'y valide</b>. Injecter le secret via un secret GitHub Actions + une étape dans <code>release.yml</code>, puis re-releaser (v2.3.1, qui embarquera aussi Pillow 12.2 patché).</p>
 </div>
 
 
