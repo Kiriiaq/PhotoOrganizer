@@ -11,8 +11,8 @@
 
 - **Nom** : PhotoOrganizer
 - **Pitch** : Organiseur automatique de photos par métadonnées EXIF, application Windows GUI.
-- **Version actuelle** : 2.3.0.dev0 (source de vérité : `src/__init__.py`).
-- **Statut** : pivot économique **implémenté** (compteur d'usages + panneau d'activation inline + machine binding + badge/bandeaux). Reste avant lancement : setup Lemon Squeezy + médias (cf. priorités).
+- **Version actuelle** : 2.3.0 (source de vérité : `src/__init__.py` ; taguée le 2026-07-02).
+- **Statut** : pivot économique **implémenté** (compteur d'usages + panneau d'activation inline + machine binding + badge/bandeaux). Médias produits (2026-07-02). Reste avant lancement : setup Lemon Squeezy + **injection du secret HMAC dans `release.yml`** (l'EXE buildé par CI utilise le placeholder → les vraies clés n'y valident pas).
 - **Modèle économique** : **édition unique** Apache-2.0. Essai gratuit limité à **10 tris**, puis déblocage par clé HMAC à **10 € lifetime, 1 PC** (cf. [docs/MONETIZATION.md](docs/MONETIZATION.md)).
 
 ## Stack & contraintes techniques
@@ -120,7 +120,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 ## État actuel & priorités
 
 - **Branche active** : `main` (+ branche `audit/2026-06-11` pour les correctifs d'audit).
-- **Tests** : **207/207 core verts** (~20 s), dont E2E worker organisation (`tests/smoke/test_organize_e2e.py`) et 17 tests licensing dédiés. Les tests Pro restent skippés (reason: `Deferred to v3.0+`).
+- **Tests** : **211/211 core verts** (~20 s), dont E2E worker organisation (`tests/smoke/test_organize_e2e.py`) et 17 tests licensing dédiés. Les tests Pro restent skippés (reason: `Deferred to v3.0+`).
 - **Pivot économique 2026-05** : 19/49/99 € freemium-par-fonctionnalité → **édition unique 10 € lifetime, 10 tris d'essai**. Cf. AUDIT.md §15.
 
 ### Priorités immédiates (post-pivot)
@@ -131,7 +131,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 | 2 | ~~**P0** Modal inline d'activation/blocage dans `organize_frame` (warnings 8/9, blocage 11)~~ ✅ *fait (v2.3.0)* | — | — |
 | 3 | ~~**P0** Badge "Essai X/10" ou "Activée" dans la barre de l'app~~ ✅ *fait (v2.3.0)* | — | — |
 | 4 | **P0** Setup Lemon Squeezy avec un seul produit à 10 € + flow d'envoi clé (manuel d'abord). L'URL `photoorganizer.lemonsqueezy.com` codée dans `_open_purchase_page` doit exister avant lancement | 2 h | Revenue |
-| 5 | **P1** Produire screenshot + GIF démo (S-01 + G-01 dans `docs/media/`) | 4-6 h | Communication publique |
+| 5 | ~~**P1** Produire screenshot + GIF démo (S-01 + G-01 dans `docs/media/`)~~ ✅ *fait (2026-07-02, capture scriptée de l'app réelle — S-01, G-01 + screenshot du panneau d'activation)* | — | — |
 | 6 | **P1** Réécrire LINKEDIN_DRAFTS.md sur la base du nouveau modèle | 1 h | Cohérence com |
 
 ### Roadmap courte

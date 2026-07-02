@@ -5,7 +5,12 @@ All notable changes to PhotoOrganizer are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2.3.0-dev
+## [2.3.0] — 2026-07-02
+
+### Added — Assets de lancement (2026-07-02)
+
+- `docs/media/screenshot-organize.png` (S-01, 1920×1200), `docs/media/demo-organize.gif` (G-01, 0,72 MB / ~10,8 s) et `docs/media/screenshot-unlock-modal.png` (panneau d'activation, 1280×800) — produits par capture scriptée de l'app réelle (compteur d'essai isolé). L'image du README fonctionne désormais.
+- Qualification : `test_data/scripts/snapshot_state.py` + empreinte `.test_state.json` (protocole Phase 0), matrice et rapport de qualification enrichis, +4 tests fonctionnels (dont B-09 purge cache). **211 tests core verts.**
 
 ### Fixed — Audit complet (2026-06-11, branche `audit/2026-06-11`)
 
