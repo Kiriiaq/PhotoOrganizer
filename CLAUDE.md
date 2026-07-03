@@ -11,8 +11,8 @@
 
 - **Nom** : PhotoOrganizer
 - **Pitch** : Organiseur automatique de photos par métadonnées EXIF, application Windows GUI.
-- **Version actuelle** : 2.3.0 (source de vérité : `src/__init__.py` ; taguée le 2026-07-02).
-- **Statut** : pivot économique **implémenté** (compteur d'usages + panneau d'activation inline + machine binding + badge/bandeaux). Médias produits (2026-07-02). Reste avant lancement : setup Lemon Squeezy + **injection du secret HMAC dans `release.yml`** (l'EXE buildé par CI utilise le placeholder → les vraies clés n'y valident pas).
+- **Version actuelle** : 2.3.1 (source de vérité : `src/__init__.py` ; taguée le 2026-07-03).
+- **Statut** : pivot économique **implémenté** (compteur d'usages + panneau d'activation inline + machine binding + badge/bandeaux). Médias produits (2026-07-02). Secret HMAC injecté dans le build CI depuis v2.3.1 (secret repo `HMAC_SECRET_B64` + garde-fou dans `release.yml`) — l'EXE public valide les vraies clés. **Reste avant lancement : setup Lemon Squeezy** (seul bloqueur revenue).
 - **Modèle économique** : **édition unique** Apache-2.0. Essai gratuit limité à **10 tris**, puis déblocage par clé HMAC à **10 € lifetime, 1 PC** (cf. [docs/MONETIZATION.md](docs/MONETIZATION.md)).
 
 ## Stack & contraintes techniques

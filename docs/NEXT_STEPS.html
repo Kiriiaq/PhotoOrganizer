@@ -225,7 +225,7 @@
     <span class="pill ok">Tests core : 207/207 ✅</span>
     <span class="pill ok">Pivot doc : ✅</span>
     <span class="pill ok">Code unlock : livré ✅ (v2.3.0)</span>
-    <span class="pill ok">v2.3.0 publiée sur GitHub ✅ (2026-07-02)</span>
+    <span class="pill ok">v2.3.1 publiée sur GitHub ✅ (2026-07-03, activation OK)</span>
     <span class="pill">Effort restant : setup Lemon Squeezy + lancement</span>
   </div>
 </header>
@@ -675,12 +675,11 @@ Cloudflare Worker https://photoorganizer.workers.dev/lemonsqueezy
     <li><s>Push <code>main</code></s> ✅ (45 commits, <code>ed5b485..1975f33</code>)</li>
     <li><s>Tag annoté <code>v2.3.0</code> poussé</s> ✅ → workflow <code>Release</code> <b>vert</b>, EXE + debug + checksums publiés</li>
     <li><s>Notes de release collées depuis CHANGELOG.md + marquée "Latest"</s> ✅ (via API)</li>
-    <li><b>Distribution assainie</b> : anciennes releases gratuites <b>v1.0.0 et v2.1.0 supprimées</b> (EXE sans limite d'essai) + tags <code>v1.0.0</code>/<code>v2.1.0</code> (remote) et <code>v2.2.0</code> (local) supprimés. Seule <b>v2.3.0</b> (essai 10 tris) reste téléchargeable.</li>
+    <li><b>Distribution assainie</b> : anciennes releases gratuites <b>v1.0.0 et v2.1.0 supprimées</b> (EXE sans limite d'essai) + tags <code>v1.0.0</code>/<code>v2.1.0</code> (remote) et <code>v2.2.0</code> (local) supprimés.</li>
     <li><b>CI réparée dans la foulée</b> (échouait depuis janvier) : <code>piexif</code> en extra dev + <code>Pillow&gt;=12.2.0</code> (7 CVE sur 11.3.0) — commit <code>d633a77</code>.</li>
+    <li><s><b>Secret HMAC injecté dans le build CI</b> (v2.3.1, 2026-07-03)</s> ✅ : secret repo <code>HMAC_SECRET_B64</code> + étape « Inject HMAC secret » dans <code>release.yml</code> (le build <b>échoue</b> si secret absent ou placeholder détecté). <b>v2.3.1 publiée avec activation fonctionnelle</b> + Pillow 12.2 patché ; la v2.3.0 (clés non validables) a été <b>retirée</b> avec son tag. Seule <b>v2.3.1</b> reste téléchargeable.</li>
     <li>⬜ <b>Reste (manuel)</b> : tester l'EXE sur un PC vierge. SmartScreen avertira (EXE non signé) — normal.</li>
   </ol>
-
-  <p><b>⚠️ Avant les premières ventes</b> : l'EXE CI est buildé <b>sans <code>src/utils/_secret.py</code></b> (gitignored) → il utilise le placeholder HMAC et <b>aucune vraie clé n'y valide</b>. Injecter le secret via un secret GitHub Actions + une étape dans <code>release.yml</code>, puis re-releaser (v2.3.1, qui embarquera aussi Pillow 12.2 patché).</p>
 </div>
 
 
