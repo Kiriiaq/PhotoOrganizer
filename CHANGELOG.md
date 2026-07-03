@@ -5,13 +5,19 @@ All notable changes to PhotoOrganizer are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.1] — 2026-07-03
 
-### Fixed — CI verte (2026-07-02, post-release)
+Release corrective du build : **premier EXE public dont l'activation de licence fonctionne**. Remplace la v2.3.0 (retirée : buildée avec la clé HMAC placeholder — aucune vraie clé n'y validait — et Pillow 11.3.0 vulnérable).
+
+### Fixed — Pipeline de release
+
+- **`release.yml` : injection du secret HMAC** — le secret repo `HMAC_SECRET_B64` (fichier `_secret.py` encodé base64) est écrit dans `src/utils/_secret.py` avant le build. Garde-fou : le build **échoue** si le secret est absent ou si la clé placeholder est détectée. Les EXE buildés par CI valident désormais les vraies clés de licence.
+
+### Fixed — CI verte (2026-07-02, post-v2.3.0)
 
 - **Job `test`** : `piexif` ajouté à l'extra `[dev]` (test-only, jamais bundlé dans l'EXE) — 12 tests de `test_organizer.py` échouaient sur CI faute de module (il ne restait installé qu'en local).
-- **Job `audit`** : `Pillow>=12.2.0,<13` (7 CVE connues sur 11.3.0, corrigées en 12.2.0). `pillow-heif` 0.22.0 compatible. 217 tests verts en local avec Pillow 12.2.0. ⚠️ L'EXE v2.3.0 publié a été buildé avec Pillow 11.3.0 — prévoir un rebuild v2.3.1.
-- Distribution : anciennes releases gratuites **v1.0.0 et v2.1.0 supprimées de GitHub** (EXE sans limitation d'essai) ainsi que leurs tags. Seule v2.3.0 (trial 10 tris) reste téléchargeable.
+- **Job `audit`** : `Pillow>=12.2.0,<13` (7 CVE connues sur 11.3.0, corrigées en 12.2.0). `pillow-heif` 0.22.0 compatible. 217 tests verts en local avec Pillow 12.2.0. L'EXE 2.3.1 embarque Pillow 12.2.
+- Distribution : anciennes releases gratuites **v1.0.0 et v2.1.0 supprimées de GitHub** (EXE sans limitation d'essai) ainsi que leurs tags, puis **v2.3.0 retirée** après publication de la 2.3.1.
 
 ## [2.3.0] — 2026-07-02
 

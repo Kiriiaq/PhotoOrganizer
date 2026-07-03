@@ -21,6 +21,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # La clé HMAC qui signe les licences est gitignorée (src/utils/_secret.py).
+      # Sans cette étape, l'EXE serait buildé avec le placeholder et AUCUNE
+      # vraie clé de licence ne validerait (cf. NEXT_STEPS §E.1). Le secret
+      # repo HMAC_SECRET_B64 contient le fichier _secret.py encodé base64.
+      - name: Inject HMAC secret (license signing)
+        shell: bash
+        env:
+          HMAC_SECRET_B64: ${{ secrets.HMAC_SECRET_B64 }}
+        run: |
+          if [ -z "$HMAC_SECRET_B64" ]; then
+            echo "::error::Secret repo HMAC_SECRET_B64 manquant — l'EXE serait signé avec la clé placeholder."
+            exit 1
+          fi
+          echo "$HMAC_SECRET_B64" | base64 -d > src/utils/_secret.py
+          python -c "import sys; sys.path.insert(0, 'src'); from utils._secret import SECRET_KEY; assert SECRET_KEY != b'placeholder-replace-at-build-time', 'placeholder detecte'; print('Secret HMAC injecte et verifie (', len(SECRET_KEY), 'octets).')"
+
       - name: Get version from tag
         id: version
         shell: bash

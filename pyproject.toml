@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photoorganizer"
-version = "2.3.0"
+version = "2.3.1"
 description = "Automatic photo organizer by EXIF metadata (Windows desktop, CustomTkinter)"
 readme = "README.md"
 license = "Apache-2.0"
