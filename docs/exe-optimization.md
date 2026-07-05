@@ -48,7 +48,7 @@ methodology: pyi-archive_viewer + ruff F401/F841 + grep imports réels + mesure 
 | 1 | Exclure entièrement `assets/tools/` (ExifTool Perl) du bundle | ~10.3 | Faible | Moyen (fallback métadonnées) | [F-01](#f-01) |
 | 2 | Construire dans un venv minimal isolé | ~5–6 | Faible | Nul | [F-02](#f-02) |
 | 3 | Passer `pillow-heif` → `pi-heif` (HEVC read-only, sans libx265) | ~2.3 | Faible | Faible | [F-03](#f-03) |
-| 4 | Exclure `PIL._avif` (ou pin `Pillow<12`) | ~1.8 | Faible | Faible (rare) | [F-04](#f-04) |
+| 4 | Exclure `PIL._avif` **par `--exclude-module`** (Option B ; le pin `Pillow<12` est ABANDONNÉ — CVE, cf. F-04) | ~1.8 | Faible | Faible (rare) | [F-04](#f-04) |
 | 5 | Recompresser `assets/icons/icon.png` (945 KB → ~80 KB) | ~0.85 | Trivial | Nul | [F-05](#f-05) |
 
 **Gain total estimé** : **~15 MB → cible 22 MB (−40 %)**.
@@ -304,17 +304,25 @@ L'app utilise `set_default_color_theme("blue")` (ui/app.py:62) en dur → `dark-
 ### Phase 4 — PyInstaller / build.py
 
 ### [F-04] `PIL._avif` (1.79 MB compressé) non requis
-**Statut**: ⬜ à faire  **Sévérité**: 🔴 fort  **Gain**: ~1.8 MB compressé
+**Statut**: ⬜ à faire (Option B uniquement)  **Sévérité**: 🔴 fort  **Gain**: ~1.8 MB compressé
 **Origine**: Pillow 12+ embarque `_avif.cp311-win_amd64.pyd` (7.7 MB raw, 1.8 MB compressé).
 
 Le projet liste `.avif` comme extension scannée (`exif_extractor.py:39`), mais l'extraction métadonnées passe par `exifread` ou `PIL.Image.open()`. AVIF métadata est rarissime dans l'usage cible (photo de smartphone JPEG/HEIC).
 
-**Option A — pin Pillow < 12** (recommandé, réversible) :
+> ⚠️ **MàJ 2026-07-05 — l'Option A (pin `Pillow<12`) est ABANDONNÉE.**
+> Pillow 11.3.0 porte **7 CVE** signalées par `pip-audit --strict` (job
+> `audit` de la CI, corrigées en 12.2.0). La contrainte du projet a été
+> **montée à `Pillow>=12.2.0,<13`** (commit `d633a77`). On accepte donc les
+> ~1.8 MB de `_avif` : **la sécurité prime sur la taille**. Le gain de F-04
+> ne reste atteignable que via l'Option B (exclusion du module au build),
+> qui **conserve Pillow ≥ 12.2**.
+
+**~~Option A — pin Pillow < 12~~ (ABANDONNÉE, cf. encart ci-dessus)** :
 ```
-# requirements.txt + pyproject.toml
-Pillow>=10.0.0,<12.0.0   # 11.x ne contient pas _avif
+# NE PLUS FAIRE — réintroduirait 7 CVE (job audit CI en échec).
+# Pillow>=10.0.0,<12.0.0
 ```
-**Option B — exclure le module** (fragile, Pillow charge dynamiquement) :
+**Option B — exclure le module** (seule voie retenue ; Pillow charge `_avif` dynamiquement, donc à tester) :
 ```python
 # build.py
 EXCLUDE_MODULES = [..., "PIL._avif"]
@@ -507,7 +515,7 @@ def _require_clean_env():
 | 1 | [F-02](#f-02) | Créer un venv minimal isolé pour le build | 5–6 | 5 min | Nul |
 | 2 | [F-01](#f-01) | Exclure `assets/tools/` (ExifTool) du bundle | 10.3 | 15 min | Moyen (docs README) |
 | 3 | [F-03](#f-03) | `pillow-heif` → `pi-heif` (HEVC read-only) | 2.3 | 10 min | Faible |
-| 4 | [F-04](#f-04) | Pin `Pillow<12` (exclure `_avif`) | 1.8 | 5 min | Faible |
+| 4 | [F-04](#f-04) | Exclure `_avif` via `--exclude-module` (**PAS** de pin `Pillow<12` — CVE) | 1.8 | 5 min | Faible |
 | 5 | [F-05](#f-05) | Recompresser `icon.png` (pngquant/oxipng) | 0.85 | 5 min | Nul |
 | 6 | [F-09](#f-09) | Exclure `cryptography`+`cffi` du bundle | 4.2 | 2 min | Faible |
 | 7 | [F-10](#f-10) | Exclure `chardet` du bundle | 0.8 | 2 min | Faible |
@@ -568,7 +576,7 @@ EXCLUDE_MODULES = [
     "pytz", "dateutil", "blake3",
     # F-09, F-10
     "cryptography", "cffi", "_cffi_backend", "chardet",
-    # F-04 (option B - fragile, préférer pin Pillow<12)
+    # F-04 (exclusion module ; NE PAS pin Pillow<12 → 7 CVE, cf. F-04)
     # "PIL._avif",
     # F-08 si appliqué (remplace requests par urllib)
     # "requests", "urllib3", "charset_normalizer", "idna", "certifi",
