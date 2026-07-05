@@ -7,11 +7,22 @@ Tous les drafts ci-dessous sont **prêts à coller** après revue finale.
 Ordre conseillé de publication : `S+0 LinkedIn pivot` → `S+1 Reddit` → `S+2
 Product Hunt + LinkedIn tech` → `S+3 Show HN`.
 
+> ⚠️ **À vérifier avant de publier quoi que ce soit** (état au 2026-07-03) :
+> 1. **La boutique Lemon Squeezy n'existe pas encore.** Plusieurs drafts citent
+>    `photoorganizer.lemonsqueezy.com`. **Ne pas publier de draft contenant ce
+>    lien tant que le store n'est pas en ligne** (cf. NEXT_STEPS §B). En
+>    attendant, publier uniquement les drafts « GitHub only » (Reddit, Show HN)
+>    ou retirer la ligne lemonsqueezy.
+> 2. Version publiée = **v2.3.1** (la v2.3.0 a été retirée : ses clés ne
+>    validaient pas). Toute mention de version doit dire v2.3.1.
+> 3. Chiffres de référence à jour : **211 tests core**, EXE **~30 MB**,
+>    **Pillow ≥ 12.2** (montée pour 7 CVE — ne PAS écrire « pin Pillow <12 »).
+
 ---
 
 ## Format 1 — LinkedIn (post pivot, storytelling)
 
-**Quand** : jour de la release v2.3.0 (S+0).
+**Quand** : jour de la release v2.3.1 (S+0).
 **Cible** : ton réseau LinkedIn (devs, indie hackers, PM, photographes).
 **Longueur** : 1500-1900 caractères (sweet spot LinkedIn 2026).
 
@@ -67,12 +78,12 @@ bienvenu — surtout celui qui dérange.
 **Cible** : devs Python, packaging, PyInstaller.
 
 ```
-PyInstaller en --onefile, 37 MB. Cible : 22 MB (-40 %).
+PyInstaller en --onefile, ~30 MB aujourd'hui. Cible de l'audit : 22 MB.
 
-Audit complet de mon EXE PhotoOrganizer publié en open-source. 8 actions
+Audit complet de mon EXE PhotoOrganizer publié en open-source. Actions
 ordonnées par ROI, métriques mesurées :
 
-— F-01 : ExifTool bundlé retiré (34 MB)
+— F-01 : ExifTool bundlé retiré (déjà fait, ~34 MB décompressés)
    Ambiguïté GPL + fallback subprocess jamais déclenché en pratique.
    Gain immédiat sans régression fonctionnelle.
 
@@ -80,10 +91,14 @@ ordonnées par ROI, métriques mesurées :
    Strip enlève les symboles debug, UPX compresse l'EXE. Trade-off :
    démarrage +200 ms (acceptable pour onefile).
 
-— F-04 : pinning Pillow à <12 (~1 MB)
-   Pillow 12 embarque libwebp + libavif. Pin à 11.x si pas besoin.
+— Le contre-exemple assumé : Pillow.
+   L'audit proposait de pinner Pillow <12 pour ne pas embarquer libavif
+   (~1,8 MB inutilisés). Sauf que Pillow 11.3 traîne 7 CVE. J'ai fait
+   l'inverse : Pillow ≥ 12.2 (patché), +1,8 MB acceptés. La sécurité
+   passe avant la taille — un audit de poids n'annule pas un audit de
+   sécurité (pip-audit --strict en CI).
 
-— F-08 : requests → urllib stdlib (~3 MB)
+— F-08 : requests → urllib stdlib (~3 MB, planifié)
    Le projet fait 1 GET vers Nominatim. urllib.request suffit.
 
 — Autres : lazy imports, --exclude-module, datas filtrés (~3 MB cumulés)
@@ -117,15 +132,16 @@ Python pur :
   (recréation des dossiers vidés inclus) ;
 → Géocodage inverse OpenStreetMap Nominatim avec respect strict de
   l'usage policy (1 req/s, User-Agent identifiable, désactivable) ;
-→ 187 tests pytest organisés en 5 catégories (smoke/functional/perf/
-  stress/volume), couverture ~70 % modules métier ;
+→ 211 tests pytest organisés en 5 catégories (smoke/functional/perf/
+  stress/volume), avec un audit sécurité pip-audit --strict en CI ;
 → CI GitHub Actions (lint ruff + tests sur Windows, build EXE release
   auto sur tag git) ;
 → Système trial+unlock maison avec HMAC SHA-256 et machine binding
   (MachineGuid + Volume Serial), pour monétiser un binaire sans serveur
   d'auth ;
-→ Packaging PyInstaller --onefile optimisé documenté dans un audit
-  reproductible (37 → 22 MB, -40 %).
+→ Packaging PyInstaller --onefile (~30 MB) documenté dans un audit
+  de taille reproductible (cible 22 MB), sécurité arbitrée au-dessus
+  du gain d'octets (Pillow ≥ 12.2 pour 7 CVE plutôt que le pin <12).
 
 Apache-2.0 sur GitHub, librement consultable et forkable. Édition
 activable à 10 € à vie pour ceux qui veulent l'utiliser sans limite
@@ -196,7 +212,7 @@ Honest feedback (including critical) welcomed.
 **Titre** :
 
 ```
-Show HN: PhotoOrganizer – freemium photo organizer with offline HMAC trial counter
+Show HN: PhotoOrganizer – shareware-style photo organizer with offline HMAC trial counter
 ```
 
 **Lien** : `https://github.com/Kiriiaq/PhotoOrganizer` (PAS la page Lemon Squeezy, HN flag commercial).
@@ -225,11 +241,15 @@ Some pieces that might be interesting to discuss:
    - Caveat: Windows reinstall invalidates the license (policy: no
      re-issuance, the user buys again — explicitly stated upfront).
 
-3. PyInstaller --onefile audit, 37 MB → 22 MB target.
-   - ExifTool bundle removed (34 MB, GPL ambiguity gone).
+3. PyInstaller --onefile size audit, ~30 MB now, 22 MB target.
+   - ExifTool bundle removed (~34 MB uncompressed, GPL ambiguity gone).
    - --strip + UPX (-5 MB, +200ms startup).
-   - requests → urllib.request (-3 MB).
-   - Pillow pinned <12 to avoid bundling libavif we don't use.
+   - requests → urllib.request (-3 MB, planned).
+   - The one I reversed: the audit said "pin Pillow <12" to drop the
+     unused libavif (~1.8 MB). But 11.3 carries 7 CVEs, so I went the
+     other way — Pillow >=12.2, +1.8 MB, security over size. A size
+     audit doesn't get to override a security audit (pip-audit --strict
+     runs in CI).
 
 4. Single codebase + trial gate beats "free vs Pro" dual binary for
    solo dev maintenance. Sublime Text / WinRAR were right.
@@ -334,8 +354,8 @@ Found a few candidates, all had at least one dealbreaker:
 - Various Python scripts on GitHub: rarely maintained, no UI, no
   duplicate handling
 
-So I wrote one. Single-file EXE (37 MB, optimization to 22 MB ongoing),
-no installer, no admin rights, no telemetry.
+So I wrote one. Single-file EXE (~30 MB, size optimization to 22 MB
+ongoing), no installer, no admin rights, no telemetry.
 
 Detail likely interesting to r/datahoarder:
 - Quarantine instead of send2trash for duplicates — you can recover
@@ -407,7 +427,7 @@ Feedback welcomed, especially "your tool ate my photos" stories
 
 | Jour | Action | Plateforme |
 |---|---|---|
-| **S+0 lundi** | Tag v2.3.0 + GitHub Release | GitHub |
+| **S+0 lundi** | v2.3.1 publiée sur GitHub (fait) + boutique Lemon Squeezy en ligne | GitHub + LS |
 | **S+0 mercredi** | Format 1 (LinkedIn pivot storytelling) | LinkedIn |
 | **S+1 mardi** | Format 6 (Reddit r/photography) | Reddit |
 | **S+2 mardi 9h Paris** | Format 4 (Product Hunt) + Format 8 (X thread) | PH + X |

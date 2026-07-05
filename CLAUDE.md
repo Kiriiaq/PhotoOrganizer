@@ -132,7 +132,7 @@ Optionnelles : `tkinterdnd2`, `plyer` (extras `dnd` et `toast`). `watchdog` (ext
 | 3 | ~~**P0** Badge "Essai X/10" ou "Activée" dans la barre de l'app~~ ✅ *fait (v2.3.0)* | — | — |
 | 4 | **P0** Setup Lemon Squeezy avec un seul produit à 10 € + flow d'envoi clé (manuel d'abord). L'URL `photoorganizer.lemonsqueezy.com` codée dans `_open_purchase_page` doit exister avant lancement | 2 h | Revenue |
 | 5 | ~~**P1** Produire screenshot + GIF démo (S-01 + G-01 dans `docs/media/`)~~ ✅ *fait (2026-07-02, capture scriptée de l'app réelle — S-01, G-01 + screenshot du panneau d'activation)* | — | — |
-| 6 | **P1** Réécrire LINKEDIN_DRAFTS.md sur la base du nouveau modèle | 1 h | Cohérence com |
+| 6 | ~~**P1** Réécrire LINKEDIN_DRAFTS.md sur la base du nouveau modèle~~ ✅ *fait (déjà réécrit trial+unlock ; rafraîchi le 2026-07-05 : v2.3.1, 211 tests, EXE ~30 MB, Pillow ≥12.2, garde-fou « ne pas publier le lien Lemon Squeezy tant que le store n'existe pas »)* | — | — |
 
 ### Roadmap courte
 

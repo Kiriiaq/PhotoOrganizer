@@ -678,7 +678,8 @@ Cloudflare Worker https://photoorganizer.workers.dev/lemonsqueezy
     <li><b>Distribution assainie</b> : anciennes releases gratuites <b>v1.0.0 et v2.1.0 supprimées</b> (EXE sans limite d'essai) + tags <code>v1.0.0</code>/<code>v2.1.0</code> (remote) et <code>v2.2.0</code> (local) supprimés.</li>
     <li><b>CI réparée dans la foulée</b> (échouait depuis janvier) : <code>piexif</code> en extra dev + <code>Pillow&gt;=12.2.0</code> (7 CVE sur 11.3.0) — commit <code>d633a77</code>.</li>
     <li><s><b>Secret HMAC injecté dans le build CI</b> (v2.3.1, 2026-07-03)</s> ✅ : secret repo <code>HMAC_SECRET_B64</code> + étape « Inject HMAC secret » dans <code>release.yml</code> (le build <b>échoue</b> si secret absent ou placeholder détecté). <b>v2.3.1 publiée avec activation fonctionnelle</b> + Pillow 12.2 patché ; la v2.3.0 (clés non validables) a été <b>retirée</b> avec son tag. Seule <b>v2.3.1</b> reste téléchargeable.</li>
-    <li>⬜ <b>Reste (manuel)</b> : tester l'EXE sur un PC vierge. SmartScreen avertira (EXE non signé) — normal.</li>
+    <li><s><b>Test EXE v2.3.1</b> (2026-07-03, poste dev avec <code>LOCALAPPDATA</code> isolé)</s> ✅ : téléchargé depuis GitHub (checksum SHA-256 OK), lancement + fenêtre GUI stables, <code>_secret.py</code> embarqué = <b>vrai secret</b> (pas le placeholder) identique à celui de <code>keygen.py</code>, et une clé <code>PROG-LIFE-…</code> générée par <code>keygen.py</code> est <b>validée par le validateur embarqué dans l'EXE</b> (email + édition + expiration corrects). Le flow d'activation est prouvé.</li>
+    <li>⬜ <b>Reste (vraiment manuel, 2e machine requise)</b> : lancer l'EXE sur un PC/VM physiquement vierge pour observer (a) l'avertissement SmartScreen (EXE non signé — « Informations complémentaires » → « Exécuter quand même », normal) et (b) le refus réel d'une clé déjà liée à un autre PC (machine binding grandeur nature).</li>
   </ol>
 </div>
 
